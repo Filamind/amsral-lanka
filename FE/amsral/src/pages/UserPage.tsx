@@ -1,0 +1,278 @@
+
+import { useState } from 'react';
+import { Modal, Box, Typography, FormControlLabel, Checkbox } from '@mui/material';
+import type { GridColDef } from '@mui/x-data-grid';
+import PrimaryButton from '../components/common/PrimaryButton';
+import PrimaryTable from '../components/common/PrimaryTable';
+import colors from '../styles/colors';
+
+const columns: GridColDef[] = [
+    { field: 'id', headerName: 'ID', width: 70 },
+    { field: 'username', headerName: 'Username', width: 180 },
+    { field: 'email', headerName: 'Email', width: 200 },
+    { field: 'role', headerName: 'Role', width: 140 },
+    { field: 'status', headerName: 'Status', width: 120 },
+];
+
+const initialRows = [
+    { id: 1, username: 'admin', email: 'admin@example.com', role: 'Admin', status: 'Active' },
+    { id: 2, username: 'user1', email: 'user1@example.com', role: 'User', status: 'Active' },
+    { id: 3, username: 'user2', email: 'user2@example.com', role: 'User', status: 'Inactive' },
+];
+
+export default function UserPage() {
+    const [search, setSearch] = useState('');
+    const [rows, setRows] = useState(initialRows);
+    const [open, setOpen] = useState(false);
+    const [form, setForm] = useState({
+        username: '',
+        email: '',
+        firstName: '',
+        lastName: '',
+        passwordHash: '',
+        phone: '',
+        dateOfBirth: '',
+        role: '',
+        status: 'Active',
+        isActive: true,
+    });
+    const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+    const validate = () => {
+        const newErrors: { [key: string]: string } = {};
+        if (!form.username) newErrors.username = 'Username is required.';
+        if (!form.email) newErrors.email = 'Email is required.';
+        if (!form.firstName) newErrors.firstName = 'First name is required.';
+        if (!form.lastName) newErrors.lastName = 'Last name is required.';
+        if (!form.passwordHash) newErrors.passwordHash = 'Password is required.';
+        return newErrors;
+    };
+
+    const handleOpen = () => {
+        setForm({
+            username: '',
+            email: '',
+            firstName: '',
+            lastName: '',
+            passwordHash: '',
+            phone: '',
+            dateOfBirth: '',
+            role: '',
+            status: 'Active',
+            isActive: true,
+        });
+        setErrors({});
+        setOpen(true);
+    };
+
+    const handleClose = () => setOpen(false);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        const { name, value, type } = e.target;
+        let checked = false;
+        if (type === 'checkbox' && 'checked' in e.target) {
+            checked = (e.target as HTMLInputElement).checked;
+        }
+        setForm(prev => ({
+            ...prev,
+            [name]: type === 'checkbox' ? checked : value,
+        }));
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const validation = validate();
+        if (Object.keys(validation).length > 0) {
+            setErrors(validation);
+            return;
+        }
+        setRows(prev => [
+            ...prev,
+            {
+                id: prev.length ? Math.max(...prev.map(r => r.id)) + 1 : 1,
+                username: form.username,
+                email: form.email,
+                role: form.role || 'User',
+                status: form.isActive ? 'Active' : 'Inactive',
+            },
+        ]);
+        setOpen(false);
+    };
+
+    const filteredRows = rows.filter(row =>
+        row.username.toLowerCase().includes(search.toLowerCase())
+    );
+
+    return (
+        <div className="w-full max-w-6xl mx-auto px-2 sm:px-6 md:px-8 py-6">
+            <div className="flex flex-col gap-4 sm:gap-6 mb-6">
+                <h2 className="text-2xl font-bold" style={{ color: colors.text.primary }}>Users</h2>
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 w-full">
+                    <div className="flex flex-1 items-center w-full sm:w-auto">
+                        <input
+                            type="text"
+                            placeholder="Search by username..."
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            className="flex-1 px-3 py-2 border rounded-xl focus:outline-none text-sm sm:text-base"
+                            style={{ borderColor: colors.border.light, maxWidth: 320 }}
+                        />
+                    </div>
+                    <div className="w-full sm:w-auto mt-2 sm:mt-0">
+                        <PrimaryButton style={{ minWidth: 160, width: '100%' }} onClick={handleOpen}>
+                            + Add User
+                        </PrimaryButton>
+                    </div>
+                </div>
+            </div>
+            <div className="mt-2">
+                <PrimaryTable
+                    columns={columns}
+                    rows={filteredRows}
+                    pageSizeOptions={[5, 10, 20]}
+                    pagination
+                />
+            </div>
+            {/* Modal for Add User */}
+            <Modal open={open} onClose={handleClose}>
+                <Box
+                    sx={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        bgcolor: 'background.paper',
+                        boxShadow: 24,
+                        borderRadius: 2,
+                        p: { xs: 2, sm: 4 },
+                        width: { xs: '95vw', sm: 480 },
+                        maxHeight: '90vh',
+                        overflowY: 'auto',
+                    }}
+                >
+                    <Typography variant="h6" fontWeight={700} mb={2} color={colors.text.primary}>
+                        Add User
+                    </Typography>
+                    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <div className="flex-1">
+                                <label className="block text-sm font-medium mb-1">Username <span className="text-red-500">*</span></label>
+                                <input
+                                    name="username"
+                                    value={form.username}
+                                    onChange={handleChange}
+                                    className={`w-full px-3 py-2 border rounded-xl focus:outline-none ${errors.username ? 'border-red-500' : ''}`}
+                                    style={{ borderColor: colors.border.light }}
+                                />
+                                {errors.username && <span className="text-xs text-red-500">{errors.username}</span>}
+                            </div>
+                            <div className="flex-1">
+                                <label className="block text-sm font-medium mb-1">Email <span className="text-red-500">*</span></label>
+                                <input
+                                    name="email"
+                                    value={form.email}
+                                    onChange={handleChange}
+                                    className={`w-full px-3 py-2 border rounded-xl focus:outline-none ${errors.email ? 'border-red-500' : ''}`}
+                                    style={{ borderColor: colors.border.light }}
+                                />
+                                {errors.email && <span className="text-xs text-red-500">{errors.email}</span>}
+                            </div>
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <div className="flex-1">
+                                <label className="block text-sm font-medium mb-1">First Name <span className="text-red-500">*</span></label>
+                                <input
+                                    name="firstName"
+                                    value={form.firstName}
+                                    onChange={handleChange}
+                                    className={`w-full px-3 py-2 border rounded-xl focus:outline-none ${errors.firstName ? 'border-red-500' : ''}`}
+                                    style={{ borderColor: colors.border.light }}
+                                />
+                                {errors.firstName && <span className="text-xs text-red-500">{errors.firstName}</span>}
+                            </div>
+                            <div className="flex-1">
+                                <label className="block text-sm font-medium mb-1">Last Name <span className="text-red-500">*</span></label>
+                                <input
+                                    name="lastName"
+                                    value={form.lastName}
+                                    onChange={handleChange}
+                                    className={`w-full px-3 py-2 border rounded-xl focus:outline-none ${errors.lastName ? 'border-red-500' : ''}`}
+                                    style={{ borderColor: colors.border.light }}
+                                />
+                                {errors.lastName && <span className="text-xs text-red-500">{errors.lastName}</span>}
+                            </div>
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <div className="flex-1">
+                                <label className="block text-sm font-medium mb-1">Password <span className="text-red-500">*</span></label>
+                                <input
+                                    name="passwordHash"
+                                    type="password"
+                                    value={form.passwordHash}
+                                    onChange={handleChange}
+                                    className={`w-full px-3 py-2 border rounded-xl focus:outline-none ${errors.passwordHash ? 'border-red-500' : ''}`}
+                                    style={{ borderColor: colors.border.light }}
+                                />
+                                {errors.passwordHash && <span className="text-xs text-red-500">{errors.passwordHash}</span>}
+                            </div>
+                            <div className="flex-1">
+                                <label className="block text-sm font-medium mb-1">Phone</label>
+                                <input
+                                    name="phone"
+                                    value={form.phone}
+                                    onChange={handleChange}
+                                    className="w-full px-3 py-2 border rounded-xl focus:outline-none"
+                                    style={{ borderColor: colors.border.light }}
+                                />
+                            </div>
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <div className="flex-1">
+                                <label className="block text-sm font-medium mb-1">Date of Birth</label>
+                                <input
+                                    name="dateOfBirth"
+                                    type="date"
+                                    value={form.dateOfBirth}
+                                    onChange={handleChange}
+                                    className="w-full px-3 py-2 border rounded-xl focus:outline-none"
+                                    style={{ borderColor: colors.border.light }}
+                                />
+                            </div>
+                            <div className="flex-1">
+                                <label className="block text-sm font-medium mb-1">Role</label>
+                                <input
+                                    name="role"
+                                    value={form.role}
+                                    onChange={handleChange}
+                                    className="w-full px-3 py-2 border rounded-xl focus:outline-none"
+                                    style={{ borderColor: colors.border.light }}
+                                />
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3 mt-1">
+                            <FormControlLabel
+                                control={
+                                    <Checkbox
+                                        name="isActive"
+                                        checked={form.isActive}
+                                        onChange={handleChange}
+                                        sx={{ color: colors.primary[500], '&.Mui-checked': { color: colors.primary[500] } }}
+                                    />
+                                }
+                                label={<span className="text-sm">Active</span>}
+                            />
+                        </div>
+                        <div className="flex gap-3 mt-2 justify-end">
+                            <PrimaryButton type="button" style={{ minWidth: 100, background: colors.primary[100], color: colors.text.primary }} onClick={handleClose}>
+                                Cancel
+                            </PrimaryButton>
+                            <PrimaryButton type="submit" style={{ minWidth: 120 }}>
+                                Save
+                            </PrimaryButton>
+                        </div>
+                    </form>
+                </Box>
+            </Modal>
+        </div>
+    );
+}
