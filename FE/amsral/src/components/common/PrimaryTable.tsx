@@ -10,7 +10,7 @@ interface PrimaryTableProps extends Partial<DataGridProps> {
     height?: number | string;
 }
 
-export default function PrimaryTable({ columns, rows, height = 400, ...props }: PrimaryTableProps) {
+export default function PrimaryTable({ columns, rows, height = 400, onRowClick, ...props }: PrimaryTableProps) {
     return (
         <Paper
             sx={{
@@ -38,6 +38,7 @@ export default function PrimaryTable({ columns, rows, height = 400, ...props }: 
                     },
                     '& .MuiDataGrid-row': {
                         background: 'transparent',
+                        cursor: onRowClick ? 'pointer' : 'default',
                         '&:hover': {
                             background: colors.gradients.cardHover,
                         },
@@ -49,6 +50,7 @@ export default function PrimaryTable({ columns, rows, height = 400, ...props }: 
                         color: colors.primary[500],
                     },
                 }}
+                onRowClick={onRowClick}
                 {...props}
             />
         </Paper>

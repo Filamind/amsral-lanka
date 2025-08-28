@@ -7,29 +7,27 @@ import PrimaryTable from '../components/common/PrimaryTable';
 import colors from '../styles/colors';
 
 const columns: GridColDef[] = [
-    { field: 'employeeCode', headerName: 'Employee Code', width: 120 },
-    { field: 'firstName', headerName: 'First Name', width: 130 },
-    { field: 'lastName', headerName: 'Last Name', width: 130 },
-    { field: 'phone', headerName: 'Phone', width: 140 },
-    { field: 'email', headerName: 'Email', width: 200 },
-    { field: 'city', headerName: 'City', width: 120 },
-    { field: 'country', headerName: 'Country', width: 120 },
-    { field: 'isActive', headerName: 'Active', width: 90, type: 'boolean' as const },
+    { field: 'employeeId', headerName: 'Employee ID', flex: 1, minWidth: 110 },
+    { field: 'firstName', headerName: 'First Name', flex: 1, minWidth: 120 },
+    { field: 'lastName', headerName: 'Last Name', flex: 1, minWidth: 120 },
+    { field: 'phone', headerName: 'Phone', flex: 1.1, minWidth: 130 },
+    { field: 'email', headerName: 'Email', flex: 1.5, minWidth: 180 },
+    { field: 'hireDate', headerName: 'Hire Date', flex: 1, minWidth: 110 },
+    { field: 'isActive', headerName: 'Active', flex: 0.6, minWidth: 80, type: 'boolean' as const },
 ];
 
 type EmployeeRow = {
     id: number;
-    employeeCode: string;
+    employeeId: string;
     firstName: string;
     lastName: string;
     phone: string;
     email: string;
-    address: string;
-    city: string;
-    postalCode: string;
-    country: string;
+    hireDate: string;
     dateOfBirth: string;
-    notes: string;
+    address: string;
+    emergencyContact: string;
+    emergencyPhone: string;
     isActive: boolean;
     createdAt: string;
     updatedAt: string;
@@ -39,34 +37,32 @@ type EmployeeRow = {
 const initialRows: EmployeeRow[] = [
     {
         id: 1,
-        employeeCode: 'EMP001',
+        employeeId: 'EMP001',
         firstName: 'Alice',
         lastName: 'Brown',
         phone: '1112223333',
         email: 'alice@example.com',
-        address: '123 Main St',
-        city: 'Colombo',
-        postalCode: '10000',
-        country: 'Sri Lanka',
+        hireDate: '2023-01-15',
         dateOfBirth: '1990-01-01',
-        notes: '',
+        address: '123 Main St',
+        emergencyContact: 'John Brown',
+        emergencyPhone: '1111111111',
         isActive: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
     },
     {
         id: 2,
-        employeeCode: 'EMP002',
+        employeeId: 'EMP002',
         firstName: 'David',
         lastName: 'Green',
         phone: '4445556666',
         email: 'david@example.com',
-        address: '456 Park Ave',
-        city: 'Kandy',
-        postalCode: '20000',
-        country: 'Sri Lanka',
+        hireDate: '2023-03-20',
         dateOfBirth: '1985-05-10',
-        notes: '',
+        address: '456 Park Ave',
+        emergencyContact: 'Sarah Green',
+        emergencyPhone: '2222222222',
         isActive: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -78,17 +74,16 @@ export default function EmployeesPage() {
     const [rows, setRows] = useState(initialRows);
     const [open, setOpen] = useState(false);
     const [form, setForm] = useState({
-        employeeCode: '',
+        employeeId: '',
         firstName: '',
         lastName: '',
         phone: '',
         email: '',
-        address: '',
-        city: '',
-        postalCode: '',
-        country: '',
+        hireDate: '',
         dateOfBirth: '',
-        notes: '',
+        address: '',
+        emergencyContact: '',
+        emergencyPhone: '',
         isActive: true,
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -100,8 +95,8 @@ export default function EmployeesPage() {
 
     const validate = () => {
         const newErrors: { [key: string]: string } = {};
-        if (!form.employeeCode) newErrors.employeeCode = 'Required';
-        else if (!isUnique('employeeCode', form.employeeCode)) newErrors.employeeCode = 'Code must be unique';
+        if (!form.employeeId) newErrors.employeeId = 'Required';
+        else if (!isUnique('employeeId', form.employeeId)) newErrors.employeeId = 'ID must be unique';
         if (!form.firstName) newErrors.firstName = 'Required';
         if (!form.lastName) newErrors.lastName = 'Required';
         if (!form.phone) newErrors.phone = 'Required';
@@ -111,17 +106,16 @@ export default function EmployeesPage() {
 
     const handleOpen = () => {
         setForm({
-            employeeCode: '',
+            employeeId: '',
             firstName: '',
             lastName: '',
             phone: '',
             email: '',
-            address: '',
-            city: '',
-            postalCode: '',
-            country: '',
+            hireDate: '',
             dateOfBirth: '',
-            notes: '',
+            address: '',
+            emergencyContact: '',
+            emergencyPhone: '',
             isActive: true,
         });
         setErrors({});
@@ -167,10 +161,10 @@ export default function EmployeesPage() {
     );
 
     return (
-        <div className="w-full max-w-6xl mx-auto px-2 sm:px-6 md:px-8 py-6">
-            <div className="flex flex-col gap-4 sm:gap-6 mb-6">
-                <h2 className="text-2xl font-bold" style={{ color: colors.text.primary }}>Employees</h2>
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 w-full">
+        <div className="w-full mx-auto px-1 sm:px-3 md:px-4 py-3">
+            <div className="flex flex-col gap-2 sm:gap-3 mb-4">
+                <h2 className="text-xl md:text-2xl font-bold" style={{ color: colors.text.primary }}>Employees</h2>
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-2 w-full">
                     <div className="flex flex-1 items-center w-full sm:w-auto">
                         <input
                             type="text"
@@ -178,17 +172,17 @@ export default function EmployeesPage() {
                             value={search}
                             onChange={e => setSearch(e.target.value)}
                             className="flex-1 px-3 py-2 border rounded-xl focus:outline-none text-sm sm:text-base"
-                            style={{ borderColor: colors.border.light, maxWidth: 320 }}
+                            style={{ borderColor: colors.border.light, maxWidth: 300 }}
                         />
                     </div>
-                    <div className="w-full sm:w-auto mt-2 sm:mt-0">
-                        <PrimaryButton style={{ minWidth: 160, width: '100%' }} onClick={handleOpen}>
+                    <div className="w-full sm:w-auto mt-1 sm:mt-0">
+                        <PrimaryButton style={{ minWidth: 140, width: '100%' }} onClick={handleOpen}>
                             + Add Employee
                         </PrimaryButton>
                     </div>
                 </div>
             </div>
-            <div className="mt-2">
+            <div className="mt-1">
                 <PrimaryTable
                     columns={columns}
                     rows={filteredRows}
@@ -207,143 +201,133 @@ export default function EmployeesPage() {
                         bgcolor: 'background.paper',
                         boxShadow: 24,
                         borderRadius: 2,
-                        p: { xs: 2, sm: 4 },
-                        width: { xs: '95vw', sm: 480 },
-                        maxHeight: '90vh',
+                        p: { xs: 2, sm: 3, md: 4 },
+                        width: { xs: '95vw', sm: '95vw', md: '90vw', lg: '1000px', xl: '1100px' },
+                        maxWidth: '95vw',
+                        maxHeight: '95vh',
                         overflowY: 'auto',
                     }}
                 >
                     <Typography variant="h6" fontWeight={700} mb={2} color={colors.text.primary}>
                         Add Employee
                     </Typography>
-                    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-                        <div className="flex flex-col sm:flex-row gap-3">
-                            <div className="flex-1">
-                                <label className="block text-sm font-medium mb-1">Employee Code <span className="text-red-500">*</span></label>
+                    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div className="flex flex-col">
+                                <label className="block text-sm font-medium mb-2">Employee ID <span className="text-red-500">*</span></label>
                                 <input
-                                    name="employeeCode"
-                                    value={form.employeeCode}
+                                    name="employeeId"
+                                    value={form.employeeId}
                                     onChange={handleChange}
-                                    className={`w-full px-3 py-2 border rounded-xl focus:outline-none ${errors.employeeCode ? 'border-red-500' : ''}`}
+                                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none text-base ${errors.employeeId ? 'border-red-500' : ''}`}
                                     style={{ borderColor: colors.border.light }}
                                 />
-                                {errors.employeeCode && <span className="text-xs text-red-500">{errors.employeeCode}</span>}
+                                {errors.employeeId && <span className="text-xs text-red-500 mt-1">{errors.employeeId}</span>}
                             </div>
-                            <div className="flex-1">
-                                <label className="block text-sm font-medium mb-1">First Name <span className="text-red-500">*</span></label>
+                            <div className="flex flex-col">
+                                <label className="block text-sm font-medium mb-2">Hire Date</label>
+                                <input
+                                    name="hireDate"
+                                    type="date"
+                                    value={form.hireDate}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-3 border rounded-xl focus:outline-none text-base"
+                                    style={{ borderColor: colors.border.light }}
+                                />
+                            </div>
+                            <div className="flex flex-col">
+                                <label className="block text-sm font-medium mb-2">First Name <span className="text-red-500">*</span></label>
                                 <input
                                     name="firstName"
                                     value={form.firstName}
                                     onChange={handleChange}
-                                    className={`w-full px-3 py-2 border rounded-xl focus:outline-none ${errors.firstName ? 'border-red-500' : ''}`}
+                                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none text-base ${errors.firstName ? 'border-red-500' : ''}`}
                                     style={{ borderColor: colors.border.light }}
                                 />
-                                {errors.firstName && <span className="text-xs text-red-500">{errors.firstName}</span>}
+                                {errors.firstName && <span className="text-xs text-red-500 mt-1">{errors.firstName}</span>}
                             </div>
                         </div>
-                        <div className="flex flex-col sm:flex-row gap-3">
-                            <div className="flex-1">
-                                <label className="block text-sm font-medium mb-1">Last Name <span className="text-red-500">*</span></label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div className="flex flex-col">
+                                <label className="block text-sm font-medium mb-2">Last Name <span className="text-red-500">*</span></label>
                                 <input
                                     name="lastName"
                                     value={form.lastName}
                                     onChange={handleChange}
-                                    className={`w-full px-3 py-2 border rounded-xl focus:outline-none ${errors.lastName ? 'border-red-500' : ''}`}
+                                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none text-base ${errors.lastName ? 'border-red-500' : ''}`}
                                     style={{ borderColor: colors.border.light }}
                                 />
-                                {errors.lastName && <span className="text-xs text-red-500">{errors.lastName}</span>}
+                                {errors.lastName && <span className="text-xs text-red-500 mt-1">{errors.lastName}</span>}
                             </div>
-                            <div className="flex-1">
-                                <label className="block text-sm font-medium mb-1">Phone <span className="text-red-500">*</span></label>
+                            <div className="flex flex-col">
+                                <label className="block text-sm font-medium mb-2">Phone <span className="text-red-500">*</span></label>
                                 <input
                                     name="phone"
                                     value={form.phone}
                                     onChange={handleChange}
-                                    className={`w-full px-3 py-2 border rounded-xl focus:outline-none ${errors.phone ? 'border-red-500' : ''}`}
+                                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none text-base ${errors.phone ? 'border-red-500' : ''}`}
                                     style={{ borderColor: colors.border.light }}
                                 />
-                                {errors.phone && <span className="text-xs text-red-500">{errors.phone}</span>}
+                                {errors.phone && <span className="text-xs text-red-500 mt-1">{errors.phone}</span>}
                             </div>
-                        </div>
-                        <div className="flex flex-col sm:flex-row gap-3">
-                            <div className="flex-1">
-                                <label className="block text-sm font-medium mb-1">Email</label>
+                            <div className="flex flex-col">
+                                <label className="block text-sm font-medium mb-2">Email</label>
                                 <input
                                     name="email"
                                     value={form.email}
                                     onChange={handleChange}
-                                    className={`w-full px-3 py-2 border rounded-xl focus:outline-none ${errors.email ? 'border-red-500' : ''}`}
+                                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none text-base ${errors.email ? 'border-red-500' : ''}`}
                                     style={{ borderColor: colors.border.light }}
                                 />
-                                {errors.email && <span className="text-xs text-red-500">{errors.email}</span>}
+                                {errors.email && <span className="text-xs text-red-500 mt-1">{errors.email}</span>}
                             </div>
-                            <div className="flex-1">
-                                <label className="block text-sm font-medium mb-1">Address</label>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div className="flex flex-col">
+                                <label className="block text-sm font-medium mb-2">Address</label>
                                 <input
                                     name="address"
                                     value={form.address}
                                     onChange={handleChange}
-                                    className="w-full px-3 py-2 border rounded-xl focus:outline-none"
+                                    className="w-full px-4 py-3 border rounded-xl focus:outline-none text-base"
                                     style={{ borderColor: colors.border.light }}
                                 />
                             </div>
-                        </div>
-                        <div className="flex flex-col sm:flex-row gap-3">
-                            <div className="flex-1">
-                                <label className="block text-sm font-medium mb-1">City</label>
-                                <input
-                                    name="city"
-                                    value={form.city}
-                                    onChange={handleChange}
-                                    className="w-full px-3 py-2 border rounded-xl focus:outline-none"
-                                    style={{ borderColor: colors.border.light }}
-                                />
-                            </div>
-                            <div className="flex-1">
-                                <label className="block text-sm font-medium mb-1">Postal Code</label>
-                                <input
-                                    name="postalCode"
-                                    value={form.postalCode}
-                                    onChange={handleChange}
-                                    className="w-full px-3 py-2 border rounded-xl focus:outline-none"
-                                    style={{ borderColor: colors.border.light }}
-                                />
-                            </div>
-                        </div>
-                        <div className="flex flex-col sm:flex-row gap-3">
-                            <div className="flex-1">
-                                <label className="block text-sm font-medium mb-1">Country</label>
-                                <input
-                                    name="country"
-                                    value={form.country}
-                                    onChange={handleChange}
-                                    className="w-full px-3 py-2 border rounded-xl focus:outline-none"
-                                    style={{ borderColor: colors.border.light }}
-                                />
-                            </div>
-                            <div className="flex-1">
-                                <label className="block text-sm font-medium mb-1">Date of Birth</label>
+                            <div className="flex flex-col">
+                                <label className="block text-sm font-medium mb-2">Date of Birth</label>
                                 <input
                                     name="dateOfBirth"
                                     type="date"
                                     value={form.dateOfBirth}
                                     onChange={handleChange}
-                                    className="w-full px-3 py-2 border rounded-xl focus:outline-none"
+                                    className="w-full px-4 py-3 border rounded-xl focus:outline-none text-base"
+                                    style={{ borderColor: colors.border.light }}
+                                />
+                            </div>
+                            <div className="flex flex-col">
+                                <label className="block text-sm font-medium mb-2">Emergency Contact</label>
+                                <input
+                                    name="emergencyContact"
+                                    value={form.emergencyContact}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-3 border rounded-xl focus:outline-none text-base"
                                     style={{ borderColor: colors.border.light }}
                                 />
                             </div>
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium mb-1">Notes</label>
-                            <textarea
-                                name="notes"
-                                value={form.notes}
-                                onChange={handleChange}
-                                className="w-full px-3 py-2 border rounded-xl focus:outline-none"
-                                style={{ borderColor: colors.border.light, minHeight: 48 }}
-                            />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="flex flex-col">
+                                <label className="block text-sm font-medium mb-2">Emergency Phone</label>
+                                <input
+                                    name="emergencyPhone"
+                                    value={form.emergencyPhone}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-3 border rounded-xl focus:outline-none text-base"
+                                    style={{ borderColor: colors.border.light }}
+                                />
+                            </div>
                         </div>
-                        <div className="flex items-center gap-3 mt-1">
+                        <div className="flex items-center gap-3 mt-2">
                             <FormControlLabel
                                 control={
                                     <Checkbox
@@ -353,15 +337,15 @@ export default function EmployeesPage() {
                                         sx={{ color: colors.primary[500], '&.Mui-checked': { color: colors.primary[500] } }}
                                     />
                                 }
-                                label={<span className="text-sm">Active</span>}
+                                label={<span className="text-base">Active</span>}
                             />
                         </div>
-                        <div className="flex gap-3 mt-2 justify-end">
-                            <PrimaryButton type="button" style={{ minWidth: 100, background: colors.primary[100], color: colors.text.primary }} onClick={handleClose}>
+                        <div className="flex gap-4 mt-4 justify-end">
+                            <PrimaryButton type="button" style={{ minWidth: 120, background: colors.primary[100], color: colors.text.primary }} onClick={handleClose}>
                                 Cancel
                             </PrimaryButton>
-                            <PrimaryButton type="submit" style={{ minWidth: 120 }}>
-                                Save
+                            <PrimaryButton type="submit" style={{ minWidth: 140 }}>
+                                Save Employee
                             </PrimaryButton>
                         </div>
                     </form>

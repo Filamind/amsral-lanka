@@ -6,6 +6,7 @@ import UserPage from './pages/UserPage';
 import EmployeesPage from './pages/EmployeesPage';
 import CustomersPage from './pages/CustomersPage';
 import OrdersPage from './pages/OrdersPage';
+import WorkFlowPage from './pages/WorkFlowPage';
 
 
 
@@ -22,6 +23,7 @@ function App() {
         >
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="orders" element={<OrdersPage />} />
+          <Route path="workflow" element={<WorkFlowPage />} />
           <Route path="users" element={<UserPage />} />
           <Route path="employees" element={<EmployeesPage />} />
           <Route path="customers" element={<CustomersPage />} />

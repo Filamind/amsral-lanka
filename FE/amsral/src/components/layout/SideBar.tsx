@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { NavLink } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -9,6 +8,7 @@ import PeopleIcon from '@mui/icons-material/People';
 import BadgeIcon from '@mui/icons-material/Badge';
 import GroupsIcon from '@mui/icons-material/Groups';
 import LayersIcon from '@mui/icons-material/Layers';
+import SettingsApplicationsIcon from '@mui/icons-material/SettingsApplications';
 import MenuOpenIcon from '@mui/icons-material/MenuOpen';
 import MenuIcon from '@mui/icons-material/Menu';
 import colors from '../../styles/colors';
@@ -20,6 +20,7 @@ const NAVIGATION: NavigationItem[] = [
     { kind: 'header', title: 'Main items' },
     { segment: 'dashboard', title: 'Dashboard', icon: <DashboardIcon /> },
     { segment: 'orders', title: 'Orders', icon: <ShoppingCartIcon /> },
+    { segment: 'workflow', title: 'Production Flow', icon: <SettingsApplicationsIcon /> },
     { kind: 'divider' },
     { segment: 'users', title: 'Users', icon: <PeopleIcon /> },
     { segment: 'employees', title: 'Employees', icon: <BadgeIcon /> },
@@ -29,12 +30,6 @@ const NAVIGATION: NavigationItem[] = [
 ];
 
 function SideBarNavigation({ navigation, expanded, onToggle }: { navigation: NavigationItem[]; expanded: boolean; onToggle: () => void }) {
-    const [openMenus, setOpenMenus] = React.useState<{ [key: string]: boolean }>({});
-
-    const handleMenuToggle = (segment: string | undefined) => {
-        if (!segment) return;
-        setOpenMenus((prev) => ({ ...prev, [segment]: !prev[segment] }));
-    };
     return (
         <Box
             sx={{
