@@ -11,10 +11,13 @@ import LayersIcon from '@mui/icons-material/Layers';
 import SettingsApplicationsIcon from '@mui/icons-material/SettingsApplications';
 import MenuOpenIcon from '@mui/icons-material/MenuOpen';
 import MenuIcon from '@mui/icons-material/Menu';
+import LogoutIcon from '@mui/icons-material/Logout';
+import toast from 'react-hot-toast';
 import colors from '../../styles/colors';
 import { useState } from 'react';
 import type { NavigationItem } from '../../types';
 import React from 'react';
+import { useAuth } from '../../hooks/useAuth';
 
 const NAVIGATION: NavigationItem[] = [
     { kind: 'header', title: 'Main items' },
@@ -30,6 +33,13 @@ const NAVIGATION: NavigationItem[] = [
 ];
 
 function SideBarNavigation({ navigation, expanded, onToggle }: { navigation: NavigationItem[]; expanded: boolean; onToggle: () => void }) {
+    const { logout, user } = useAuth();
+
+    const handleLogout = () => {
+        toast.success('Logged out successfully. See you soon!');
+        logout();
+    };
+
     return (
         <Box
             sx={{
@@ -110,6 +120,40 @@ function SideBarNavigation({ navigation, expanded, onToggle }: { navigation: Nav
                         </NavLink>
                     );
                 })}
+            </Box>
+
+            {/* User info and logout */}
+            <Box sx={{ mt: 'auto', pt: 2, borderTop: 1, borderColor: colors.border.light }}>
+                {expanded && user && (
+                    <Typography variant="caption" sx={{ color: colors.text.secondary, mb: 1, display: 'block', px: 1.5 }}>
+                        Welcome, {user.firstName}
+                    </Typography>
+                )}
+                <Box
+                    onClick={handleLogout}
+                    sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        px: 1.5,
+                        py: 1,
+                        borderRadius: 2,
+                        transition: 'background 0.2s',
+                        cursor: 'pointer',
+                        '&:hover': {
+                            background: colors.gradients.cardHover,
+                        },
+                        justifyContent: expanded ? 'flex-start' : 'center',
+                    }}
+                >
+                    <Box sx={{ color: colors.text.primary, minWidth: 28, display: 'flex', justifyContent: 'center' }}>
+                        <LogoutIcon />
+                    </Box>
+                    {expanded && (
+                        <Typography sx={{ ml: 2, fontSize: { xs: 14, sm: 16 }, color: colors.text.primary, fontWeight: 500 }}>
+                            Logout
+                        </Typography>
+                    )}
+                </Box>
             </Box>
         </Box>
     );

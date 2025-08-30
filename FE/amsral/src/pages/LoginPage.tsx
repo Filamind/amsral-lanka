@@ -3,31 +3,47 @@ import colors from "../styles/colors"
 import logo from "../assets/Images/AL1.png"
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
-import { useState } from "react";
-import axios from "axios";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import toast from 'react-hot-toast';
+import { useAuth } from "../hooks/useAuth";
 
 
 function LoginPage() {
     const [showPassword, setShowPassword] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const { login, isAuthenticated } = useAuth();
+    const navigate = useNavigate();
 
-    const LogIn = async (email: string, password: string) => {
+    // Redirect if already authenticated
+    useEffect(() => {
+        if (isAuthenticated) {
+            navigate('/dashboard');
+        }
+    }, [isAuthenticated, navigate]);
+
+    const handleLogin = async (email: string, password: string) => {
         try {
-            const response = await axios.post("http://localhost:3000/api/users/login", {
-                email,
-                password
-            }, {
-                headers: { 'Content-Type': 'application/json' }
-            });
-
-            const data = response.data;
-            if (data.success) {
-                localStorage.setItem('token', data.token);
+            setLoading(true);
+            setError('');
+            await login(email, password);
+            toast.success('Login successful! Welcome back.');
+            // Navigation will happen automatically via useEffect when isAuthenticated becomes true
+        } catch (err: unknown) {
+            console.error('Login error:', err);
+            if (err && typeof err === 'object' && 'response' in err) {
+                const axiosError = err as { response?: { data?: { message?: string } } };
+                const errorMessage = axiosError.response?.data?.message || 'Login failed. Please try again.';
+                setError(errorMessage);
+                toast.error(errorMessage);
             } else {
-                alert(data.message);
+                const errorMessage = 'Network error. Please try again.';
+                setError(errorMessage);
+                toast.error(errorMessage);
             }
-        } catch (err) {
-            console.error(err);
-            alert("Network error. Please try again.");
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -35,11 +51,12 @@ function LoginPage() {
         setShowPassword((prev) => !prev);
     };
 
-    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        const username = e.currentTarget.username.value;
-        const password = e.currentTarget.password.value;
-        LogIn(username, password);
+        const formData = new FormData(e.currentTarget);
+        const email = formData.get('username') as string;
+        const password = formData.get('password') as string;
+        await handleLogin(email, password);
     };
 
     return (
@@ -61,16 +78,27 @@ function LoginPage() {
                     <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-3 sm:mb-4 text-center" style={{ color: colors.text.primary }}>
                         Login to AMSRAL
                     </h1>
+
+                    {/* Error Message */}
+                    {error && (
+                        <div className="w-full mb-3 sm:mb-4 p-3 rounded-lg bg-red-100 border border-red-300">
+                            <p className="text-red-700 text-sm text-center">{error}</p>
+                        </div>
+                    )}
+
                     {/* Login Form */}
                     <form className="w-full" onSubmit={handleSubmit}>
                         <div className="mb-3 sm:mb-4">
                             <label className="block mb-2 text-sm sm:text-base" htmlFor="username" style={{ color: colors.text.secondary }}>
-                                Username
+                                Email
                             </label>
                             <input
-                                type="text"
+                                type="email"
                                 id="username"
-                                className="w-full px-3 py-2 border rounded-xl focus:outline-none text-xs sm:text-sm md:text-base"
+                                name="username"
+                                required
+                                disabled={loading}
+                                className="w-full px-3 py-2 border rounded-xl focus:outline-none text-xs sm:text-sm md:text-base disabled:opacity-50 disabled:cursor-not-allowed"
                                 style={{
                                     borderColor: colors.border.light
                                 }}
@@ -93,7 +121,10 @@ function LoginPage() {
                             <div className="flex flex-row relative">
                                 <input
                                     id="password"
-                                    className="w-full px-3 py-2 border rounded-xl focus:outline-none text-xs sm:text-sm md:text-base pr-10"
+                                    name="password"
+                                    required
+                                    disabled={loading}
+                                    className="w-full px-3 py-2 border rounded-xl focus:outline-none text-xs sm:text-sm md:text-base pr-10 disabled:opacity-50 disabled:cursor-not-allowed"
                                     style={{
                                         borderColor: colors.border.light
                                     }}
@@ -122,9 +153,11 @@ function LoginPage() {
                         </div>
                         <button
                             type="submit"
+                            disabled={loading}
                             className="
                                 w-full px-4 py-2 rounded-lg transition duration-200 cursor-pointer
                                 text-sm sm:text-base md:text-lg font-semibold
+                                disabled:opacity-50 disabled:cursor-not-allowed
                             "
                             style={{
                                 backgroundColor: colors.button.primary,
@@ -137,7 +170,7 @@ function LoginPage() {
                                 e.currentTarget.style.backgroundColor = colors.button.primary;
                             }}
                         >
-                            Login
+                            {loading ? 'Logging in...' : 'Login'}
                         </button>
                     </form>
                 </div>
