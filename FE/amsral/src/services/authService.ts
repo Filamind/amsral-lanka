@@ -29,7 +29,9 @@ export class AuthService {
   // Login user
   static async login(credentials: LoginRequest): Promise<LoginResponse> {
     try {
+      console.log('AuthService: Making login request to:', '/users/login'); // Debug log
       const response = await apiClient.post('/users/login', credentials);
+      console.log('AuthService: Login response received:', response.data); // Debug log
       const { token, user } = response.data;
       
       // Store token and user in cookies
@@ -47,7 +49,7 @@ export class AuthService {
       
       return response.data;
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('AuthService: Login error:', error);
       throw error;
     }
   }

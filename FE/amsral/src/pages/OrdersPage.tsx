@@ -53,13 +53,16 @@ const customerOptions = [
   { value: 'CUST005', label: 'David Wilson' },
 ];
 
-const statusOptions = [
-  { value: 'pending', label: 'Pending' },
-  { value: 'confirmed', label: 'Confirmed' },
-  { value: 'processing', label: 'Processing' },
-  { value: 'shipped', label: 'Shipped' },
-  { value: 'delivered', label: 'Delivered' },
-  { value: 'cancelled', label: 'Cancelled' },
+// Sample items data 
+const itemOptions = [
+  { value: 'ITEM001', label: 'Denim Jeans - Classic Blue' },
+  { value: 'ITEM002', label: 'Denim Jeans - Dark Wash' },
+  { value: 'ITEM003', label: 'Denim Jacket - Light Blue' },
+  { value: 'ITEM004', label: 'Denim Shorts - Distressed' },
+  { value: 'ITEM005', label: 'Denim Shirt - Chambray' },
+  { value: 'ITEM006', label: 'Denim Overalls - Classic' },
+  { value: 'ITEM007', label: 'Denim Skirt - A-Line' },
+  { value: 'ITEM008', label: 'Denim Vest - Sleeveless' },
 ];
 
 const washTypeOptions = [
@@ -150,30 +153,21 @@ export default function OrdersPage() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0], // Today's date as default
-    referenceNo: '',
     customerId: '',
-    item: '',
+    itemId: '',
     quantity: 1,
     notes: '',
-    deliveryDate: '',
-    status: 'pending',
+    deliveryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 2 weeks from now
   });
   const [records, setRecords] = useState<ProcessRecord[]>([]);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
-
-  // For unique validation
-  const isUnique = (field: string, value: string) => {
-    if (!value) return true;
-    return !rows.some(row => String(row[field]) === value);
-  };
+  const [showAdditional, setShowAdditional] = useState(false);
 
   const validate = () => {
     const newErrors: { [key: string]: string } = {};
-    if (!form.date) newErrors.date = 'Required';
-    if (!form.referenceNo) newErrors.referenceNo = 'Required';
-    else if (!isUnique('referenceNo', form.referenceNo)) newErrors.referenceNo = 'Reference number must be unique';
-    if (!form.customerId) newErrors.customerId = 'Required';
-    if (!form.item) newErrors.item = 'Required';
+    if (!form.date) newErrors.date = 'Date is required';
+    if (!form.customerId) newErrors.customerId = 'Customer is required';
+    if (!form.itemId) newErrors.itemId = 'Item is required';
     if (!form.quantity || form.quantity <= 0) newErrors.quantity = 'Quantity must be greater than 0';
 
     // Validate total records quantity doesn't exceed order quantity
@@ -198,16 +192,15 @@ export default function OrdersPage() {
   const handleOpen = () => {
     setForm({
       date: new Date().toISOString().split('T')[0],
-      referenceNo: '',
       customerId: '',
-      item: '',
+      itemId: '',
       quantity: 1,
       notes: '',
-      deliveryDate: '',
-      status: 'pending',
+      deliveryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 2 weeks from now
     });
     setRecords([]);
     setErrors({});
+    setShowAdditional(false);
     setOpen(true);
   };
 
@@ -275,23 +268,27 @@ export default function OrdersPage() {
     }
 
     const selectedCustomer = customerOptions.find(customer => customer.value === form.customerId);
+    const selectedItem = itemOptions.find(item => item.value === form.itemId);
     const now = new Date().toISOString();
+
+    // Generate reference number (auto-increment)
+    const newReferenceNo = `ORD${String(rows.length + 1).padStart(3, '0')}`;
 
     setRows(prev => [
       ...prev,
       {
         id: prev.length ? Math.max(...prev.map(r => r.id)) + 1 : 1,
         date: form.date,
-        referenceNo: form.referenceNo,
+        referenceNo: newReferenceNo,
         customerId: form.customerId,
         customerName: selectedCustomer?.label || '',
-        item: form.item,
+        item: selectedItem?.label || '',
         quantity: form.quantity,
         notes: form.notes,
         records: records,
         recordsCount: records.length,
         deliveryDate: form.deliveryDate,
-        status: form.status.charAt(0).toUpperCase() + form.status.slice(1),
+        status: 'Pending', // Default status
         createdAt: now,
         updatedAt: now,
       },
@@ -346,44 +343,32 @@ export default function OrdersPage() {
             bgcolor: 'background.paper',
             boxShadow: 24,
             borderRadius: 2,
-            p: { xs: 2, sm: 3, md: 4 },
-            width: { xs: '95vw', sm: '95vw', md: '90vw', lg: '900px', xl: '1000px' },
+            p: { xs: 3, sm: 4, md: 5 },
+            width: { xs: '95vw', sm: '90vw', md: '85vw', lg: '800px', xl: '900px' },
             maxWidth: '95vw',
             maxHeight: '95vh',
             overflowY: 'auto',
           }}
         >
-          <Typography variant="h6" fontWeight={700} mb={2} color={colors.text.primary}>
+          <Typography variant="h6" fontWeight={700} mb={3} color={colors.text.primary}>
             Add Order
           </Typography>
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+            {/* Main Order Information - 2x2 Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="flex flex-col">
-                <label className="block text-sm font-medium mb-2">Date <span className="text-red-500">*</span></label>
                 <input
                   name="date"
                   type="date"
                   value={form.date}
                   onChange={handleChange}
-                  className={`w-full px-4 py-3 border rounded-xl focus:outline-none text-base ${errors.date ? 'border-red-500' : ''}`}
+                  className={`w-full px-4 py-4 border rounded-xl focus:outline-none text-lg ${errors.date ? 'border-red-500' : ''}`}
                   style={{ borderColor: colors.border.light }}
                 />
                 {errors.date && <span className="text-xs text-red-500 mt-1">{errors.date}</span>}
               </div>
+
               <div className="flex flex-col">
-                <label className="block text-sm font-medium mb-2">Reference No <span className="text-red-500">*</span></label>
-                <input
-                  name="referenceNo"
-                  value={form.referenceNo}
-                  onChange={handleChange}
-                  className={`w-full px-4 py-3 border rounded-xl focus:outline-none text-base ${errors.referenceNo ? 'border-red-500' : ''}`}
-                  style={{ borderColor: colors.border.light }}
-                  placeholder="e.g., ORD001"
-                />
-                {errors.referenceNo && <span className="text-xs text-red-500 mt-1">{errors.referenceNo}</span>}
-              </div>
-              <div className="flex flex-col">
-                <label className="block text-sm font-medium mb-2">Customer <span className="text-red-500">*</span></label>
                 <PrimaryDropdown
                   name="customerId"
                   value={form.customerId}
@@ -391,75 +376,84 @@ export default function OrdersPage() {
                   options={customerOptions}
                   placeholder="Select a customer"
                   error={!!errors.customerId}
-                  className="px-4 py-3 text-base"
+                  className="px-4 py-4 text-lg"
                   style={{ borderColor: colors.border.light }}
                 />
                 {errors.customerId && <span className="text-xs text-red-500 mt-1">{errors.customerId}</span>}
               </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
               <div className="flex flex-col">
-                <label className="block text-sm font-medium mb-2">Item <span className="text-red-500">*</span></label>
-                <input
-                  name="item"
-                  value={form.item}
+                <PrimaryDropdown
+                  name="itemId"
+                  value={form.itemId}
                   onChange={handleChange}
-                  className={`w-full px-4 py-3 border rounded-xl focus:outline-none text-base ${errors.item ? 'border-red-500' : ''}`}
+                  options={itemOptions}
+                  placeholder="Select an item"
+                  error={!!errors.itemId}
+                  className="px-4 py-4 text-lg"
                   style={{ borderColor: colors.border.light }}
-                  placeholder="e.g., Product Name"
                 />
-                {errors.item && <span className="text-xs text-red-500 mt-1">{errors.item}</span>}
+                {errors.itemId && <span className="text-xs text-red-500 mt-1">{errors.itemId}</span>}
               </div>
+
               <div className="flex flex-col">
-                <label className="block text-sm font-medium mb-2">Quantity <span className="text-red-500">*</span></label>
                 <input
                   name="quantity"
                   type="number"
                   min="1"
                   value={form.quantity}
                   onChange={handleChange}
-                  className={`w-full px-4 py-3 border rounded-xl focus:outline-none text-base ${errors.quantity ? 'border-red-500' : ''}`}
+                  placeholder="Enter quantity"
+                  className={`w-full px-4 py-4 border rounded-xl focus:outline-none text-lg ${errors.quantity ? 'border-red-500' : ''}`}
                   style={{ borderColor: colors.border.light }}
+                  inputMode="numeric"
                 />
                 {errors.quantity && <span className="text-xs text-red-500 mt-1">{errors.quantity}</span>}
               </div>
-              <div className="flex flex-col">
-                <label className="block text-sm font-medium mb-2">Delivery Date</label>
-                <input
-                  name="deliveryDate"
-                  type="date"
-                  value={form.deliveryDate}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border rounded-xl focus:outline-none text-base"
-                  style={{ borderColor: colors.border.light }}
-                />
-              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex flex-col">
-                <label className="block text-sm font-medium mb-2">Status</label>
-                <PrimaryDropdown
-                  name="status"
-                  value={form.status}
-                  onChange={handleChange}
-                  options={statusOptions}
-                  placeholder="Select status"
-                  className="px-4 py-3 text-base"
-                  style={{ borderColor: colors.border.light }}
-                />
-              </div>
-              <div className="flex flex-col">
-                <label className="block text-sm font-medium mb-2">Notes</label>
-                <textarea
-                  name="notes"
-                  value={form.notes}
-                  onChange={handleChange}
-                  rows={3}
-                  className="w-full px-4 py-3 border rounded-xl focus:outline-none text-base resize-none"
-                  style={{ borderColor: colors.border.light }}
-                  placeholder="Enter order notes..."
-                />
-              </div>
+
+            {/* Additional Section - Collapsible */}
+            <div className="border-t pt-4">
+              <button
+                type="button"
+                onClick={() => setShowAdditional(!showAdditional)}
+                className="flex items-center justify-between w-full text-left"
+              >
+                <Typography variant="h6" fontWeight={600} color={colors.text.primary}>
+                  Additional Information
+                </Typography>
+                <span className="text-2xl" style={{ color: colors.primary[500] }}>
+                  {showAdditional ? '−' : '+'}
+                </span>
+              </button>
+
+              {showAdditional && (
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="flex flex-col">
+                    <label className='m-y-[4px]'>Delivery Date</label>
+                    <input
+                      name="deliveryDate"
+                      type="date"
+                      value={form.deliveryDate}
+                      onChange={handleChange}
+                      placeholder="Delivery date"
+                      className="w-full px-4 py-4 border rounded-xl focus:outline-none text-lg"
+                      style={{ borderColor: colors.border.light }}
+                    />
+                  </div>
+                  <div className="flex flex-col">
+                    <textarea
+                      name="notes"
+                      value={form.notes}
+                      onChange={handleChange}
+                      rows={3}
+                      className="w-full px-4 py-4 border rounded-xl focus:outline-none text-lg resize-none"
+                      style={{ borderColor: colors.border.light }}
+                      placeholder="Enter any notes..."
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Process Records Section */}
@@ -573,7 +567,7 @@ export default function OrdersPage() {
                 </div>
               )}
             </div>
-            <div className="flex gap-4 mt-4 justify-end">
+            <div className="flex gap-4 mt-6 justify-end">
               <PrimaryButton type="button" style={{ minWidth: 120, background: colors.primary[100], color: colors.text.primary }} onClick={handleClose}>
                 Cancel
               </PrimaryButton>

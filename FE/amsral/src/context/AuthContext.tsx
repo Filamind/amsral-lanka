@@ -36,9 +36,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const login = async (email: string, password: string): Promise<void> => {
         setLoading(true);
         try {
+            console.log('AuthContext: Starting login process'); // Debug log
             const response = await AuthService.login({ email, password });
+            console.log('AuthContext: Login successful, setting user'); // Debug log
             setUser(response.user);
+        } catch (error) {
+            console.error('AuthContext: Login error:', error); // Debug log
+            // Always re-throw to allow LoginPage to handle it
+            throw error;
         } finally {
+            console.log('AuthContext: Setting loading to false'); // Debug log
             setLoading(false);
         }
     };

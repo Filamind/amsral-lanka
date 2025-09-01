@@ -61,6 +61,7 @@ export class EmployeeService {
       if (options.isDeleted !== undefined) params.append('isDeleted', options.isDeleted.toString());
       if (options.department) params.append('department', options.department);
       if (options.position) params.append('position', options.position);
+      if (options.search) params.append('search', options.search);
 
       const queryString = params.toString();
       const url = queryString ? `/employees?${queryString}` : '/employees';

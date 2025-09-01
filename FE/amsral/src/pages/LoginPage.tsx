@@ -12,7 +12,7 @@ import { useAuth } from "../hooks/useAuth";
 function LoginPage() {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
+    const [errorMessage, setErrorMessage] = useState('');
     const { login, isAuthenticated } = useAuth();
     const navigate = useNavigate();
 
@@ -23,26 +23,98 @@ function LoginPage() {
         }
     }, [isAuthenticated, navigate]);
 
+    // Debug info on page load
+    useEffect(() => {
+        const debugAttempt = localStorage.getItem('debug_login_attempt');
+        const debugError = localStorage.getItem('debug_login_error');
+        const debugMessage = localStorage.getItem('debug_error_message');
+        const debugFinally = localStorage.getItem('debug_login_finally');
+
+        if (debugAttempt || debugError || debugMessage || debugFinally) {
+            console.log('=== DEBUG INFO FROM PREVIOUS SESSION ===');
+            if (debugAttempt) console.log('Login attempt:', JSON.parse(debugAttempt));
+            if (debugError) console.log('Login error:', JSON.parse(debugError));
+            if (debugMessage) console.log('Error message:', debugMessage);
+            if (debugFinally) console.log('Finally executed at:', debugFinally);
+            console.log('=== END DEBUG INFO ===');
+
+            // Clear debug info
+            localStorage.removeItem('debug_login_attempt');
+            localStorage.removeItem('debug_login_error');
+            localStorage.removeItem('debug_error_message');
+            localStorage.removeItem('debug_login_finally');
+        }
+
+        // Add global unhandled rejection handler to prevent page reload
+        const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+            console.error('Unhandled promise rejection:', event.reason);
+            event.preventDefault(); // Prevent default browser behavior (like page reload)
+            localStorage.setItem('debug_unhandled_rejection', JSON.stringify({
+                timestamp: new Date().toISOString(),
+                reason: event.reason?.toString() || 'Unknown error'
+            }));
+        };
+
+        window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+        // Cleanup
+        return () => {
+            window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+        };
+    }, []);
+
     const handleLogin = async (email: string, password: string) => {
+        let loginPromise: Promise<void> | null = null;
+
         try {
             setLoading(true);
-            setError('');
-            await login(email, password);
+            setErrorMessage(''); // Clear any previous error
+            console.log('Starting login with:', email); // Debug log
+            localStorage.setItem('debug_login_attempt', JSON.stringify({
+                timestamp: new Date().toISOString(),
+                email,
+                step: 'starting'
+            }));
+
+            // Wrap the login call to ensure we can catch any issues
+            loginPromise = login(email, password);
+            await loginPromise;
+
+            console.log('Login successful'); // Debug log
+            localStorage.setItem('debug_login_result', 'success');
             toast.success('Login successful! Welcome back.');
             // Navigation will happen automatically via useEffect when isAuthenticated becomes true
         } catch (err: unknown) {
-            console.error('Login error:', err);
+            console.error('Login error caught in LoginPage:', err); // Enhanced debug log
+            localStorage.setItem('debug_login_error', JSON.stringify({
+                timestamp: new Date().toISOString(),
+                error: err,
+                step: 'error_caught'
+            }));
+
+            let displayMessage = '';
             if (err && typeof err === 'object' && 'response' in err) {
                 const axiosError = err as { response?: { data?: { message?: string } } };
-                const errorMessage = axiosError.response?.data?.message || 'Login failed. Please try again.';
-                setError(errorMessage);
-                toast.error(errorMessage);
+                displayMessage = axiosError.response?.data?.message || 'Login failed. Please try again.';
+            } else if (err && typeof err === 'object' && 'message' in err) {
+                displayMessage = (err as { message: string }).message || 'Login failed. Please try again.';
             } else {
-                const errorMessage = 'Network error. Please try again.';
-                setError(errorMessage);
-                toast.error(errorMessage);
+                displayMessage = 'Network error. Please try again.';
             }
+
+            console.log('Displaying error message:', displayMessage); // Debug log
+            localStorage.setItem('debug_error_message', displayMessage);
+            setErrorMessage(displayMessage); // Set error state
+
+            // Use setTimeout to ensure the error message is set before showing toast
+            setTimeout(() => {
+                toast.error(displayMessage);
+                console.log('Toast error called with message:', displayMessage);
+            }, 10);
+
         } finally {
+            console.log('Login attempt finished, setting loading to false'); // Debug log
+            localStorage.setItem('debug_login_finally', new Date().toISOString());
             setLoading(false);
         }
     };
@@ -52,11 +124,40 @@ function LoginPage() {
     };
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+        // Immediately prevent default to stop any form submission
         e.preventDefault();
-        const formData = new FormData(e.currentTarget);
-        const email = formData.get('username') as string;
-        const password = formData.get('password') as string;
-        await handleLogin(email, password);
+        e.stopPropagation();
+
+        try {
+            console.log('Form submitted, preventDefault called'); // Debug log
+
+            const formData = new FormData(e.currentTarget);
+            const email = formData.get('username') as string;
+            const password = formData.get('password') as string;
+
+            console.log('Form data extracted:', { email, password: password ? '***' : 'empty' }); // Debug log
+
+            // Prevent the form from submitting if already loading
+            if (loading) {
+                console.log('Already loading, preventing duplicate submission'); // Debug log
+                return;
+            }
+
+            // Call handleLogin and ensure any error is caught
+            await handleLogin(email, password).catch((error) => {
+                console.error('Uncaught error in handleLogin:', error);
+                // Don't re-throw, just log
+            });
+
+        } catch (error) {
+            console.error('Error in handleSubmit outer catch:', error);
+            // Absolutely do not re-throw or let this propagate
+            setErrorMessage('An unexpected error occurred. Please try again.');
+            setLoading(false);
+        }
+
+        // Return false to ensure form doesn't submit
+        return false;
     };
 
     return (
@@ -79,15 +180,21 @@ function LoginPage() {
                         Login to AMSRAL
                     </h1>
 
-                    {/* Error Message */}
-                    {error && (
+                    {/* Error Message Display */}
+                    {errorMessage && (
                         <div className="w-full mb-3 sm:mb-4 p-3 rounded-lg bg-red-100 border border-red-300">
-                            <p className="text-red-700 text-sm text-center">{error}</p>
+                            <p className="text-red-700 text-sm text-center">{errorMessage}</p>
                         </div>
                     )}
 
                     {/* Login Form */}
-                    <form className="w-full" onSubmit={handleSubmit}>
+                    <form
+                        className="w-full"
+                        onSubmit={handleSubmit}
+                        noValidate
+                        onInvalid={(e) => e.preventDefault()}
+                        action="javascript:void(0)"
+                    >
                         <div className="mb-3 sm:mb-4">
                             <label className="block mb-2 text-sm sm:text-base" htmlFor="username" style={{ color: colors.text.secondary }}>
                                 Email

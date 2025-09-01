@@ -1,7 +1,7 @@
 
 import { Modal, Box, Typography, FormControlLabel, Checkbox, IconButton } from '@mui/material';
 import type { GridColDef } from '@mui/x-data-grid';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import PrimaryButton from '../components/common/PrimaryButton';
 import PrimaryTable from '../components/common/PrimaryTable';
@@ -66,7 +66,7 @@ export default function EmployeesPage() {
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
-    
+
     // Pagination state
     const [pagination, setPagination] = useState<PaginationInfo>({
         currentPage: 1,
@@ -78,14 +78,56 @@ export default function EmployeesPage() {
     });
     const [pageSize, setPageSize] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
-    
-    // Filter state
-    const [filters, setFilters] = useState<EmployeeFetchOptions>({
+
+    // Filter state - memoized to prevent unnecessary re-renders
+    const [filterState, setFilterState] = useState<EmployeeFetchOptions>({
         isActive: null,
-        isDeleted: false
+        isDeleted: false,
+        search: ''
     });
 
-    const loadEmployees = useCallback(async () => {
+    // Memoize filters object to prevent unnecessary re-renders
+    const filters = useMemo(() => filterState, [filterState]);
+
+    // Load employees effect - runs when dependencies change
+    useEffect(() => {
+        const loadEmployees = async () => {
+            try {
+                setLoading(true);
+                const options: EmployeeFetchOptions = {
+                    ...filters,
+                    page: currentPage,
+                    limit: pageSize
+                };
+
+                const response = await EmployeeService.getAllEmployees(options);
+                console.log('Loaded employees:', response); // Debug log
+
+                setRows(response.employees);
+                setPagination(response.pagination);
+            } catch (error) {
+                console.error('Failed to load employees:', error);
+                // Set empty array on error
+                setRows([]);
+                setPagination({
+                    currentPage: 1,
+                    totalPages: 1,
+                    totalItems: 0,
+                    itemsPerPage: pageSize,
+                    hasNextPage: false,
+                    hasPrevPage: false
+                });
+                toast.error('Failed to load employees. Please try again.');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadEmployees();
+    }, [filters, currentPage, pageSize]);
+
+    // Manual reload function for after create/delete operations
+    const reloadEmployees = async () => {
         try {
             setLoading(true);
             const options: EmployeeFetchOptions = {
@@ -93,34 +135,27 @@ export default function EmployeesPage() {
                 page: currentPage,
                 limit: pageSize
             };
-            
+
             const response = await EmployeeService.getAllEmployees(options);
-            console.log('Loaded employees:', response); // Debug log
-            
             setRows(response.employees);
             setPagination(response.pagination);
         } catch (error) {
-            console.error('Failed to load employees:', error);
-            // Set empty array on error
-            setRows([]);
-            setPagination({
-                currentPage: 1,
-                totalPages: 1,
-                totalItems: 0,
-                itemsPerPage: pageSize,
-                hasNextPage: false,
-                hasPrevPage: false
-            });
-            toast.error('Failed to load employees. Please try again.');
+            console.error('Failed to reload employees:', error);
+            toast.error('Failed to reload employees. Please try again.');
         } finally {
             setLoading(false);
         }
-    }, [filters, currentPage, pageSize]);
+    };
 
-    // Load employees on component mount and when pagination changes
+    // Debounced search effect - directly update filterState
     useEffect(() => {
-        loadEmployees();
-    }, [loadEmployees]);
+        const timeoutId = setTimeout(() => {
+            setFilterState(prev => ({ ...prev, search: search }));
+            setCurrentPage(1); // Reset to first page when search changes
+        }, 500); // 500ms debounce
+
+        return () => clearTimeout(timeoutId);
+    }, [search]);
 
     const handlePageChange = (newPage: number) => {
         setCurrentPage(newPage);
@@ -132,7 +167,7 @@ export default function EmployeesPage() {
     };
 
     const handleFilterChange = (newFilters: Partial<EmployeeFetchOptions>) => {
-        setFilters(prev => ({ ...prev, ...newFilters }));
+        setFilterState(prev => ({ ...prev, ...newFilters }));
         setCurrentPage(1); // Reset to first page when filters change
     };
 
@@ -191,7 +226,7 @@ export default function EmployeesPage() {
             toast.success(`Employee ${employeeToDelete.firstName} ${employeeToDelete.lastName} deleted successfully!`);
             setDeleteConfirmOpen(false);
             setEmployeeToDelete(null);
-            loadEmployees();
+            reloadEmployees();
         } catch (error) {
             console.error('Failed to delete employee:', error);
             toast.error('Failed to delete employee. Please try again.');
@@ -298,7 +333,7 @@ export default function EmployeesPage() {
 
             // Reload data after a short delay to prevent any race conditions
             setTimeout(() => {
-                loadEmployees();
+                reloadEmployees();
             }, 500);
 
         } catch (error: unknown) {
@@ -327,8 +362,7 @@ export default function EmployeesPage() {
 
     const handleSearchChange = (value: string) => {
         setSearch(value);
-        // Implement server-side search with debounce if needed
-        // For now, we'll keep it simple and search on enter or after a delay
+        // The debounced search effect will handle the API call
     };
 
     return (
@@ -367,7 +401,7 @@ export default function EmployeesPage() {
                         </PrimaryButton>
                     </div>
                 </div>
-                
+
                 {/* Pagination Info */}
                 <div className="flex flex-col sm:flex-row justify-between items-center gap-2 text-sm" style={{ color: colors.text.secondary }}>
                     <div>
@@ -403,7 +437,7 @@ export default function EmployeesPage() {
                             rows={rows}
                             pageSizeOptions={[5, 10, 20]}
                         />
-                        
+
                         {/* Custom Pagination Controls */}
                         {pagination.totalPages > 1 && (
                             <div className="flex justify-center items-center gap-2 mt-4">
@@ -418,7 +452,7 @@ export default function EmployeesPage() {
                                 >
                                     Previous
                                 </PrimaryButton>
-                                
+
                                 <div className="flex items-center gap-1">
                                     {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
                                         let pageNum;
@@ -431,16 +465,15 @@ export default function EmployeesPage() {
                                         } else {
                                             pageNum = pagination.currentPage - 2 + i;
                                         }
-                                        
+
                                         return (
                                             <button
                                                 key={pageNum}
                                                 onClick={() => handlePageChange(pageNum)}
-                                                className={`px-3 py-1 rounded text-sm ${
-                                                    pageNum === pagination.currentPage
-                                                        ? 'font-bold'
-                                                        : ''
-                                                }`}
+                                                className={`px-3 py-1 rounded text-sm ${pageNum === pagination.currentPage
+                                                    ? 'font-bold'
+                                                    : ''
+                                                    }`}
                                                 style={{
                                                     backgroundColor: pageNum === pagination.currentPage ? colors.primary[500] : 'transparent',
                                                     color: pageNum === pagination.currentPage ? 'white' : colors.text.primary,
@@ -452,7 +485,7 @@ export default function EmployeesPage() {
                                         );
                                     })}
                                 </div>
-                                
+
                                 <PrimaryButton
                                     style={{
                                         minWidth: 80,
