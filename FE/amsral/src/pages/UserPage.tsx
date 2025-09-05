@@ -256,6 +256,8 @@ export default function UserPage() {
 
     // Handler functions for edit and delete
     const handleEdit = (user: User) => {
+        console.log('Edit user data:', user); // Debug log
+        console.log('User roleId:', user.roleId, 'type:', typeof user.roleId); // Debug roleId
         setSelectedUser(user);
         setEditMode(true);
         setForm({
@@ -266,7 +268,7 @@ export default function UserPage() {
             password: '', // Don't populate password on edit
             phone: user.phone || '',
             dateOfBirth: user.dateOfBirth || '',
-            roleId: user.roleId || 0,
+            roleId: user.roleId || 1, // Default to 1 instead of 0
             isActive: user.isActive !== undefined ? user.isActive : true,
         });
         setErrors({});
@@ -355,6 +357,7 @@ export default function UserPage() {
             if (editMode && selectedUser) {
                 // Update existing user
                 console.log('Updating user with data:', form); // Debug log
+                console.log('Form roleId type:', typeof form.roleId, 'value:', form.roleId); // Debug roleId
                 const updateData: UpdateUserRequest = {
                     username: form.username,
                     firstName: form.firstName,
@@ -364,6 +367,7 @@ export default function UserPage() {
                     roleId: form.roleId,
                     isActive: form.isActive,
                 };
+                console.log('Sending update request with:', updateData); // Debug request data
                 // Email is not changeable in edit mode
                 // Password is not changeable in edit mode
 
@@ -379,6 +383,7 @@ export default function UserPage() {
             } else {
                 // Create new user
                 console.log('Creating user with data:', form); // Debug log
+                console.log('Form roleId type:', typeof form.roleId, 'value:', form.roleId); // Debug roleId
                 const createData: CreateUserRequest = {
                     username: form.username,
                     email: form.email,
@@ -390,6 +395,7 @@ export default function UserPage() {
                     roleId: form.roleId,
                     isActive: form.isActive,
                 };
+                console.log('Sending create request with:', createData); // Debug request data
 
                 const newUser = await UserService.createUser(createData);
                 console.log('User created successfully:', newUser);
@@ -533,46 +539,27 @@ export default function UserPage() {
                         </div>
                     </div>
                 ) : (
-                    <>
-                        <PrimaryTable
-                            columns={getColumns(handleEdit, handleDelete)}
-                            rows={rows}
-                            pageSizeOptions={[5, 10, 20]}
-                        />
-
-                        {/* Custom Pagination Controls */}
-                        {pagination.totalPages > 1 && (
-                            <div className="flex justify-center items-center gap-2 mt-4">
-                                <PrimaryButton
-                                    style={{
-                                        minWidth: 80,
-                                        background: !pagination.hasPrevPage ? colors.primary[100] : colors.primary[500],
-                                        color: !pagination.hasPrevPage ? colors.text.secondary : 'white'
-                                    }}
-                                    onClick={() => handlePageChange(pagination.currentPage - 1)}
-                                    disabled={!pagination.hasPrevPage}
-                                >
-                                    Previous
-                                </PrimaryButton>
-
-                                <div className="flex items-center gap-1">
-                                    <span>Page {pagination.currentPage} of {pagination.totalPages}</span>
-                                </div>
-
-                                <PrimaryButton
-                                    style={{
-                                        minWidth: 80,
-                                        background: !pagination.hasNextPage ? colors.primary[100] : colors.primary[500],
-                                        color: !pagination.hasNextPage ? colors.text.secondary : 'white'
-                                    }}
-                                    onClick={() => handlePageChange(pagination.currentPage + 1)}
-                                    disabled={!pagination.hasNextPage}
-                                >
-                                    Next
-                                </PrimaryButton>
-                            </div>
-                        )}
-                    </>
+                    <PrimaryTable
+                        columns={getColumns(handleEdit, handleDelete)}
+                        rows={rows}
+                        pagination
+                        paginationMode="server"
+                        paginationModel={{
+                            page: pagination.currentPage - 1, // DataGrid uses 0-based indexing
+                            pageSize: pageSize
+                        }}
+                        rowCount={pagination.totalItems}
+                        pageSizeOptions={[5, 10, 20, 50]}
+                        onPaginationModelChange={(model) => {
+                            if (model.pageSize !== pageSize) {
+                                handlePageSizeChange(model.pageSize);
+                            }
+                            if (model.page !== pagination.currentPage - 1) {
+                                handlePageChange(model.page + 1); // Convert back to 1-based
+                            }
+                        }}
+                        loading={loading}
+                    />
                 )}
             </div>
             {/* Modal for Add User */}

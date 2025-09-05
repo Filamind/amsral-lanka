@@ -141,6 +141,8 @@ export class UserService {
 
   static async createUser(user: CreateUserRequest): Promise<User> {
     try {
+      console.log('UserService.createUser called with:', user); // Debug log
+      console.log('RoleId type and value:', typeof user.roleId, user.roleId); // Debug roleId specifically
       const response = await apiClient.post('/users', user);
       console.log('Create User API Response:', response.data); // Debug log
       
@@ -161,6 +163,8 @@ export class UserService {
 
   static async updateUser(id: number, user: UpdateUserRequest): Promise<User> {
     try {
+      console.log('UserService.updateUser called with ID:', id, 'and data:', user); // Debug log
+      console.log('RoleId type and value:', typeof user.roleId, user.roleId); // Debug roleId specifically
       const response = await apiClient.put(`/users/${id}`, user);
       console.log('Update User API Response:', response.data); // Debug log
       

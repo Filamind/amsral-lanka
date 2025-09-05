@@ -401,27 +401,6 @@ export default function EmployeesPage() {
                         </PrimaryButton>
                     </div>
                 </div>
-
-                {/* Pagination Info */}
-                <div className="flex flex-col sm:flex-row justify-between items-center gap-2 text-sm" style={{ color: colors.text.secondary }}>
-                    <div>
-                        Showing {rows.length > 0 ? ((pagination.currentPage - 1) * pagination.itemsPerPage + 1) : 0}-{Math.min(pagination.currentPage * pagination.itemsPerPage, pagination.totalItems)} of {pagination.totalItems} employees
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <label>Items per page:</label>
-                        <select
-                            value={pageSize}
-                            onChange={e => handlePageSizeChange(Number(e.target.value))}
-                            className="px-2 py-1 border rounded text-sm"
-                            style={{ borderColor: colors.border.light }}
-                        >
-                            <option value={5}>5</option>
-                            <option value={10}>10</option>
-                            <option value={20}>20</option>
-                            <option value={50}>50</option>
-                        </select>
-                    </div>
-                </div>
             </div>
             <div className="mt-1">
                 {loading ? (
@@ -431,75 +410,27 @@ export default function EmployeesPage() {
                         </div>
                     </div>
                 ) : (
-                    <>
-                        <PrimaryTable
-                            columns={getColumns(handleEdit, handleDelete)}
-                            rows={rows}
-                            pageSizeOptions={[5, 10, 20]}
-                        />
-
-                        {/* Custom Pagination Controls */}
-                        {pagination.totalPages > 1 && (
-                            <div className="flex justify-center items-center gap-2 mt-4">
-                                <PrimaryButton
-                                    style={{
-                                        minWidth: 80,
-                                        background: !pagination.hasPrevPage ? colors.primary[100] : colors.primary[500],
-                                        color: !pagination.hasPrevPage ? colors.text.secondary : 'white'
-                                    }}
-                                    onClick={() => handlePageChange(pagination.currentPage - 1)}
-                                    disabled={!pagination.hasPrevPage}
-                                >
-                                    Previous
-                                </PrimaryButton>
-
-                                <div className="flex items-center gap-1">
-                                    {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                                        let pageNum;
-                                        if (pagination.totalPages <= 5) {
-                                            pageNum = i + 1;
-                                        } else if (pagination.currentPage <= 3) {
-                                            pageNum = i + 1;
-                                        } else if (pagination.currentPage >= pagination.totalPages - 2) {
-                                            pageNum = pagination.totalPages - 4 + i;
-                                        } else {
-                                            pageNum = pagination.currentPage - 2 + i;
-                                        }
-
-                                        return (
-                                            <button
-                                                key={pageNum}
-                                                onClick={() => handlePageChange(pageNum)}
-                                                className={`px-3 py-1 rounded text-sm ${pageNum === pagination.currentPage
-                                                    ? 'font-bold'
-                                                    : ''
-                                                    }`}
-                                                style={{
-                                                    backgroundColor: pageNum === pagination.currentPage ? colors.primary[500] : 'transparent',
-                                                    color: pageNum === pagination.currentPage ? 'white' : colors.text.primary,
-                                                    border: `1px solid ${colors.border.light}`
-                                                }}
-                                            >
-                                                {pageNum}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-
-                                <PrimaryButton
-                                    style={{
-                                        minWidth: 80,
-                                        background: !pagination.hasNextPage ? colors.primary[100] : colors.primary[500],
-                                        color: !pagination.hasNextPage ? colors.text.secondary : 'white'
-                                    }}
-                                    onClick={() => handlePageChange(pagination.currentPage + 1)}
-                                    disabled={!pagination.hasNextPage}
-                                >
-                                    Next
-                                </PrimaryButton>
-                            </div>
-                        )}
-                    </>
+                    <PrimaryTable
+                        columns={getColumns(handleEdit, handleDelete)}
+                        rows={rows}
+                        pagination
+                        paginationMode="server"
+                        paginationModel={{
+                            page: pagination.currentPage - 1, // DataGrid uses 0-based indexing
+                            pageSize: pageSize
+                        }}
+                        rowCount={pagination.totalItems}
+                        pageSizeOptions={[5, 10, 20, 50]}
+                        onPaginationModelChange={(model) => {
+                            if (model.pageSize !== pageSize) {
+                                handlePageSizeChange(model.pageSize);
+                            }
+                            if (model.page !== pagination.currentPage - 1) {
+                                handlePageChange(model.page + 1); // Convert back to 1-based
+                            }
+                        }}
+                        loading={loading}
+                    />
                 )}
             </div>
             {/* Modal for Add Employee */}

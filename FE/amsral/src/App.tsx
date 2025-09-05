@@ -11,6 +11,7 @@ import EmployeesPage from './pages/EmployeesPage';
 import CustomersPage from './pages/CustomersPage';
 import OrdersPage from './pages/OrdersPage';
 import WorkFlowPage from './pages/WorkFlowPage';
+import SystemDataPage from './pages/SystemDataPage';
 
 function App() {
   return (
@@ -62,6 +63,7 @@ function App() {
               </ErrorBoundary>
             } />
             <Route path="customers" element={<CustomersPage />} />
+            <Route path="system-data" element={<SystemDataPage />} />
             {/* Optional: Redirect root to dashboard */}
             <Route index element={<Navigate to="dashboard" />} />
           </Route>

@@ -12,6 +12,7 @@ import SettingsApplicationsIcon from '@mui/icons-material/SettingsApplications';
 import MenuOpenIcon from '@mui/icons-material/MenuOpen';
 import MenuIcon from '@mui/icons-material/Menu';
 import LogoutIcon from '@mui/icons-material/Logout';
+import StorageIcon from '@mui/icons-material/Storage';
 import toast from 'react-hot-toast';
 import colors from '../../styles/colors';
 import { useState } from 'react';
@@ -28,6 +29,7 @@ const NAVIGATION: NavigationItem[] = [
     { segment: 'users', title: 'Users', icon: <PeopleIcon /> },
     { segment: 'employees', title: 'Employees', icon: <BadgeIcon /> },
     { segment: 'customers', title: 'Customers', icon: <GroupsIcon /> },
+    { segment: 'system-data', title: 'System Data', icon: <StorageIcon /> },
     { kind: 'divider' },
     { segment: 'integrations', title: 'Integrations', icon: <LayersIcon /> },
 ];

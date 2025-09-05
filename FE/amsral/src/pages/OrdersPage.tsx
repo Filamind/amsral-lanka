@@ -1,5 +1,4 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Modal, Box, Typography } from '@mui/material';
 import type { GridColDef } from '@mui/x-data-grid';
 import PrimaryButton from '../components/common/PrimaryButton';
@@ -7,6 +6,12 @@ import PrimaryTable from '../components/common/PrimaryTable';
 import PrimaryDropdown from '../components/common/PrimaryDropdown';
 import PrimaryMultiSelect from '../components/common/PrimaryMultiSelect';
 import colors from '../styles/colors';
+import { orderService, type CreateOrderRequest, type ErrorResponse } from '../services/orderService';
+import CustomerService from '../services/customerService';
+import { itemService } from '../services/itemService';
+import { washingTypeService } from '../services/washingTypeService';
+import { processTypeService } from '../services/processTypeService';
+import toast from 'react-hot-toast';
 
 const columns: GridColDef[] = [
   { field: 'date', headerName: 'Date', flex: 0.8, minWidth: 110 },
@@ -32,7 +37,7 @@ type OrderRow = {
   referenceNo: string;
   customerId: string;
   customerName: string;
-  item: string;
+  item: string; // This will be itemName from API
   quantity: number;
   notes: string;
   records: ProcessRecord[];
@@ -43,54 +48,6 @@ type OrderRow = {
   updatedAt: string;
   [key: string]: string | number | boolean | ProcessRecord[];
 };
-
-// Sample customers data (you can replace this with actual API data later)
-const customerOptions = [
-  { value: 'CUST001', label: 'John Doe' },
-  { value: 'CUST002', label: 'Jane Smith' },
-  { value: 'CUST003', label: 'Bob Johnson' },
-  { value: 'CUST004', label: 'Alice Brown' },
-  { value: 'CUST005', label: 'David Wilson' },
-];
-
-// Sample items data 
-const itemOptions = [
-  { value: 'ITEM001', label: 'Denim Jeans - Classic Blue' },
-  { value: 'ITEM002', label: 'Denim Jeans - Dark Wash' },
-  { value: 'ITEM003', label: 'Denim Jacket - Light Blue' },
-  { value: 'ITEM004', label: 'Denim Shorts - Distressed' },
-  { value: 'ITEM005', label: 'Denim Shirt - Chambray' },
-  { value: 'ITEM006', label: 'Denim Overalls - Classic' },
-  { value: 'ITEM007', label: 'Denim Skirt - A-Line' },
-  { value: 'ITEM008', label: 'Denim Vest - Sleeveless' },
-];
-
-const washTypeOptions = [
-  { value: 'normal', label: 'Normal Wash (N/W)' },
-  { value: 'heavy', label: 'Heavy Wash (Hy/W)' },
-  { value: 'silicon', label: 'Silicon Wash (Sil/W)' },
-  { value: 'heavy_silicon', label: 'Heavy Silicon Wash (Hy/Sil/W)' },
-  { value: 'enzyme', label: 'Enzyme Wash (En/W)' },
-  { value: 'heavy_enzyme', label: 'Heavy Enzyme Wash (Hy/En/W)' },
-  { value: 'dark', label: 'Dark Wash (Dk/W)' },
-  { value: 'mid', label: 'Mid Wash (Mid/W)' },
-  { value: 'light', label: 'Light Wash (Lit/W)' },
-  { value: 'sky', label: 'Sky Wash (Sky/W)' },
-  { value: 'acid', label: 'Acid Wash (Acid/W)' },
-  { value: 'tint', label: 'Tint Wash (Tint/W)' },
-  { value: 'chemical', label: 'Chemical Wash (Chem/W)' },
-];
-
-const processTypeOptions = [
-  { value: 'reese', label: 'Reese' },
-  { value: 'sand_blast', label: 'Sand Blast (S/B)' },
-  { value: 'viscose', label: 'Viscose (V)' },
-  { value: 'chevron', label: 'Chevron (Chev)' },
-  { value: 'hand_sand', label: 'Hand Sand (H/S)' },
-  { value: 'rib', label: 'Rib' },
-  { value: 'tool', label: 'Tool' },
-  { value: 'grind', label: 'Grind (Grnd)' },
-];
 
 const initialRows: OrderRow[] = [
   {
@@ -151,6 +108,15 @@ export default function OrdersPage() {
   const [search, setSearch] = useState('');
   const [rows, setRows] = useState(initialRows);
   const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  // State for dropdown options
+  const [customerOptions, setCustomerOptions] = useState<{ value: string; label: string }[]>([]);
+  const [itemOptions, setItemOptions] = useState<{ value: string; label: string }[]>([]);
+  const [washTypeOptions, setWashTypeOptions] = useState<{ value: string; label: string }[]>([]);
+  const [processTypeOptions, setProcessTypeOptions] = useState<{ value: string; label: string }[]>([]);
+  const [optionsLoading, setOptionsLoading] = useState(true);
+
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0], // Today's date as default
     customerId: '',
@@ -162,6 +128,57 @@ export default function OrdersPage() {
   const [records, setRecords] = useState<ProcessRecord[]>([]);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [showAdditional, setShowAdditional] = useState(false);
+
+  // Fetch dropdown options on component mount
+  useEffect(() => {
+    const fetchOptions = async () => {
+      try {
+        setOptionsLoading(true);
+
+        // Fetch customers with full names
+        const customersResponse = await CustomerService.getAllCustomers({
+          limit: 100, // Get all customers for dropdown
+          isActive: true
+        });
+        const customerOpts = customersResponse.customers.map(customer => ({
+          value: customer.id!.toString(),
+          label: `${customer.firstName} ${customer.lastName}`.trim()
+        }));
+        setCustomerOptions(customerOpts);
+
+        // Fetch items
+        const itemsResponse = await itemService.getItemsList();
+        setItemOptions(itemsResponse.data);
+
+        // Fetch washing types
+        const washingTypesResponse = await washingTypeService.getWashingTypes({
+          limit: 100 // Get all washing types for dropdown
+        });
+        const washTypeOpts = washingTypesResponse.data.washingTypes.map(washType => ({
+          value: washType.id,
+          label: `${washType.name} (${washType.code})`
+        }));
+        setWashTypeOptions(washTypeOpts);
+
+        // Fetch process types
+        const processTypesResponse = await processTypeService.getProcessTypesList();
+        // The API returns data with { id, value, label } format which matches our dropdown needs
+        const processTypeOpts = processTypesResponse.data.map(item => ({
+          value: item.value.toString(),
+          label: item.label
+        }));
+        setProcessTypeOptions(processTypeOpts);
+
+      } catch (error) {
+        console.error('Error fetching dropdown options:', error);
+        toast.error('Failed to load dropdown options. Please refresh the page.');
+      } finally {
+        setOptionsLoading(false);
+      }
+    };
+
+    fetchOptions();
+  }, []);
 
   const validate = () => {
     const newErrors: { [key: string]: string } = {};
@@ -259,7 +276,7 @@ export default function OrdersPage() {
     return records.reduce((total, record) => total + record.quantity, 0);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const validation = validate();
     if (Object.keys(validation).length > 0) {
@@ -267,33 +284,80 @@ export default function OrdersPage() {
       return;
     }
 
-    const selectedCustomer = customerOptions.find(customer => customer.value === form.customerId);
-    const selectedItem = itemOptions.find(item => item.value === form.itemId);
-    const now = new Date().toISOString();
+    setLoading(true);
+    setErrors({});
 
-    // Generate reference number (auto-increment)
-    const newReferenceNo = `ORD${String(rows.length + 1).padStart(3, '0')}`;
-
-    setRows(prev => [
-      ...prev,
-      {
-        id: prev.length ? Math.max(...prev.map(r => r.id)) + 1 : 1,
+    try {
+      // Prepare the order data according to API format
+      const orderData: CreateOrderRequest = {
         date: form.date,
-        referenceNo: newReferenceNo,
         customerId: form.customerId,
-        customerName: selectedCustomer?.label || '',
-        item: selectedItem?.label || '',
+        itemId: form.itemId,
         quantity: form.quantity,
-        notes: form.notes,
-        records: records,
-        recordsCount: records.length,
+        notes: form.notes || undefined,
         deliveryDate: form.deliveryDate,
-        status: 'Pending', // Default status
-        createdAt: now,
-        updatedAt: now,
-      },
-    ]);
-    setOpen(false);
+        records: records.map(record => ({
+          quantity: record.quantity,
+          washType: record.washType,
+          processTypes: record.processTypes
+        }))
+      };
+
+      // Call the API
+      const response = await orderService.createOrder(orderData);
+
+      if (response.success) {
+        // Add the new order to the local state
+        const newOrderRow: OrderRow = {
+          id: response.data.id,
+          date: response.data.date,
+          referenceNo: response.data.referenceNo,
+          customerId: response.data.customerId,
+          customerName: response.data.customerName,
+          item: response.data.itemName,
+          quantity: response.data.quantity,
+          notes: response.data.notes,
+          records: response.data.records.map(record => ({
+            id: record.id.toString(),
+            quantity: record.quantity,
+            washType: record.washType,
+            processTypes: record.processTypes
+          })),
+          recordsCount: response.data.recordsCount,
+          deliveryDate: response.data.deliveryDate,
+          status: response.data.status,
+          createdAt: response.data.createdAt,
+          updatedAt: response.data.updatedAt,
+        };
+
+        setRows(prev => [newOrderRow, ...prev]);
+        setOpen(false);
+
+        // Reset form
+        setForm({
+          date: new Date().toISOString().split('T')[0],
+          customerId: '',
+          itemId: '',
+          quantity: 1,
+          notes: '',
+          deliveryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        });
+        setRecords([]);
+        setShowAdditional(false);
+      }
+    } catch (error) {
+      console.error('Error creating order:', error);
+
+      // Handle API validation errors
+      const apiError = error as ErrorResponse;
+      if (apiError.errors) {
+        setErrors(apiError.errors);
+      } else {
+        setErrors({ general: apiError.message || 'Failed to create order. Please try again.' });
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filteredRows = rows.filter(row =>
@@ -354,6 +418,15 @@ export default function OrdersPage() {
             Add Order
           </Typography>
           <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+            {/* General error message */}
+            {errors.general && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <div className="text-sm text-red-800">
+                  <strong>Error:</strong> {errors.general}
+                </div>
+              </div>
+            )}
+
             {/* Main Order Information - 2x2 Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="flex flex-col">
@@ -374,8 +447,9 @@ export default function OrdersPage() {
                   value={form.customerId}
                   onChange={handleChange}
                   options={customerOptions}
-                  placeholder="Select a customer"
+                  placeholder={optionsLoading ? "Loading customers..." : "Select a customer"}
                   error={!!errors.customerId}
+                  disabled={optionsLoading}
                   className="px-4 py-4 text-lg"
                   style={{ borderColor: colors.border.light }}
                 />
@@ -388,8 +462,9 @@ export default function OrdersPage() {
                   value={form.itemId}
                   onChange={handleChange}
                   options={itemOptions}
-                  placeholder="Select an item"
+                  placeholder={optionsLoading ? "Loading items..." : "Select an item"}
                   error={!!errors.itemId}
+                  disabled={optionsLoading}
                   className="px-4 py-4 text-lg"
                   style={{ borderColor: colors.border.light }}
                 />
@@ -533,8 +608,9 @@ export default function OrdersPage() {
                         value={record.washType}
                         onChange={(e) => updateRecord(record.id, 'washType', e.target.value)}
                         options={washTypeOptions}
-                        placeholder="Select wash type"
+                        placeholder={optionsLoading ? "Loading wash types..." : "Select wash type"}
                         error={!!errors[`record_${record.id}_washType`]}
+                        disabled={optionsLoading}
                         className="px-4 py-3 text-base"
                         style={{ borderColor: errors[`record_${record.id}_washType`] ? '#ef4444' : colors.border.light }}
                       />
@@ -550,7 +626,7 @@ export default function OrdersPage() {
                         value={record.processTypes}
                         onChange={handleRecordMultiSelectChange(record.id, 'processTypes')}
                         options={processTypeOptions}
-                        placeholder="Select process types"
+                        placeholder={optionsLoading ? "Loading process types..." : "Select process types"}
                         className="text-base"
                         style={{ borderColor: colors.border.light }}
                       />
@@ -568,11 +644,20 @@ export default function OrdersPage() {
               )}
             </div>
             <div className="flex gap-4 mt-6 justify-end">
-              <PrimaryButton type="button" style={{ minWidth: 120, background: colors.primary[100], color: colors.text.primary }} onClick={handleClose}>
+              <PrimaryButton
+                type="button"
+                style={{ minWidth: 120, background: colors.primary[100], color: colors.text.primary }}
+                onClick={handleClose}
+                disabled={loading}
+              >
                 Cancel
               </PrimaryButton>
-              <PrimaryButton type="submit" style={{ minWidth: 140 }}>
-                Save Order
+              <PrimaryButton
+                type="submit"
+                style={{ minWidth: 140 }}
+                disabled={loading}
+              >
+                {loading ? 'Saving...' : 'Save Order'}
               </PrimaryButton>
             </div>
           </form>
