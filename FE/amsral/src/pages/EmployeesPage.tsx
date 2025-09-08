@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import PrimaryButton from '../components/common/PrimaryButton';
 import PrimaryTable from '../components/common/PrimaryTable';
+import PrimaryDatePicker from '../components/common/PrimaryDatePicker';
 import colors from '../styles/colors';
 import EmployeeService, { type Employee, type PaginationInfo, type EmployeeFetchOptions } from '../services/employeeService';
 
@@ -479,14 +480,11 @@ export default function EmployeesPage() {
                                 {errors.lastName && <span className="text-xs text-red-500 mt-1">{errors.lastName}</span>}
                             </div>
                             <div className="flex flex-col">
-                                <label className="block text-sm font-medium mb-2">Hire Date</label>
-                                <input
+                                <PrimaryDatePicker
                                     name="hireDate"
-                                    type="date"
                                     value={form.hireDate}
                                     onChange={handleChange}
-                                    className="w-full px-4 py-3 border rounded-xl focus:outline-none text-base"
-                                    style={{ borderColor: colors.border.light }}
+                                    label="Hire Date"
                                 />
                             </div>
                         </div>
@@ -515,14 +513,11 @@ export default function EmployeesPage() {
                                 {errors.email && <span className="text-xs text-red-500 mt-1">{errors.email}</span>}
                             </div>
                             <div className="flex flex-col">
-                                <label className="block text-sm font-medium mb-2">Date of Birth</label>
-                                <input
+                                <PrimaryDatePicker
                                     name="dateOfBirth"
-                                    type="date"
                                     value={form.dateOfBirth}
                                     onChange={handleChange}
-                                    className="w-full px-4 py-3 border rounded-xl focus:outline-none text-base"
-                                    style={{ borderColor: colors.border.light }}
+                                    label="Date of Birth"
                                 />
                             </div>
                         </div>

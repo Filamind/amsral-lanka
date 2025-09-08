@@ -5,6 +5,7 @@ import type { GridColDef } from '@mui/x-data-grid';
 import PrimaryButton from '../components/common/PrimaryButton';
 import PrimaryTable from '../components/common/PrimaryTable';
 import PrimaryDropdown from '../components/common/PrimaryDropdown';
+import PrimaryDatePicker from '../components/common/PrimaryDatePicker';
 import colors from '../styles/colors';
 import toast from 'react-hot-toast';
 import UserService, { type User, type PaginationInfo, type UserFetchOptions, type CreateUserRequest, type UpdateUserRequest } from '../services/userService';
@@ -668,14 +669,11 @@ export default function UserPage() {
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="flex flex-col">
-                                <label className="block text-sm font-medium mb-2">Date of Birth</label>
-                                <input
+                                <PrimaryDatePicker
                                     name="dateOfBirth"
-                                    type="date"
                                     value={form.dateOfBirth}
                                     onChange={handleChange}
-                                    className="w-full px-4 py-3 border rounded-xl focus:outline-none text-base"
-                                    style={{ borderColor: colors.border.light }}
+                                    label="Date of Birth"
                                 />
                             </div>
                             <div className="flex flex-col">

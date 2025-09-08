@@ -1,4 +1,19 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React from 'react';
+import {
+    FormControl,
+    Select,
+    MenuItem,
+    FormHelperText,
+    InputLabel,
+    Box,
+    Typography,
+    Chip,
+    OutlinedInput,
+    Checkbox,
+    ListItemText
+} from '@mui/material';
+import type { SelectChangeEvent } from '@mui/material';
+import { styled } from '@mui/material/styles';
 import colors from '../../styles/colors';
 
 type Option = {
@@ -17,6 +32,82 @@ type PrimaryMultiSelectProps = {
     style?: React.CSSProperties;
 };
 
+const StyledFormControl = styled(FormControl)(({ error }) => ({
+    '& .MuiOutlinedInput-root': {
+        borderRadius: '12px',
+        backgroundColor: colors.background.primary,
+        '& fieldset': {
+            borderColor: error ? colors.error : colors.border.light,
+            borderWidth: '1px',
+        },
+        '&:hover fieldset': {
+            borderColor: error ? colors.error : colors.primary[300],
+        },
+        '&.Mui-focused fieldset': {
+            borderColor: error ? colors.error : colors.primary[500],
+            borderWidth: '2px',
+        },
+        '&.Mui-disabled fieldset': {
+            borderColor: colors.border.light,
+            backgroundColor: colors.background.secondary,
+        },
+    },
+    '& .MuiInputLabel-root': {
+        color: colors.text.secondary,
+        '&.Mui-focused': {
+            color: colors.primary[500],
+        },
+        '&.Mui-disabled': {
+            color: colors.text.muted,
+        },
+    },
+    '& .MuiSelect-select': {
+        color: colors.text.primary,
+        padding: '12px 14px',
+        '&.Mui-disabled': {
+            color: colors.text.muted,
+        },
+    },
+    '& .MuiFormHelperText-root': {
+        color: error ? colors.error : colors.text.secondary,
+        marginLeft: '14px',
+        marginTop: '4px',
+    },
+}));
+
+const StyledMenuItem = styled(MenuItem)(() => ({
+    color: colors.text.primary,
+    backgroundColor: colors.background.primary,
+    '&:hover': {
+        backgroundColor: colors.primary[50],
+    },
+    '&.Mui-selected': {
+        backgroundColor: colors.primary[100],
+        '&:hover': {
+            backgroundColor: colors.primary[200],
+        },
+    },
+    '&.Mui-disabled': {
+        color: colors.text.muted,
+        backgroundColor: colors.background.secondary,
+    },
+}));
+
+const StyledChip = styled(Chip)(() => ({
+    backgroundColor: colors.primary[100],
+    color: colors.primary[700],
+    border: `1px solid ${colors.primary[200]}`,
+    '& .MuiChip-deleteIcon': {
+        color: colors.primary[600],
+        '&:hover': {
+            color: colors.primary[800],
+        },
+    },
+    margin: '2px',
+    height: '24px',
+    fontSize: '0.75rem',
+}));
+
 const PrimaryMultiSelect: React.FC<PrimaryMultiSelectProps> = ({
     name,
     value = [],
@@ -27,27 +118,20 @@ const PrimaryMultiSelect: React.FC<PrimaryMultiSelectProps> = ({
     className = "",
     style = {},
 }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const dropdownRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-                setIsOpen(false);
+    const handleChange = (event: SelectChangeEvent<string[]>) => {
+        const selectedValues = typeof event.target.value === 'string'
+            ? event.target.value.split(',')
+            : event.target.value;
+        onChange({
+            target: {
+                name,
+                value: selectedValues
             }
-        };
+        });
+    };
 
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, []);
-
-    const handleChange = (optionValue: string) => {
-        const newValue = value.includes(optionValue)
-            ? value.filter(v => v !== optionValue)
-            : [...value, optionValue];
-
+    const handleDelete = (valueToDelete: string) => {
+        const newValue = value.filter(item => item !== valueToDelete);
         onChange({
             target: {
                 name,
@@ -56,58 +140,94 @@ const PrimaryMultiSelect: React.FC<PrimaryMultiSelectProps> = ({
         });
     };
 
-    const selectedLabels = value.map(v => {
-        const option = options.find(opt => opt.value === v);
-        return option?.label || v;
-    }).join(', ');
+    const renderValue = (selected: string[]) => {
+        if (selected.length === 0) {
+            return (
+                <Typography
+                    variant="body1"
+                    sx={{ color: colors.text.muted }}
+                >
+                    {placeholder}
+                </Typography>
+            );
+        }
+
+        if (selected.length <= 3) {
+            return (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    {selected.map((val) => {
+                        const option = options.find(opt => opt.value === val);
+                        return (
+                            <StyledChip
+                                key={val}
+                                label={option?.label || val}
+                                onDelete={() => handleDelete(val)}
+                                size="small"
+                            />
+                        );
+                    })}
+                </Box>
+            );
+        }
+
+        return (
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                {selected.slice(0, 3).map((val) => {
+                    const option = options.find(opt => opt.value === val);
+                    return (
+                        <StyledChip
+                            key={val}
+                            label={option?.label || val}
+                            onDelete={() => handleDelete(val)}
+                            size="small"
+                        />
+                    );
+                })}
+                <StyledChip
+                    label={`+${selected.length - 3} more`}
+                    size="small"
+                    sx={{
+                        backgroundColor: colors.secondary[200],
+                        color: colors.secondary[700],
+                        border: `1px solid ${colors.secondary[300]}`,
+                    }}
+                />
+            </Box>
+        );
+    };
 
     return (
-        <div className="relative" ref={dropdownRef}>
-            <div
-                className={`w-full border rounded-xl focus-within:outline-none cursor-pointer ${error ? 'border-red-500' : ''} ${className}`}
-                style={{
-                    borderColor: error ? '#ef4444' : colors.border.light,
-                    minHeight: '48px',
-                    ...style
-                }}
-                onClick={() => setIsOpen(!isOpen)}
+        <Box className={className} style={style}>
+            <StyledFormControl
+                fullWidth={true}
+                error={error}
+                size="medium"
             >
-                <div className="px-4 py-3 text-base">
-                    {value.length > 0 ? (
-                        <span className="text-sm">
-                            {selectedLabels}
-                        </span>
-                    ) : (
-                        <span className="text-gray-400">{placeholder}</span>
-                    )}
-                </div>
-
-                {isOpen && (
-                    <div className="absolute bottom-full left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-lg z-50 max-h-60 overflow-y-auto mb-1">
-                        {options.map((option) => (
-                            <div
-                                key={option.value}
-                                className={`px-4 py-2 cursor-pointer hover:bg-gray-50 flex items-center gap-2 ${value.includes(option.value) ? 'bg-blue-50' : ''
-                                    }`}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleChange(option.value);
+                <Select
+                    multiple
+                    value={value}
+                    onChange={handleChange}
+                    input={<OutlinedInput />}
+                    renderValue={renderValue}
+                    displayEmpty
+                >
+                    {options.map((option) => (
+                        <StyledMenuItem key={option.value} value={option.value}>
+                            <Checkbox
+                                checked={value.indexOf(option.value) > -1}
+                                sx={{
+                                    color: colors.primary[500],
+                                    '&.Mui-checked': {
+                                        color: colors.primary[600],
+                                    },
                                 }}
-                            >
-                                <input
-                                    type="checkbox"
-                                    checked={value.includes(option.value)}
-                                    onChange={() => { }} // Handled by div click
-                                    className="w-4 h-4"
-                                    style={{ accentColor: colors.primary[500] }}
-                                />
-                                <span className="text-sm">{option.label}</span>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-        </div>
+                            />
+                            <ListItemText primary={option.label} />
+                        </StyledMenuItem>
+                    ))}
+                </Select>
+            </StyledFormControl>
+        </Box>
     );
 };
 

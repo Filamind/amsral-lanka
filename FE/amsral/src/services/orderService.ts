@@ -3,11 +3,11 @@ import apiClient from '../config/api';
 export interface CreateOrderRequest {
   date: string;
   customerId: string;
-  itemId: string;
   quantity: number;
   notes?: string;
   deliveryDate: string;
   records: {
+    itemId: string;
     quantity: number;
     washType: string;
     processTypes: string[];
@@ -17,6 +17,7 @@ export interface CreateOrderRequest {
 export interface OrderRecord {
   id: number;
   orderId: number;
+  itemId: string;
   quantity: number;
   washType: string;
   processTypes: string[];
