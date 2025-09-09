@@ -1,0 +1,46 @@
+import apiClient from '../config/api';
+import type { ErrorResponse } from '../config/api';
+
+// Types
+export interface Machine {
+  id: string;
+  name: string;
+  type: 'washing' | 'drying';
+  status: 'available' | 'in_use' | 'maintenance';
+  capacity: number;
+}
+
+export interface MachinesResponse {
+  success: boolean;
+  data: {
+    machines: Machine[];
+  };
+}
+
+class MachineService {
+  // Get all machines
+  async getAllMachines(type?: 'washing' | 'drying'): Promise<Machine[]> {
+    try {
+      const queryParams = new URLSearchParams();
+      if (type) queryParams.append('type', type);
+      
+      const response = await apiClient.get(`/machines?${queryParams.toString()}`);
+      return response.data.data.machines;
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: ErrorResponse } };
+      throw apiError.response?.data || { success: false, message: 'Failed to fetch machines' };
+    }
+  }
+
+  // Get washing machines
+  async getWashingMachines(): Promise<Machine[]> {
+    return this.getAllMachines('washing');
+  }
+
+  // Get drying machines
+  async getDryingMachines(): Promise<Machine[]> {
+    return this.getAllMachines('drying');
+  }
+}
+
+export default new MachineService();
