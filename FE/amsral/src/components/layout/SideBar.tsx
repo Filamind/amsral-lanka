@@ -24,7 +24,7 @@ const NAVIGATION: NavigationItem[] = [
     { kind: 'header', title: 'Main items' },
     { segment: 'dashboard', title: 'Dashboard', icon: <DashboardIcon /> },
     { segment: 'orders', title: 'Orders', icon: <ShoppingCartIcon /> },
-    { segment: 'workflow', title: 'Production Flow', icon: <SettingsApplicationsIcon /> },
+    { segment: 'production', title: 'Production Flow', icon: <SettingsApplicationsIcon /> },
     { kind: 'divider' },
     { segment: 'users', title: 'Users', icon: <PeopleIcon /> },
     { segment: 'employees', title: 'Employees', icon: <BadgeIcon /> },

@@ -7,14 +7,30 @@ import colors from '../../styles/colors';
 interface PrimaryTableProps extends Partial<DataGridProps> {
     columns: GridColDef[];
     rows: any[];
-    height?: number | string;
+    height?: number | string | 'auto';
 }
 
 export default function PrimaryTable({ columns, rows, height = 400, onRowClick, ...props }: PrimaryTableProps) {
+    // Calculate dynamic height based on number of rows
+    const calculateHeight = () => {
+        if (height === 'auto') {
+            const headerHeight = 56; // Header height
+            const rowHeight = 52; // Row height
+            const paginationHeight = 52; // Pagination height
+            const padding = 16; // Paper padding
+            const minHeight = 200; // Minimum height
+            const maxHeight = 600; // Maximum height
+
+            const calculatedHeight = headerHeight + (rows.length * rowHeight) + paginationHeight + padding;
+            return Math.max(minHeight, Math.min(maxHeight, calculatedHeight));
+        }
+        return height;
+    };
+
     return (
         <Paper
             sx={{
-                height,
+                height: calculateHeight(),
                 width: '100%',
                 background: colors.gradients.loginCard,
                 boxShadow: 3,

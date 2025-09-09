@@ -10,7 +10,9 @@ import UserPage from './pages/UserPage';
 import EmployeesPage from './pages/EmployeesPage';
 import CustomersPage from './pages/CustomersPage';
 import OrdersPage from './pages/OrdersPage';
+import OrderRecordsPage from './pages/OrderRecordsPage';
 import WorkFlowPage from './pages/WorkFlowPage';
+import RecordAssignmentsPage from './pages/RecordAssignmentsPage';
 import SystemDataPage from './pages/SystemDataPage';
 
 function App() {
@@ -55,7 +57,9 @@ function App() {
           >
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="orders" element={<OrdersPage />} />
-            <Route path="workflow" element={<WorkFlowPage />} />
+            <Route path="orders/:orderId/records" element={<OrderRecordsPage />} />
+            <Route path="production" element={<WorkFlowPage />} />
+            <Route path="production/record/:recordId" element={<RecordAssignmentsPage />} />
             <Route path="users" element={<UserPage />} />
             <Route path="employees" element={
               <ErrorBoundary>
