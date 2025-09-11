@@ -8,8 +8,10 @@ import PrimaryTable from '../components/common/PrimaryTable';
 import PrimaryDatePicker from '../components/common/PrimaryDatePicker';
 import colors from '../styles/colors';
 import EmployeeService, { type Employee, type PaginationInfo, type EmployeeFetchOptions } from '../services/employeeService';
+import { useAuth } from '../hooks/useAuth';
+import { hasPermission } from '../utils/roleUtils';
 
-const getColumns = (onEdit: (employee: Employee) => void, onDelete: (employee: Employee) => void): GridColDef[] => [
+const getColumns = (onEdit: (employee: Employee) => void, onDelete: (employee: Employee) => void, canEdit: boolean, canDelete: boolean): GridColDef[] => [
     { field: 'id', headerName: 'ID', flex: 0.6, minWidth: 80 },
     { field: 'firstName', headerName: 'First Name', flex: 1, minWidth: 120 },
     { field: 'lastName', headerName: 'Last Name', flex: 1, minWidth: 120 },
@@ -25,20 +27,24 @@ const getColumns = (onEdit: (employee: Employee) => void, onDelete: (employee: E
         sortable: false,
         renderCell: (params) => (
             <div className="flex gap-2">
-                <IconButton
-                    size="small"
-                    onClick={() => onEdit(params.row as Employee)}
-                    sx={{ color: colors.primary[500] }}
-                >
-                    ✏️
-                </IconButton>
-                <IconButton
-                    size="small"
-                    onClick={() => onDelete(params.row as Employee)}
-                    sx={{ color: '#ef4444' }}
-                >
-                    🗑️
-                </IconButton>
+                {canEdit && (
+                    <IconButton
+                        size="small"
+                        onClick={() => onEdit(params.row as Employee)}
+                        sx={{ color: colors.primary[500] }}
+                    >
+                        ✏️
+                    </IconButton>
+                )}
+                {canDelete && (
+                    <IconButton
+                        size="small"
+                        onClick={() => onDelete(params.row as Employee)}
+                        sx={{ color: '#ef4444' }}
+                    >
+                        🗑️
+                    </IconButton>
+                )}
             </div>
         ),
     },
@@ -47,6 +53,7 @@ const getColumns = (onEdit: (employee: Employee) => void, onDelete: (employee: E
 // Using Employee interface from service
 
 export default function EmployeesPage() {
+    const { user } = useAuth();
     const [search, setSearch] = useState('');
     const [rows, setRows] = useState<Employee[]>([]);
     const [loading, setLoading] = useState(false);
@@ -396,11 +403,13 @@ export default function EmployeesPage() {
                             <option value="inactive">Inactive Only</option>
                         </select>
                     </div>
-                    <div className="w-full sm:w-auto mt-1 sm:mt-0">
-                        <PrimaryButton style={{ minWidth: 140, width: '100%' }} onClick={handleOpen}>
-                            + Add Employee
-                        </PrimaryButton>
-                    </div>
+                    {hasPermission(user, 'canEdit') && (
+                        <div className="w-full sm:w-auto mt-1 sm:mt-0">
+                            <PrimaryButton style={{ minWidth: 140, width: '100%' }} onClick={handleOpen}>
+                                + Add Employee
+                            </PrimaryButton>
+                        </div>
+                    )}
                 </div>
             </div>
             <div className="mt-1">
@@ -412,7 +421,7 @@ export default function EmployeesPage() {
                     </div>
                 ) : (
                     <PrimaryTable
-                        columns={getColumns(handleEdit, handleDelete)}
+                        columns={getColumns(handleEdit, handleDelete, hasPermission(user, 'canEdit'), hasPermission(user, 'canDelete'))}
                         rows={rows}
                         pagination
                         paginationMode="server"

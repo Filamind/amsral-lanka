@@ -25,6 +25,7 @@ export interface CreateOrderRecordRequest {
   quantity: number;
   washType: WashType;
   processTypes: ProcessType[];
+  trackingNumber?: string; // Optional, will be generated if not provided
 }
 
 export interface UpdateOrderRecordRequest {
@@ -33,6 +34,7 @@ export interface UpdateOrderRecordRequest {
   quantity: number;
   washType: WashType;
   processTypes: ProcessType[];
+  trackingNumber?: string; // Optional, for updating tracking number if needed
 }
 
 // Response Interfaces
@@ -43,8 +45,108 @@ export interface OrderRecord {
   quantity: number;
   washType: WashType;
   processTypes: ProcessType[];
+  trackingNumber: string; // Required in response
   createdAt: string;
   updatedAt: string;
+}
+
+// Management API Interfaces
+export interface ManagementOrder {
+  id: number;
+  date: string;
+  referenceNo: string;
+  customerId: string;
+  customerName: string;
+  quantity: number;
+  notes: string;
+  deliveryDate: string;
+  status: OrderStatus;
+  recordsCount: number;
+  complete: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrderDetailsRecord {
+  id: number;
+  orderId: number;
+  itemId: string;
+  quantity: number;
+  washType: string;
+  processTypes: string[];
+  trackingNumber: string;
+  status: string;
+  complete: boolean;
+  assignments: OrderAssignment[];
+  stats: RecordStats;
+}
+
+export interface OrderAssignment {
+  id: number;
+  recordId: number;
+  orderId: number;
+  assignedTo: string;
+  quantity: number;
+  washingMachine: string;
+  dryingMachine: string;
+  trackingNumber: string;
+  status: string;
+  assignedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RecordStats {
+  totalQuantity: number;
+  assignedQuantity: number;
+  remainingQuantity: number;
+  totalAssignments: number;
+  completedAssignments: number;
+  inProgressAssignments: number;
+  completionPercentage: number;
+}
+
+export interface OverallStats {
+  totalQuantity: number;
+  totalAssignedQuantity: number;
+  totalCompletedQuantity: number;
+  remainingQuantity: number;
+  totalAssignments: number;
+  completedAssignments: number;
+  inProgressAssignments: number;
+  overallCompletionPercentage: number;
+  recordsCount: number;
+  completeRecordsCount: number;
+  assignmentCompleteness: {
+    totalAssignments: number;
+    completedAssignments: number;
+    inProgressAssignments: number;
+    cancelledAssignments: number;
+    assignmentCompletionPercentage: number;
+  };
+  workCompletion: {
+    totalQuantity: number;
+    assignedQuantity: number;
+    completedQuantity: number;
+    remainingQuantity: number;
+    workCompletionPercentage: number;
+  };
+}
+
+export interface OrderDetailsResponse {
+  order: ManagementOrder;
+  records: OrderDetailsRecord[];
+  overallStats: OverallStats;
+}
+
+export interface OrdersListResponse {
+  orders: ManagementOrder[];
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    totalRecords: number;
+    limit: number;
+  };
 }
 
 export interface Order {
@@ -265,6 +367,54 @@ class OrderService {
   // Additional utility methods for backward compatibility
   async getOrdersWithDefaults(page: number = 1, limit: number = 10, search?: string): Promise<OrdersResponse> {
     return this.getOrders({ page, limit, search });
+  }
+
+  /**
+   * Management API Methods
+   */
+
+  /**
+   * Get orders list with filters for Management
+   * GET /api/orders?page=1&limit=10
+   * GET /api/orders?customerName=John&page=1&limit=5
+   * GET /api/orders?orderId=3&page=1&limit=5
+   * GET /api/orders?status=Pending&page=1&limit=10
+   */
+  async getManagementOrders(params?: {
+    page?: number;
+    limit?: number;
+    customerName?: string;
+    orderId?: number;
+    status?: OrderStatus;
+  }): Promise<{ success: boolean; data: OrdersListResponse }> {
+    try {
+      const queryParams = new URLSearchParams();
+      if (params?.page) queryParams.append('page', params.page.toString());
+      if (params?.limit) queryParams.append('limit', params.limit.toString());
+      if (params?.customerName) queryParams.append('customerName', params.customerName);
+      if (params?.orderId) queryParams.append('orderId', params.orderId.toString());
+      if (params?.status) queryParams.append('status', params.status);
+      
+      const response = await apiClient.get(`/orders?${queryParams.toString()}`);
+      return response.data;
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: ErrorResponse } };
+      throw apiError.response?.data || { success: false, message: 'Failed to fetch orders' };
+    }
+  }
+
+  /**
+   * Get order details with records and assignments
+   * GET /api/orders/:id/details
+   */
+  async getOrderDetails(orderId: number): Promise<{ success: boolean; data: OrderDetailsResponse }> {
+    try {
+      const response = await apiClient.get(`/orders/${orderId}/details`);
+      return response.data;
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: ErrorResponse } };
+      throw apiError.response?.data || { success: false, message: 'Failed to fetch order details' };
+    }
   }
 }
 

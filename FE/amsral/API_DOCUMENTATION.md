@@ -97,6 +97,7 @@ GET /orders/{orderId}
         "quantity": 500,
         "washType": "normal",
         "processTypes": ["viscose"],
+        "trackingNumber": "1A",
         "createdAt": "2025-01-15T10:35:00Z",
         "updatedAt": "2025-01-15T10:35:00Z"
       },
@@ -107,6 +108,7 @@ GET /orders/{orderId}
         "quantity": 500,
         "washType": "heavy",
         "processTypes": ["viscose", "rib"],
+        "trackingNumber": "1B",
         "createdAt": "2025-01-15T10:40:00Z",
         "updatedAt": "2025-01-15T10:40:00Z"
       }
@@ -132,9 +134,12 @@ POST /orders/{orderId}/records
   "itemId": "ITEM001",
   "quantity": 500,
   "washType": "normal",
-  "processTypes": ["viscose", "rib"]
+  "processTypes": ["viscose", "rib"],
+  "trackingNumber": "6A"
 }
 ```
+
+**Note:** The `trackingNumber` field is optional. If not provided, the backend will automatically generate the next available tracking number for the order in the format `<order_id><alphabetical_letter>` (e.g., 6A, 6B, 6C, etc.). It's recommended to let the backend handle tracking number generation to avoid conflicts.
 
 ### Response Structure
 
@@ -148,6 +153,7 @@ POST /orders/{orderId}/records
     "quantity": 500,
     "washType": "normal",
     "processTypes": ["viscose", "rib"],
+    "trackingNumber": "6A",
     "createdAt": "2025-01-15T11:00:00Z",
     "updatedAt": "2025-01-15T11:00:00Z"
   }
@@ -171,9 +177,12 @@ PUT /orders/{orderId}/records/{recordId}
   "itemId": "ITEM002",
   "quantity": 750,
   "washType": "heavy",
-  "processTypes": ["sand_blast", "chevron"]
+  "processTypes": ["sand_blast", "chevron"],
+  "trackingNumber": "6A"
 }
 ```
+
+**Note:** The `trackingNumber` field is optional. If provided, it will update the tracking number for the record. If not provided, the existing tracking number will be preserved.
 
 ### Response Structure
 
@@ -187,6 +196,7 @@ PUT /orders/{orderId}/records/{recordId}
     "quantity": 750,
     "washType": "heavy",
     "processTypes": ["sand_blast", "chevron"],
+    "trackingNumber": "6A",
     "createdAt": "2025-01-15T11:00:00Z",
     "updatedAt": "2025-01-15T11:15:00Z"
   }
