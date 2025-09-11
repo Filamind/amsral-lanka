@@ -14,6 +14,8 @@ import OrderRecordsPage from './pages/OrderRecordsPage';
 import WorkFlowPage from './pages/WorkFlowPage';
 import RecordAssignmentsPage from './pages/RecordAssignmentsPage';
 import SystemDataPage from './pages/SystemDataPage';
+import ManagementPage from './pages/ManagementPage';
+import OrderDetailsPage from './pages/OrderDetailsPage';
 
 function App() {
   return (
@@ -60,6 +62,8 @@ function App() {
             <Route path="orders/:orderId/records" element={<OrderRecordsPage />} />
             <Route path="production" element={<WorkFlowPage />} />
             <Route path="production/record/:recordId" element={<RecordAssignmentsPage />} />
+            <Route path="management" element={<ManagementPage />} />
+            <Route path="management/orders/:orderId" element={<OrderDetailsPage />} />
             <Route path="users" element={<UserPage />} />
             <Route path="employees" element={
               <ErrorBoundary>

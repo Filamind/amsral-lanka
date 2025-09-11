@@ -7,10 +7,12 @@ import PrimaryTable from '../components/common/PrimaryTable';
 import colors from '../styles/colors';
 import toast from 'react-hot-toast';
 import CustomerService, { type Customer, type PaginationInfo, type CustomerFetchOptions } from '../services/customerService';
+import { useAuth } from '../hooks/useAuth';
+import { hasPermission } from '../utils/roleUtils';
 
 import type { GridColDef } from '@mui/x-data-grid';
 
-const getColumns = (onEdit: (customer: Customer) => void, onDelete: (customer: Customer) => void): GridColDef[] => [
+const getColumns = (onEdit: (customer: Customer) => void, onDelete: (customer: Customer) => void, canEdit: boolean, canDelete: boolean): GridColDef[] => [
     { field: 'customerCode', headerName: 'Code', flex: 0.8, minWidth: 110 },
     { field: 'firstName', headerName: 'First Name', flex: 1, minWidth: 130 },
     { field: 'lastName', headerName: 'Last Name', flex: 1, minWidth: 130 },
@@ -27,26 +29,31 @@ const getColumns = (onEdit: (customer: Customer) => void, onDelete: (customer: C
         sortable: false,
         renderCell: (params) => (
             <div className="flex gap-2">
-                <IconButton
-                    size="small"
-                    onClick={() => onEdit(params.row as Customer)}
-                    sx={{ color: colors.primary[500] }}
-                >
-                    ✏️
-                </IconButton>
-                <IconButton
-                    size="small"
-                    onClick={() => onDelete(params.row as Customer)}
-                    sx={{ color: '#ef4444' }}
-                >
-                    🗑️
-                </IconButton>
+                {canEdit && (
+                    <IconButton
+                        size="small"
+                        onClick={() => onEdit(params.row as Customer)}
+                        sx={{ color: colors.primary[500] }}
+                    >
+                        ✏️
+                    </IconButton>
+                )}
+                {canDelete && (
+                    <IconButton
+                        size="small"
+                        onClick={() => onDelete(params.row as Customer)}
+                        sx={{ color: '#ef4444' }}
+                    >
+                        🗑️
+                    </IconButton>
+                )}
             </div>
         ),
     },
 ];
 
 export default function CustomersPage() {
+    const { user } = useAuth();
     const [search, setSearch] = useState('');
     const [rows, setRows] = useState<Customer[]>([]);
     const [loading, setLoading] = useState(false);
@@ -397,11 +404,13 @@ export default function CustomersPage() {
                             <option value="inactive">Inactive Only</option>
                         </select>
                     </div>
-                    <div className="w-full sm:w-auto mt-1 sm:mt-0">
-                        <PrimaryButton style={{ minWidth: 140, width: '100%' }} onClick={handleOpen}>
-                            + Add Customer
-                        </PrimaryButton>
-                    </div>
+                    {hasPermission(user, 'canEdit') && (
+                        <div className="w-full sm:w-auto mt-1 sm:mt-0">
+                            <PrimaryButton style={{ minWidth: 140, width: '100%' }} onClick={handleOpen}>
+                                + Add Customer
+                            </PrimaryButton>
+                        </div>
+                    )}
                 </div>
 
             </div>
@@ -414,7 +423,7 @@ export default function CustomersPage() {
                     </div>
                 ) : (
                     <PrimaryTable
-                        columns={getColumns(handleEdit, handleDelete)}
+                        columns={getColumns(handleEdit, handleDelete, hasPermission(user, 'canEdit'), hasPermission(user, 'canDelete'))}
                         rows={rows}
                         pageSizeOptions={[5, 10, 20, 50]}
                         pagination

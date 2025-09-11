@@ -23,6 +23,7 @@ export interface MachineAssignment {
   recordId: string;
   orderId: number;
   orderRef: string;
+  trackingNumber?: string; // Add tracking number field
   customerName: string;
   item: string;
   assignedBy: string;

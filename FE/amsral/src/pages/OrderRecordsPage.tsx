@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Typography, IconButton, Menu, MenuItem } from '@mui/material';
-import { ArrowBack, MoreVert } from '@mui/icons-material';
+import { ArrowBack, MoreVert, Print } from '@mui/icons-material';
 import type { GridColDef } from '@mui/x-data-grid';
 import PrimaryButton from '../components/common/PrimaryButton';
 import PrimaryTable from '../components/common/PrimaryTable';
@@ -15,6 +15,7 @@ import { orderService, type Order, type CreateOrderRecordRequest, type UpdateOrd
 import { itemService } from '../services/itemService';
 import { washingTypeService } from '../services/washingTypeService';
 import { processTypeService } from '../services/processTypeService';
+import { generateOrderReceipt } from '../utils/pdfUtils';
 import toast from 'react-hot-toast';
 
 interface ProcessRecord {
@@ -24,6 +25,7 @@ interface ProcessRecord {
     quantity: number;
     washType: string;
     processTypes: string[];
+    trackingNumber?: string; // Optional, will be included when available
     status?: string;
     isCompleted?: boolean;
     createdAt?: string;
@@ -90,6 +92,7 @@ export default function OrderRecordsPage() {
                     quantity: record.quantity,
                     washType: record.washType,
                     processTypes: record.processTypes,
+                    trackingNumber: record.trackingNumber, // Include tracking number from API
                 }));
                 setRecords(convertedRecords);
 
@@ -186,12 +189,14 @@ export default function OrderRecordsPage() {
 
         try {
             setSaving(true);
+
             const recordData: CreateOrderRecordRequest = {
                 orderId: parseInt(orderId),
                 itemId: newRecord.itemId || '',
                 quantity: newRecord.quantity,
                 washType: newRecord.washType as any, // Send the ID directly
                 processTypes: newRecord.processTypes as any,
+                // Let the backend generate the tracking number to avoid conflicts
             };
 
             const response = await orderService.addOrderRecord(parseInt(orderId), recordData);
@@ -203,6 +208,7 @@ export default function OrderRecordsPage() {
                     quantity: response.data.quantity,
                     washType: response.data.washType,
                     processTypes: response.data.processTypes,
+                    trackingNumber: response.data.trackingNumber, // Include tracking number from response
                 };
 
                 setRecords(prev => [...prev, newProcessRecord]);
@@ -215,7 +221,7 @@ export default function OrderRecordsPage() {
                 });
                 setShowAddForm(false);
                 setErrors({});
-                toast.success('Record added successfully');
+                toast.success(`Record added successfully with tracking number: ${response.data.trackingNumber}`);
             }
         } catch (error) {
             console.error('Error adding record:', error);
@@ -309,6 +315,26 @@ export default function OrderRecordsPage() {
     const handleMenuClose = () => {
         setMenuAnchor(null);
         setSelectedRecord(null);
+    };
+
+    const handlePrintRecord = (record: ProcessRecord) => {
+        if (!order) return;
+
+        try {
+            const receiptData = {
+                orderId: order.id,
+                customerName: order.customerName,
+                totalQuantity: record.quantity,
+                orderDate: order.date,
+                notes: order.itemId ? `Item: ${record.itemId}, Wash Type: ${record.washType}, Process Types: ${record.processTypes.join(', ')}` : order.notes
+            };
+
+            generateOrderReceipt(receiptData);
+            toast.success('Record receipt downloaded successfully!');
+        } catch (error) {
+            console.error('Error generating record receipt:', error);
+            toast.error('Failed to generate receipt. Please try again.');
+        }
     };
 
     const handleEditRecordClick = () => {
@@ -408,7 +434,17 @@ export default function OrderRecordsPage() {
 
 
     const columns: GridColDef[] = [
-        { field: 'orderId', headerName: 'Order ID', flex: 0.8, minWidth: 100 },
+        {
+            field: 'trackingNumber',
+            headerName: 'Tracking No',
+            flex: 0.8,
+            minWidth: 100,
+            renderCell: (params) => (
+                <span className="font-mono font-semibold" style={{ color: colors.button.primary }}>
+                    {params.row.trackingNumber || 'N/A'}
+                </span>
+            )
+        },
         { field: 'customerName', headerName: 'Customer', flex: 1.2, minWidth: 150 },
         { field: 'itemName', headerName: 'Item', flex: 1.5, minWidth: 200 },
         { field: 'quantity', headerName: 'Quantity', flex: 0.8, minWidth: 100, type: 'number' },
@@ -439,6 +475,26 @@ export default function OrderRecordsPage() {
                     </span>
                 );
             }
+        },
+        {
+            field: 'print',
+            headerName: 'Print',
+            flex: 0.3,
+            minWidth: 60,
+            sortable: false,
+            renderCell: (params) => (
+                <IconButton
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        handlePrintRecord(params.row);
+                    }}
+                    size="small"
+                    sx={{ color: colors.button.primary }}
+                    title="Print Record"
+                >
+                    <Print />
+                </IconButton>
+            )
         },
         {
             field: 'actions',
@@ -477,7 +533,7 @@ export default function OrderRecordsPage() {
 
         return {
             id: record.id,
-            orderId: order?.id || 'N/A',
+            trackingNumber: record.trackingNumber || 'N/A', // Add tracking number field
             customerName: order?.customerName || 'N/A',
             itemName,
             quantity: record.quantity,
@@ -485,6 +541,7 @@ export default function OrderRecordsPage() {
             processTypes: processTypesText,
             status: record.status || 'pending',
             isCompleted: record.isCompleted || false,
+            print: record.id, // Add print field for the print button
             actions: record.id,
         };
     });
@@ -522,7 +579,7 @@ export default function OrderRecordsPage() {
                 </IconButton>
                 <div>
                     <h2 className="text-xl md:text-2xl font-bold" style={{ color: colors.text.primary }}>
-                        Order Records - {order.referenceNo}
+                        Order Records -  {order.id}
                     </h2>
                     <p className="text-sm text-gray-600">
                         Customer: {order.customerName} | Total Quantity:

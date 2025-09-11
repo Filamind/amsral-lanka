@@ -13,18 +13,21 @@ import MenuOpenIcon from '@mui/icons-material/MenuOpen';
 import MenuIcon from '@mui/icons-material/Menu';
 import LogoutIcon from '@mui/icons-material/Logout';
 import StorageIcon from '@mui/icons-material/Storage';
+import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import toast from 'react-hot-toast';
 import colors from '../../styles/colors';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { NavigationItem } from '../../types';
 import React from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import { getRolePermissions } from '../../utils/roleUtils';
 
 const NAVIGATION: NavigationItem[] = [
-    { kind: 'header', title: 'Main items' },
+    { kind: 'header', title: '' },
     { segment: 'dashboard', title: 'Dashboard', icon: <DashboardIcon /> },
     { segment: 'orders', title: 'Orders', icon: <ShoppingCartIcon /> },
     { segment: 'production', title: 'Production Flow', icon: <SettingsApplicationsIcon /> },
+    { segment: 'management', title: 'Management', icon: <ManageAccountsIcon /> },
     { kind: 'divider' },
     { segment: 'users', title: 'Users', icon: <PeopleIcon /> },
     { segment: 'employees', title: 'Employees', icon: <BadgeIcon /> },
@@ -36,6 +39,43 @@ const NAVIGATION: NavigationItem[] = [
 
 function SideBarNavigation({ navigation, expanded, onToggle }: { navigation: NavigationItem[]; expanded: boolean; onToggle: () => void }) {
     const { logout, user } = useAuth();
+
+    // Filter navigation items based on user permissions
+    const filteredNavigation = useMemo(() => {
+        if (!user) return navigation;
+
+        const permissions = getRolePermissions(user);
+
+        return navigation.filter(item => {
+            if (item.kind === 'header' || item.kind === 'divider') {
+                return true; // Always show headers and dividers
+            }
+
+            // Filter based on segment permissions
+            switch (item.segment) {
+                case 'dashboard':
+                    return true; // Everyone can see dashboard
+                case 'orders':
+                    return permissions.canViewOrders;
+                case 'production':
+                    return permissions.canViewProduction;
+                case 'management':
+                    return permissions.canViewManagement;
+                case 'users':
+                    return permissions.canViewUsers;
+                case 'employees':
+                    return permissions.canViewEmployees;
+                case 'customers':
+                    return permissions.canViewCustomers;
+                case 'system-data':
+                    return permissions.canViewSystemData;
+                case 'integrations':
+                    return permissions.canViewIntegrations;
+                default:
+                    return true; // Show unknown segments by default
+            }
+        });
+    }, [navigation, user]);
 
     const handleLogout = () => {
         toast.success('Logged out successfully. See you soon!');
@@ -70,7 +110,7 @@ function SideBarNavigation({ navigation, expanded, onToggle }: { navigation: Nav
                 </IconButton>
             </Box>
             <Box sx={{ flex: 1, overflowY: 'auto' }}>
-                {navigation.map((item, idx) => {
+                {filteredNavigation.map((item, idx) => {
                     if (item.kind === 'header') {
                         return expanded ? (
                             <Typography key={idx} variant="subtitle2" sx={{ mt: 2, mb: 1, color: colors.text.secondary, fontWeight: 600, fontSize: { xs: 13, sm: 15 } }}>

@@ -14,6 +14,7 @@ type ProcessRecord = {
     id: string;
     orderId: number;
     orderRef: string;
+    trackingNumber?: string; // Add tracking number field
     customerName: string;
     item: string;
     itemId?: string;
@@ -36,7 +37,7 @@ type ProcessRecord = {
 // Table columns
 const recordsColumns: GridColDef[] = [
     { field: 'createdAt', headerName: 'Date', flex: 0.8, minWidth: 110 },
-    { field: 'orderId', headerName: 'Order ID', flex: 0.8, minWidth: 100, type: 'number' },
+    { field: 'trackingNumber', headerName: 'Tracking No', flex: 0.8, minWidth: 100 },
     { field: 'item', headerName: 'Item', flex: 1.5, minWidth: 150 },
     {
         field: 'quantity',
@@ -86,6 +87,26 @@ export default function WorkFlowPage() {
     const [recordsSearch, setRecordsSearch] = useState('');
     const [records, setRecords] = useState<ProcessRecord[]>([]);
     const [loading, setLoading] = useState(true);
+
+    // Add CSS styles for row coloring
+    const rowStyles = `
+        .even-order-row {
+            background-color: #dbeafe !important; /* Light blue for even order IDs */
+            color: #1e40af !important;
+            border-bottom: 1px solid #93c5fd !important; /* Blue border for visibility */
+        }
+        .even-order-row:hover {
+            background-color: #bfdbfe !important; /* Slightly darker light blue on hover */
+        }
+        .odd-order-row {
+            background-color: #f8fafc !important; /* Light background for odd order IDs */
+            color: #1e293b !important;
+            border-bottom: 1px solid #e2e8f0 !important; /* Light border for consistency */
+        }
+        .odd-order-row:hover {
+            background-color: #e2e8f0 !important; /* Slightly darker light background on hover */
+        }
+    `;
 
     // Pagination state
     const [pagination, setPagination] = useState({
@@ -138,7 +159,8 @@ export default function WorkFlowPage() {
                     productionRecords.push({
                         id: record.id.toString(),
                         orderId: record.orderId,
-                        orderRef: record.orderRef || record.referenceNo || `ORD${record.orderId}`,
+                        orderRef: `${record.orderId}`,
+                        trackingNumber: record.trackingNumber || 'N/A', // Include tracking number from API
                         customerName: record.customerName || 'Unknown Customer',
                         item: itemName,
                         itemId: record.itemId,
@@ -170,7 +192,7 @@ export default function WorkFlowPage() {
         } finally {
             setLoading(false);
         }
-    }, [itemOptions, washTypeOptions, processTypeOptions, currentPage, pageSize, recordsSearch]);
+    }, [itemOptions, washTypeOptions, processTypeOptions, recordsSearch]);
 
     // Fetch dropdown options
     const fetchDropdownOptions = useCallback(async () => {
@@ -216,9 +238,78 @@ export default function WorkFlowPage() {
     // Fetch production records when dropdown options are loaded
     useEffect(() => {
         if (itemOptions.length > 0 && washTypeOptions.length > 0 && processTypeOptions.length > 0) {
-            fetchProductionRecords();
+            // Inline fetch to avoid circular dependency
+            const fetchData = async () => {
+                try {
+                    setLoading(true);
+                    const response = await orderService.getAllProductionRecords({
+                        page: currentPage,
+                        limit: pageSize,
+                        search: recordsSearch || undefined
+                    });
+
+                    if (response.success) {
+                        // Transform records into production records
+                        const productionRecords: ProcessRecord[] = [];
+
+                        // The /orders/records endpoint returns records directly
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        const records = (response.data as any).records || [];
+
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        records.forEach((record: any) => {
+                            // Find item name
+                            const itemName = itemOptions.find(item => item.value === record.itemId)?.label || 'Unknown Item';
+
+                            // Find wash type name
+                            const washTypeName = washTypeOptions.find(wash => wash.value === record.washType)?.label || record.washType;
+
+                            // Find process type names
+                            const processTypeNames = record.processTypes.map((pt: string) =>
+                                processTypeOptions.find(p => p.value === pt)?.label || pt
+                            );
+
+                            productionRecords.push({
+                                id: record.id.toString(),
+                                orderId: record.orderId,
+                                orderRef: `${record.orderId}`,
+                                trackingNumber: record.trackingNumber || 'N/A', // Include tracking number from API
+                                customerName: record.customerName || 'Unknown Customer',
+                                item: itemName,
+                                itemId: record.itemId,
+                                quantity: record.quantity,
+                                remainingQuantity: record.remainingQuantity || 0,
+                                washType: washTypeName,
+                                processTypes: processTypeNames,
+                                status: 'pending',
+                                createdAt: record.createdAt ? new Date(record.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                                complete: record.complete || false
+                            });
+                        });
+
+                        setRecords(productionRecords);
+
+                        // Update pagination info
+                        setPagination({
+                            currentPage: response.data.pagination?.currentPage || 1,
+                            totalPages: response.data.pagination?.totalPages || 1,
+                            totalItems: response.data.pagination?.totalRecords || productionRecords.length,
+                            itemsPerPage: response.data.pagination?.limit || pageSize,
+                            hasNextPage: (response.data.pagination?.currentPage || 1) < (response.data.pagination?.totalPages || 1),
+                            hasPrevPage: (response.data.pagination?.currentPage || 1) > 1
+                        });
+                    }
+                } catch (error) {
+                    console.error('Error fetching production records:', error);
+                    toast.error('Failed to fetch production records');
+                } finally {
+                    setLoading(false);
+                }
+            };
+            fetchData();
         }
-    }, [fetchProductionRecords, itemOptions, washTypeOptions, processTypeOptions]);
+    }, [itemOptions, washTypeOptions, processTypeOptions, currentPage, pageSize, recordsSearch]);
+
 
     // Pagination handlers
     const handlePageChange = (newPage: number) => {
@@ -233,14 +324,82 @@ export default function WorkFlowPage() {
     // Debounced search effect
     useEffect(() => {
         const timeoutId = setTimeout(() => {
-            if (recordsSearch !== undefined) {
+            if (recordsSearch !== undefined && itemOptions.length > 0 && washTypeOptions.length > 0 && processTypeOptions.length > 0) {
                 setCurrentPage(1); // Reset to first page when search changes
-                fetchProductionRecords();
+                // Inline fetch to avoid circular dependency
+                const fetchData = async () => {
+                    try {
+                        setLoading(true);
+                        const response = await orderService.getAllProductionRecords({
+                            page: 1, // Reset to first page for search
+                            limit: pageSize,
+                            search: recordsSearch || undefined
+                        });
+
+                        if (response.success) {
+                            // Transform records into production records
+                            const productionRecords: ProcessRecord[] = [];
+
+                            // The /orders/records endpoint returns records directly
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            const records = (response.data as any).records || [];
+
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            records.forEach((record: any) => {
+                                // Find item name
+                                const itemName = itemOptions.find(item => item.value === record.itemId)?.label || 'Unknown Item';
+
+                                // Find wash type name
+                                const washTypeName = washTypeOptions.find(wash => wash.value === record.washType)?.label || record.washType;
+
+                                // Find process type names
+                                const processTypeNames = record.processTypes.map((pt: string) =>
+                                    processTypeOptions.find(p => p.value === pt)?.label || pt
+                                );
+
+                                productionRecords.push({
+                                    id: record.id.toString(),
+                                    orderId: record.orderId,
+                                    orderRef: `${record.orderId}`,
+                                    trackingNumber: record.trackingNumber || 'N/A', // Include tracking number from API
+                                    customerName: record.customerName || 'Unknown Customer',
+                                    item: itemName,
+                                    itemId: record.itemId,
+                                    quantity: record.quantity,
+                                    remainingQuantity: record.remainingQuantity || 0,
+                                    washType: washTypeName,
+                                    processTypes: processTypeNames,
+                                    status: 'pending',
+                                    createdAt: record.createdAt ? new Date(record.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                                    complete: record.complete || false
+                                });
+                            });
+
+                            setRecords(productionRecords);
+
+                            // Update pagination info
+                            setPagination({
+                                currentPage: response.data.pagination?.currentPage || 1,
+                                totalPages: response.data.pagination?.totalPages || 1,
+                                totalItems: response.data.pagination?.totalRecords || productionRecords.length,
+                                itemsPerPage: response.data.pagination?.limit || pageSize,
+                                hasNextPage: (response.data.pagination?.currentPage || 1) < (response.data.pagination?.totalPages || 1),
+                                hasPrevPage: (response.data.pagination?.currentPage || 1) > 1
+                            });
+                        }
+                    } catch (error) {
+                        console.error('Error fetching production records:', error);
+                        toast.error('Failed to fetch production records');
+                    } finally {
+                        setLoading(false);
+                    }
+                };
+                fetchData();
             }
         }, 500);
 
         return () => clearTimeout(timeoutId);
-    }, [recordsSearch, fetchProductionRecords]);
+    }, [recordsSearch, itemOptions, washTypeOptions, processTypeOptions, pageSize]);
 
     // Handle row click to navigate to record assignments page
     const handleRowClick = (params: GridRowParams) => {
@@ -257,7 +416,10 @@ export default function WorkFlowPage() {
     }));
 
     return (
-        <div className="w-full mx-auto px-1 sm:px-3 md:px-4 py-3">;
+        <div className="w-full mx-auto px-1 sm:px-3 md:px-4 py-3">
+            {/* Add CSS styles for row coloring */}
+            <style>{rowStyles}</style>
+
             {/* Header */}
             <div className="mb-6">
                 <h1 className="text-2xl md:text-3xl font-bold mb-2" style={{ color: colors.text.primary }}>
@@ -313,6 +475,10 @@ export default function WorkFlowPage() {
                             }
                         }}
                         onRowClick={handleRowClick}
+                        getRowClassName={(params) => {
+                            // Even order_id gets dark blue background, odd gets light background
+                            return params.row.orderId % 2 === 0 ? 'even-order-row' : 'odd-order-row';
+                        }}
                         height="auto"
                     />
                 )}

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Modal, Box, Typography, IconButton, Menu, MenuItem } from '@mui/material';
-import { ArrowBack, MoreVert } from '@mui/icons-material';
+import { ArrowBack, MoreVert, CheckCircle, RadioButtonUnchecked } from '@mui/icons-material';
 import type { GridColDef } from '@mui/x-data-grid';
 import PrimaryButton from '../components/common/PrimaryButton';
 import PrimaryTable from '../components/common/PrimaryTable';
@@ -11,6 +11,7 @@ import colors from '../styles/colors';
 import EmployeeService, { type Employee } from '../services/employeeService';
 import recordService, { type ProcessRecord, type MachineAssignment } from '../services/recordService';
 import machineService, { type Machine } from '../services/machineService';
+import { generateAssignmentReceipt, type AssignmentReceiptData } from '../utils/pdfUtils';
 import toast from 'react-hot-toast';
 
 // Types are now imported from services
@@ -61,6 +62,17 @@ export default function RecordAssignmentsPage() {
 
     // Table columns
     const assignmentsColumns: GridColDef[] = [
+        {
+            field: 'trackingNumber',
+            headerName: 'Tracking No',
+            flex: 0.8,
+            minWidth: 100,
+            renderCell: (params) => (
+                <span className="font-mono font-semibold" style={{ color: colors.button.primary }}>
+                    {params.row.trackingNumber || 'N/A'}
+                </span>
+            )
+        },
         { field: 'assignedTo', headerName: 'Assign To', flex: 1.2, minWidth: 120 },
         { field: 'quantity', headerName: 'Quantity', flex: 0.8, minWidth: 100, type: 'number' },
         { field: 'washingMachine', headerName: 'Washing Machine', flex: 1.4, minWidth: 140 },
@@ -84,6 +96,27 @@ export default function RecordAssignmentsPage() {
                 >
                     {params.value || 'Pending'}
                 </span>
+            )
+        },
+        {
+            field: 'toggleStatus',
+            headerName: 'Complete',
+            flex: 0.5,
+            minWidth: 80,
+            sortable: false,
+            renderCell: (params) => (
+                <IconButton
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleStatusDirect(params.row);
+                    }}
+                    size="small"
+                    sx={{
+                        color: params.row.status === 'Completed' ? colors.button.primary : colors.text.secondary
+                    }}
+                >
+                    {params.row.status === 'Completed' ? <CheckCircle /> : <RadioButtonUnchecked />}
+                </IconButton>
             )
         },
         {
@@ -206,8 +239,7 @@ export default function RecordAssignmentsPage() {
         if (record && form.quantity > record.remainingQuantity) {
             newErrors.quantity = `Cannot exceed remaining quantity (${record.remainingQuantity})`;
         }
-        if (!form.washingMachine) newErrors.washingMachine = 'Required';
-        if (!form.dryingMachine) newErrors.dryingMachine = 'Required';
+        // Washing and drying machines are now optional
         return newErrors;
     };
 
@@ -325,42 +357,56 @@ export default function RecordAssignmentsPage() {
         handleMenuClose();
     };
 
-    const handleToggleStatus = () => {
-        if (!selectedAssignment || !record || !recordId) return;
 
-        const isCompleted = selectedAssignment.status === 'Completed';
-        const actionText = isCompleted ? 'mark as In Progress' : 'mark as Complete';
+    const handleToggleStatusDirect = async (assignment: MachineAssignment) => {
+        if (!record || !recordId) return;
 
-        setConfirmDialog({
-            open: true,
-            title: 'Update Assignment Status',
-            message: `Are you sure you want to ${actionText} this assignment?`,
-            confirmText: isCompleted ? 'Mark as In Progress' : 'Mark as Complete',
-            onConfirm: async () => {
-                try {
-                    setSaving(true);
+        const isCompleted = assignment.status === 'Completed';
 
-                    // Toggle status via API based on current status
-                    const updatedAssignment = isCompleted
-                        ? await recordService.setAssignmentInProgress(recordId, selectedAssignment.id)
-                        : await recordService.completeAssignment(recordId, selectedAssignment.id);
+        try {
+            setSaving(true);
 
-                    // Update assignment in local state
-                    setAssignments(prev => prev.map(a =>
-                        a.id === selectedAssignment.id ? updatedAssignment : a
-                    ));
+            // Toggle status via API based on current status
+            const updatedAssignment = isCompleted
+                ? await recordService.setAssignmentInProgress(recordId, assignment.id)
+                : await recordService.completeAssignment(recordId, assignment.id);
 
-                    toast.success(`Assignment ${isCompleted ? 'marked as In Progress' : 'completed'} successfully`);
-                } catch (error) {
-                    console.error('Error updating assignment status:', error);
-                    toast.error('Failed to update assignment status');
-                } finally {
-                    setSaving(false);
-                    setConfirmDialog(prev => ({ ...prev, open: false }));
-                    handleMenuClose();
-                }
-            },
-        });
+            // Update assignment in local state
+            setAssignments(prev => prev.map(a =>
+                a.id === assignment.id ? updatedAssignment : a
+            ));
+
+            toast.success(`Assignment ${isCompleted ? 'marked as In Progress' : 'completed'} successfully`);
+        } catch (error) {
+            console.error('Error updating assignment status:', error);
+            toast.error('Failed to update assignment status');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handlePrintAssignment = () => {
+        if (!selectedAssignment || !record) return;
+
+        try {
+            const receiptData: AssignmentReceiptData = {
+                assignmentId: Number(selectedAssignment.id) || 0,
+                orderId: Number(selectedAssignment.orderId) || 0,
+                recordId: recordId || 'N/A',
+                itemName: selectedAssignment.item || 'N/A',
+                washType: record.washType || 'N/A',
+                processTypes: Array.isArray(record.processTypes) ? record.processTypes : [],
+                assignedTo: selectedAssignment.assignedTo || 'N/A',
+                quantity: Number(selectedAssignment.quantity) || 0
+            };
+
+            generateAssignmentReceipt(receiptData);
+            toast.success('Assignment receipt downloaded successfully!');
+        } catch (error) {
+            console.error('Error printing assignment:', error);
+            toast.error('Failed to print assignment');
+        }
+
         handleMenuClose();
     };
 
@@ -553,13 +599,13 @@ export default function RecordAssignmentsPage() {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="flex flex-col">
-                                <label className="block text-sm font-medium mb-2">Washing Machine <span className="text-red-500">*</span></label>
+                                <label className="block text-sm font-medium mb-2">Washing Machine <span className="text-gray-500">(Optional)</span></label>
                                 <PrimaryDropdown
                                     name="washingMachine"
                                     value={form.washingMachine}
                                     onChange={handleChange}
                                     options={washingMachineOptions}
-                                    placeholder="Select washing machine"
+                                    placeholder="Select washing machine (optional)"
                                     error={!!errors.washingMachine}
                                     className="px-4 py-3 text-base"
                                     style={{ borderColor: colors.border.light }}
@@ -568,13 +614,13 @@ export default function RecordAssignmentsPage() {
                             </div>
 
                             <div className="flex flex-col">
-                                <label className="block text-sm font-medium mb-2">Drying Machine <span className="text-red-500">*</span></label>
+                                <label className="block text-sm font-medium mb-2">Drying Machine <span className="text-gray-500">(Optional)</span></label>
                                 <PrimaryDropdown
                                     name="dryingMachine"
                                     value={form.dryingMachine}
                                     onChange={handleChange}
                                     options={dryingMachineOptions}
-                                    placeholder="Select drying machine"
+                                    placeholder="Select drying machine (optional)"
                                     error={!!errors.dryingMachine}
                                     className="px-4 py-3 text-base"
                                     style={{ borderColor: colors.border.light }}
@@ -618,8 +664,9 @@ export default function RecordAssignmentsPage() {
                     horizontal: 'right',
                 }}
             >
-                <MenuItem onClick={handleToggleStatus}>
-                    {selectedAssignment?.status === 'Completed' ? 'Mark as In Progress' : 'Mark as Complete'}
+                <MenuItem onClick={handlePrintAssignment}>
+
+                    Print Assignment
                 </MenuItem>
                 <MenuItem onClick={handleDeleteAssignment} sx={{ color: 'error.main' }}>
                     Delete Assignment

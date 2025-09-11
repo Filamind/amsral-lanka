@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Modal, Box, Menu, MenuItem, IconButton } from '@mui/material';
-import { MoreVert } from '@mui/icons-material';
+import { MoreVert, Print } from '@mui/icons-material';
 import type { GridColDef, GridRowParams } from '@mui/x-data-grid';
 import PrimaryButton from '../components/common/PrimaryButton';
 import PrimaryTable from '../components/common/PrimaryTable';
@@ -10,6 +10,7 @@ import ConfirmationDialog from '../components/common/ConfirmationDialog';
 import colors from '../styles/colors';
 import { orderService, type CreateOrderRequest, type ErrorResponse } from '../services/orderService';
 import CustomerService from '../services/customerService';
+import { generateOrderReceipt, type OrderReceiptData } from '../utils/pdfUtils';
 import toast from 'react-hot-toast';
 
 // We'll define columns inside the component to access the handler functions
@@ -25,7 +26,6 @@ type ProcessRecord = {
 type OrderRow = {
   id: number;
   date: string;
-  referenceNo: string;
   customerId: string;
   customerName: string;
   quantity: number;
@@ -97,7 +97,6 @@ export default function OrdersPage() {
         const orderRows: OrderRow[] = response.data.orders.map(order => ({
           id: order.id,
           date: order.date,
-          referenceNo: order.referenceNo,
           customerId: order.customerId,
           customerName: order.customerName,
           quantity: order.quantity,
@@ -272,13 +271,13 @@ export default function OrdersPage() {
     setConfirmDialog({
       open: true,
       title: 'Delete Order',
-      message: `Are you sure you want to delete order "${selectedOrder.referenceNo}"? This action cannot be undone and will also delete all associated records.`,
+      message: `Are you sure you want to delete order "${selectedOrder.id}"? This action cannot be undone and will also delete all associated records.`,
       onConfirm: async () => {
         try {
           setLoading(true);
           await orderService.deleteOrder(selectedOrder.id);
           setRows(prev => prev.filter(row => row.id !== selectedOrder.id));
-          toast.success(`Order ${selectedOrder.referenceNo} deleted successfully`);
+          toast.success(`Order ${selectedOrder.id} deleted successfully`);
         } catch (error) {
           console.error('Error deleting order:', error);
           const apiError = error as ErrorResponse;
@@ -293,10 +292,29 @@ export default function OrdersPage() {
     handleMenuClose();
   };
 
+
+  const handlePrintOrder = (orderRow: OrderRow) => {
+    try {
+      const receiptData: OrderReceiptData = {
+        orderId: orderRow.id,
+        customerName: orderRow.customerName,
+        totalQuantity: orderRow.quantity,
+        orderDate: orderRow.date,
+        notes: orderRow.notes
+      };
+
+      generateOrderReceipt(receiptData);
+      toast.success('Order receipt downloaded successfully!');
+    } catch (error) {
+      console.error('Error generating order receipt:', error);
+      toast.error('Failed to generate receipt. Please try again.');
+    }
+  };
+
   // Define columns inside component to access handler functions
   const columns: GridColDef[] = [
     { field: 'date', headerName: 'Date', flex: 0.8, minWidth: 110 },
-    { field: 'id', headerName: 'Order ID', flex: 0.8, minWidth: 100, type: 'number' },
+    { field: 'id', headerName: 'Reference No', flex: 0.8, minWidth: 100, type: 'number' },
     { field: 'customerName', headerName: 'Customer', flex: 1.5, minWidth: 180 },
     {
       field: 'quantity',
@@ -335,6 +353,26 @@ export default function OrdersPage() {
         >
           {params.row.complete ? 'Complete' : params.row.status || 'Pending'}
         </span>
+      )
+    },
+    {
+      field: 'print',
+      headerName: 'Print',
+      flex: 0.3,
+      minWidth: 60,
+      sortable: false,
+      renderCell: (params) => (
+        <IconButton
+          onClick={(e) => {
+            e.stopPropagation();
+            handlePrintOrder(params.row);
+          }}
+          size="small"
+          sx={{ color: colors.button.primary }}
+          title="Print Order"
+        >
+          <Print />
+        </IconButton>
       )
     },
     {
@@ -397,7 +435,7 @@ export default function OrdersPage() {
 
           setRows(prev => prev.map(row => row.id === editingOrder.id ? updatedOrderRow : row));
           setOpen(false);
-          toast.success(`Order ${response.data.referenceNo} updated successfully!`);
+          toast.success(`Order ${response.data.id} updated successfully!`);
         }
       } else {
         // Create new order
@@ -416,7 +454,6 @@ export default function OrdersPage() {
           const newOrderRow: OrderRow = {
             id: response.data.id,
             date: response.data.date,
-            referenceNo: response.data.referenceNo,
             customerId: response.data.customerId,
             customerName: response.data.customerName,
             quantity: response.data.quantity,
@@ -439,7 +476,7 @@ export default function OrdersPage() {
 
           setRows(prev => [newOrderRow, ...prev]);
           setOpen(false);
-          toast.success(`Order ${response.data.referenceNo} created successfully! You can now add process records by clicking on the order.`);
+          toast.success(`Order ${response.data.id} created successfully! You can now add process records by clicking on the order.`);
         }
       }
 

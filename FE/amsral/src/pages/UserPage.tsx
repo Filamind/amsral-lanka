@@ -11,8 +11,10 @@ import toast from 'react-hot-toast';
 import UserService, { type User, type PaginationInfo, type UserFetchOptions, type CreateUserRequest, type UpdateUserRequest } from '../services/userService';
 import RoleService, { type RoleOption } from '../services/roleService';
 import { formatDisplayText } from '../utils';
+import { useAuth } from '../hooks/useAuth';
+import { hasPermission } from '../utils/roleUtils';
 
-const getColumns = (onEdit: (user: User) => void, onDelete: (user: User) => void): GridColDef[] => [
+const getColumns = (onEdit: (user: User) => void, onDelete: (user: User) => void, canEdit: boolean, canDelete: boolean): GridColDef[] => [
     { field: 'id', headerName: 'ID', flex: 0.5, minWidth: 70 },
     { field: 'username', headerName: 'Username', flex: 1, minWidth: 120 },
     { field: 'email', headerName: 'Email', flex: 1.5, minWidth: 200 },
@@ -38,20 +40,24 @@ const getColumns = (onEdit: (user: User) => void, onDelete: (user: User) => void
         sortable: false,
         renderCell: (params) => (
             <div className="flex gap-2">
-                <IconButton
-                    size="small"
-                    onClick={() => onEdit(params.row as User)}
-                    sx={{ color: colors.primary[500] }}
-                >
-                    ✏️
-                </IconButton>
-                <IconButton
-                    size="small"
-                    onClick={() => onDelete(params.row as User)}
-                    sx={{ color: '#ef4444' }}
-                >
-                    🗑️
-                </IconButton>
+                {canEdit && (
+                    <IconButton
+                        size="small"
+                        onClick={() => onEdit(params.row as User)}
+                        sx={{ color: colors.primary[500] }}
+                    >
+                        ✏️
+                    </IconButton>
+                )}
+                {canDelete && (
+                    <IconButton
+                        size="small"
+                        onClick={() => onDelete(params.row as User)}
+                        sx={{ color: '#ef4444' }}
+                    >
+                        🗑️
+                    </IconButton>
+                )}
             </div>
         ),
     },
@@ -59,6 +65,7 @@ const getColumns = (onEdit: (user: User) => void, onDelete: (user: User) => void
 
 
 export default function UserPage() {
+    const { user } = useAuth();
     const [search, setSearch] = useState('');
     const [rows, setRows] = useState<User[]>([]);
     const [loading, setLoading] = useState(false);
@@ -504,11 +511,13 @@ export default function UserPage() {
                             ))}
                         </select>
                     </div>
-                    <div className="w-full sm:w-auto mt-1 sm:mt-0">
-                        <PrimaryButton style={{ minWidth: 140, width: '100%' }} onClick={handleOpen}>
-                            + Add User
-                        </PrimaryButton>
-                    </div>
+                    {hasPermission(user, 'canEdit') && (
+                        <div className="w-full sm:w-auto mt-1 sm:mt-0">
+                            <PrimaryButton style={{ minWidth: 140, width: '100%' }} onClick={handleOpen}>
+                                + Add User
+                            </PrimaryButton>
+                        </div>
+                    )}
                 </div>
 
                 {/* Pagination Info */}
@@ -541,7 +550,7 @@ export default function UserPage() {
                     </div>
                 ) : (
                     <PrimaryTable
-                        columns={getColumns(handleEdit, handleDelete)}
+                        columns={getColumns(handleEdit, handleDelete, hasPermission(user, 'canEdit'), hasPermission(user, 'canDelete'))}
                         rows={rows}
                         pagination
                         paginationMode="server"
