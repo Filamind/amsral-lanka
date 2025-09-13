@@ -10,6 +10,7 @@ export interface User {
 export type UserRole = 'admin' | 'manager' | 'user';
 
 export interface RolePermissions {
+  canViewDashboard: boolean;
   canViewUsers: boolean;
   canViewEmployees: boolean;
   canViewCustomers: boolean;
@@ -42,7 +43,7 @@ export const getUserRole = (user: User | null): UserRole => {
     roleString = user.role;
   } else if (typeof user.role === 'object' && user.role !== null && 'name' in user.role) {
     // If role is an object with a name property
-    roleString = (user.role as any).name || '';
+    roleString = (user.role as { name: string }).name || '';
   } else {
     // Fallback: convert to string
     roleString = String(user.role);
@@ -67,6 +68,7 @@ export const getRolePermissions = (user: User | null): RolePermissions => {
   switch (role) {
     case 'admin':
       return {
+        canViewDashboard: true,
         canViewUsers: true,
         canViewEmployees: true,
         canViewCustomers: true,
@@ -81,6 +83,7 @@ export const getRolePermissions = (user: User | null): RolePermissions => {
     
     case 'manager':
       return {
+        canViewDashboard: false,
         canViewUsers: false,
         canViewEmployees: false,
         canViewCustomers: false,
@@ -88,7 +91,7 @@ export const getRolePermissions = (user: User | null): RolePermissions => {
         canViewOrders: true,
         canViewProduction: true,
         canViewManagement: true,
-        canViewIntegrations: true,
+        canViewIntegrations: false,
         canEdit: false,
         canDelete: false,
       };
@@ -96,6 +99,7 @@ export const getRolePermissions = (user: User | null): RolePermissions => {
     case 'user':
     default:
       return {
+        canViewDashboard: false,
         canViewUsers: false,
         canViewEmployees: false,
         canViewCustomers: false,

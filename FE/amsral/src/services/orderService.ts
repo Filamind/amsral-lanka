@@ -208,6 +208,33 @@ export interface ErrorResponse {
   errors?: { [key: string]: string };
 }
 
+// Order Summary for Gatepass
+export interface OrderSummaryRecord {
+  id: number;
+  quantity: number;
+  washType: string;
+  processTypes: string[];
+  itemName: string;
+  itemId: string;
+  status: string;
+  trackingNumber: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrderSummaryData {
+  id: number;
+  customerName: string;
+  orderDate: string;
+  totalQuantity: number;
+  createdDate: string;
+  referenceNo: string;
+  deliveryDate: string;
+  status: string;
+  notes: string | null;
+  records: OrderSummaryRecord[];
+}
+
 class OrderService {
   /**
    * 1. Create Order
@@ -414,6 +441,20 @@ class OrderService {
     } catch (error: unknown) {
       const apiError = error as { response?: { data?: ErrorResponse } };
       throw apiError.response?.data || { success: false, message: 'Failed to fetch order details' };
+    }
+  }
+
+  /**
+   * Get order summary for gatepass
+   * GET /api/orders/:id/summary
+   */
+  async getOrderSummary(orderId: number): Promise<{ success: boolean; data: OrderSummaryData }> {
+    try {
+      const response = await apiClient.get(`/orders/${orderId}/summary`);
+      return response.data;
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: ErrorResponse } };
+      throw apiError.response?.data || { success: false, message: 'Failed to fetch order summary' };
     }
   }
 }

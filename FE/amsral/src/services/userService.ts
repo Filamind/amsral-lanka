@@ -76,6 +76,23 @@ export interface UpdateUserRequest {
   password?: string; // Optional for updates
 }
 
+// Profile update interfaces
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface ChangeUsernameRequest {
+  newUsername: string;
+}
+
+export interface UpdateProfileRequest {
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  dateOfBirth?: string;
+}
+
 // User service class
 export class UserService {
   static async getAllUsers(options: UserFetchOptions = {}): Promise<UserResponse> {
@@ -188,6 +205,36 @@ export class UserService {
       await apiClient.delete(`/users/${id}`);
     } catch (error) {
       console.error('Error deleting user:', error);
+      throw error;
+    }
+  }
+
+  // Profile management methods
+  static async changePassword(id: number, passwordData: ChangePasswordRequest): Promise<void> {
+    try {
+      await apiClient.put(`/users/${id}/change-password`, passwordData);
+    } catch (error) {
+      console.error('Error changing password:', error);
+      throw error;
+    }
+  }
+
+  static async changeUsername(id: number, usernameData: ChangeUsernameRequest): Promise<User> {
+    try {
+      const response = await apiClient.put(`/users/${id}/change-username`, usernameData);
+      return response.data.data || response.data;
+    } catch (error) {
+      console.error('Error changing username:', error);
+      throw error;
+    }
+  }
+
+  static async updateProfile(id: number, profileData: UpdateProfileRequest): Promise<User> {
+    try {
+      const response = await apiClient.put(`/users/${id}/profile`, profileData);
+      return response.data.data || response.data;
+    } catch (error) {
+      console.error('Error updating profile:', error);
       throw error;
     }
   }

@@ -13,15 +13,40 @@ function LoginPage() {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
-    const { login, isAuthenticated } = useAuth();
+    const { login, isAuthenticated, user } = useAuth();
     const navigate = useNavigate();
 
-    // Redirect if already authenticated
+    // Redirect if already authenticated with role-based navigation
     useEffect(() => {
-        if (isAuthenticated) {
-            navigate('/dashboard');
+        if (isAuthenticated && user) {
+            // Handle role as object with name property
+            let userRole = '';
+            if (typeof user.role === 'string') {
+                userRole = user.role.toLowerCase();
+            } else if (user.role && typeof user.role === 'object' && 'name' in user.role) {
+                userRole = (user.role as { name: string }).name?.toLowerCase() || '';
+            }
+
+            console.log('LoginPage - User role:', userRole);
+            console.log('LoginPage - User object:', user);
+
+            // Navigate based on role
+            if (userRole === 'admin') {
+                console.log('LoginPage - Redirecting admin to dashboard');
+                navigate('/dashboard');
+            } else if (userRole === 'manager') {
+                console.log('LoginPage - Redirecting manager to management');
+                navigate('/management');
+            } else if (userRole === 'user') {
+                console.log('LoginPage - Redirecting user to orders');
+                navigate('/orders');
+            } else {
+                // Fallback to orders for unknown roles
+                console.log('LoginPage - Unknown role, redirecting to orders');
+                navigate('/orders');
+            }
         }
-    }, [isAuthenticated, navigate]);
+    }, [isAuthenticated, user, navigate]);
 
     // Debug info on page load
     useEffect(() => {

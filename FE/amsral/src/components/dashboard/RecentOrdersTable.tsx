@@ -52,31 +52,56 @@ export default function RecentOrdersTable({ orders, loading = false }: RecentOrd
     }
 
     return (
-        <Card sx={{ height: 400, p: 0 }}>
-            <CardContent sx={{ height: '100%', p: 0 }}>
-                <Box sx={{ p: 3, pb: 2 }}>
+        <Card sx={{ width: '100%', boxShadow: 2, borderRadius: 2 }}>
+            <CardContent sx={{ p: 0 }}>
+                <Box sx={{ p: 3, pb: 2, borderBottom: `1px solid ${colors.border.light}` }}>
                     <Typography variant="h6" sx={{ fontWeight: 600, color: colors.text.primary }}>
                         Recent Orders
                     </Typography>
                 </Box>
 
-                <TableContainer sx={{ height: 'calc(100% - 80px)', overflow: 'auto' }}>
+                <TableContainer sx={{ maxHeight: 500, overflow: 'auto' }}>
                     <Table stickyHeader>
                         <TableHead>
                             <TableRow>
-                                <TableCell sx={{ fontWeight: 600, color: colors.text.primary, borderBottom: `1px solid ${colors.border.light}` }}>
+                                <TableCell sx={{
+                                    fontWeight: 600,
+                                    color: colors.text.primary,
+                                    borderBottom: `1px solid ${colors.border.light}`,
+                                    backgroundColor: colors.primary[50]
+                                }}>
                                     Order ID
                                 </TableCell>
-                                <TableCell sx={{ fontWeight: 600, color: colors.text.primary, borderBottom: `1px solid ${colors.border.light}` }}>
+                                <TableCell sx={{
+                                    fontWeight: 600,
+                                    color: colors.text.primary,
+                                    borderBottom: `1px solid ${colors.border.light}`,
+                                    backgroundColor: colors.primary[50]
+                                }}>
                                     Customer
                                 </TableCell>
-                                <TableCell sx={{ fontWeight: 600, color: colors.text.primary, borderBottom: `1px solid ${colors.border.light}` }}>
+                                <TableCell sx={{
+                                    fontWeight: 600,
+                                    color: colors.text.primary,
+                                    borderBottom: `1px solid ${colors.border.light}`,
+                                    backgroundColor: colors.primary[50]
+                                }}>
                                     Status
                                 </TableCell>
-                                <TableCell sx={{ fontWeight: 600, color: colors.text.primary, borderBottom: `1px solid ${colors.border.light}` }}>
+                                <TableCell sx={{
+                                    fontWeight: 600,
+                                    color: colors.text.primary,
+                                    borderBottom: `1px solid ${colors.border.light}`,
+                                    backgroundColor: colors.primary[50]
+                                }}>
                                     Amount
                                 </TableCell>
-                                <TableCell sx={{ fontWeight: 600, color: colors.text.primary, borderBottom: `1px solid ${colors.border.light}` }}>
+                                <TableCell sx={{
+                                    fontWeight: 600,
+                                    color: colors.text.primary,
+                                    borderBottom: `1px solid ${colors.border.light}`,
+                                    backgroundColor: colors.primary[50]
+                                }}>
                                     Date
                                 </TableCell>
                             </TableRow>
@@ -100,6 +125,9 @@ export default function RecentOrdersTable({ orders, loading = false }: RecentOrd
                                                 cursor: 'pointer',
                                                 '&:hover': {
                                                     backgroundColor: colors.primary[50],
+                                                },
+                                                '&:nth-of-type(even)': {
+                                                    backgroundColor: colors.primary[25],
                                                 },
                                             }}
                                         >

@@ -16,6 +16,7 @@ import RecordAssignmentsPage from './pages/RecordAssignmentsPage';
 import SystemDataPage from './pages/SystemDataPage';
 import ManagementPage from './pages/ManagementPage';
 import OrderDetailsPage from './pages/OrderDetailsPage';
+import ProfilePage from './pages/ProfilePage';
 
 function App() {
   return (
@@ -72,8 +73,9 @@ function App() {
             } />
             <Route path="customers" element={<CustomersPage />} />
             <Route path="system-data" element={<SystemDataPage />} />
-            {/* Optional: Redirect root to dashboard */}
-            <Route index element={<Navigate to="dashboard" />} />
+            <Route path="profile" element={<ProfilePage />} />
+            {/* Redirect to login if not authenticated */}
+            <Route index element={<Navigate to="/login" />} />
           </Route>
         </Routes>
       </BrowserRouter>

@@ -14,6 +14,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 import LogoutIcon from '@mui/icons-material/Logout';
 import StorageIcon from '@mui/icons-material/Storage';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
+import PersonIcon from '@mui/icons-material/Person';
 import toast from 'react-hot-toast';
 import colors from '../../styles/colors';
 import { useState, useMemo } from 'react';
@@ -33,8 +34,6 @@ const NAVIGATION: NavigationItem[] = [
     { segment: 'employees', title: 'Employees', icon: <BadgeIcon /> },
     { segment: 'customers', title: 'Customers', icon: <GroupsIcon /> },
     { segment: 'system-data', title: 'System Data', icon: <StorageIcon /> },
-    { kind: 'divider' },
-    { segment: 'integrations', title: 'Integrations', icon: <LayersIcon /> },
 ];
 
 function SideBarNavigation({ navigation, expanded, onToggle }: { navigation: NavigationItem[]; expanded: boolean; onToggle: () => void }) {
@@ -54,7 +53,7 @@ function SideBarNavigation({ navigation, expanded, onToggle }: { navigation: Nav
             // Filter based on segment permissions
             switch (item.segment) {
                 case 'dashboard':
-                    return true; // Everyone can see dashboard
+                    return permissions.canViewDashboard;
                 case 'orders':
                     return permissions.canViewOrders;
                 case 'production':
@@ -69,8 +68,6 @@ function SideBarNavigation({ navigation, expanded, onToggle }: { navigation: Nav
                     return permissions.canViewCustomers;
                 case 'system-data':
                     return permissions.canViewSystemData;
-                case 'integrations':
-                    return permissions.canViewIntegrations;
                 default:
                     return true; // Show unknown segments by default
             }
@@ -164,13 +161,53 @@ function SideBarNavigation({ navigation, expanded, onToggle }: { navigation: Nav
                 })}
             </Box>
 
-            {/* User info and logout */}
+            {/* User info, profile, and logout */}
             <Box sx={{ mt: 'auto', pt: 2, borderTop: 1, borderColor: colors.border.light }}>
                 {expanded && user && (
                     <Typography variant="caption" sx={{ color: colors.text.secondary, mb: 1, display: 'block', px: 1.5 }}>
                         Welcome, {user.firstName}
                     </Typography>
                 )}
+
+                {/* Profile Link */}
+                <NavLink
+                    to="/profile"
+                    style={({ isActive }) => ({
+                        textDecoration: 'none',
+                        color: isActive ? colors.primary[700] : colors.text.primary,
+                        fontWeight: isActive ? 700 : 500,
+                        background: isActive ? colors.gradients.cardHover : 'none',
+                        borderRadius: 8,
+                        display: 'block',
+                    })}
+                >
+                    <Box
+                        sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            mb: 1,
+                            px: 1.5,
+                            py: 1,
+                            borderRadius: 2,
+                            transition: 'background 0.2s',
+                            '&:hover': {
+                                background: colors.gradients.cardHover,
+                            },
+                            justifyContent: expanded ? 'flex-start' : 'center',
+                        }}
+                    >
+                        <Box sx={{ color: 'inherit', minWidth: 28, display: 'flex', justifyContent: 'center' }}>
+                            <PersonIcon />
+                        </Box>
+                        {expanded && (
+                            <Typography sx={{ ml: 2, fontSize: { xs: 14, sm: 16 }, color: 'inherit', fontWeight: 500 }}>
+                                Profile
+                            </Typography>
+                        )}
+                    </Box>
+                </NavLink>
+
+                {/* Logout */}
                 <Box
                     onClick={handleLogout}
                     sx={{
