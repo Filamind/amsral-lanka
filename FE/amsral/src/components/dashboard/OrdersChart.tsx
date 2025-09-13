@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Typography, Card, CardContent } from '@mui/material';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import colors from '../../styles/colors';
 
 // Local type definitions to avoid import issues
@@ -37,6 +37,25 @@ export function OrdersTrendChart({ data, loading = false }: OrdersTrendChartProp
         );
     }
 
+    // Debug: Log the data to see what we're getting
+    console.log('OrdersTrendChart data:', data);
+
+    // Handle empty data
+    if (!data || data.length === 0) {
+        return (
+            <Card sx={{ height: 400, p: 0 }}>
+                <CardContent sx={{ height: '100%', p: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: colors.text.primary }}>
+                        Orders Trend
+                    </Typography>
+                    <Typography color="text.secondary" sx={{ textAlign: 'center' }}>
+                        No order data available for the selected period.
+                    </Typography>
+                </CardContent>
+            </Card>
+        );
+    }
+
     return (
         <Card sx={{ height: 400, p: 0 }}>
             <CardContent sx={{ height: '100%', p: 3 }}>
@@ -51,7 +70,17 @@ export function OrdersTrendChart({ data, loading = false }: OrdersTrendChartProp
                                 dataKey="date"
                                 stroke={colors.text.secondary}
                                 fontSize={12}
-                                tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                tickFormatter={(value) => {
+                                    const date = new Date(value);
+                                    // Show different formats based on data range
+                                    if (data.length <= 7) {
+                                        return date.toLocaleDateString('en-US', { weekday: 'short' });
+                                    } else if (data.length <= 30) {
+                                        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                                    } else {
+                                        return date.toLocaleDateString('en-US', { month: 'short' });
+                                    }
+                                }}
                             />
                             <YAxis
                                 stroke={colors.text.secondary}
@@ -66,9 +95,14 @@ export function OrdersTrendChart({ data, loading = false }: OrdersTrendChartProp
                                 }}
                                 labelFormatter={(value) => new Date(value).toLocaleDateString()}
                                 formatter={(value: any, name: string) => [
-                                    name === 'orders' ? `${value} orders` : `$${value}`,
+                                    name === 'orders' ? `${value} orders` : `$${value.toLocaleString()}`,
                                     name === 'orders' ? 'Orders' : 'Revenue'
                                 ]}
+                            />
+                            <Legend
+                                verticalAlign="top"
+                                height={36}
+                                iconType="line"
                             />
                             <Line
                                 type="monotone"
@@ -77,6 +111,16 @@ export function OrdersTrendChart({ data, loading = false }: OrdersTrendChartProp
                                 strokeWidth={3}
                                 dot={{ fill: colors.primary[500], strokeWidth: 2, r: 4 }}
                                 activeDot={{ r: 6, stroke: colors.primary[500], strokeWidth: 2 }}
+                                name="Orders"
+                            />
+                            <Line
+                                type="monotone"
+                                dataKey="revenue"
+                                stroke={colors.success[500]}
+                                strokeWidth={2}
+                                dot={{ fill: colors.success[500], strokeWidth: 2, r: 3 }}
+                                activeDot={{ r: 5, stroke: colors.success[500], strokeWidth: 2 }}
+                                name="Revenue"
                             />
                         </LineChart>
                     </ResponsiveContainer>

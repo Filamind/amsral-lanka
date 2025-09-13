@@ -8,6 +8,8 @@ export interface OrderReceiptData {
   totalQuantity: number;
   orderDate: string;
   notes?: string;
+  referenceNo?: string;
+  deliveryDate?: string;
 }
 
 export interface AssignmentReceiptData {
@@ -19,6 +21,36 @@ export interface AssignmentReceiptData {
   processTypes: string[];
   assignedTo: string;
   quantity: number;
+}
+
+export interface GatepassData {
+  id: number;
+  customerName: string;
+  orderDate: string;
+  totalQuantity: number;
+  createdDate: string;
+  referenceNo: string;
+  deliveryDate: string;
+  status: string;
+  notes: string | null;
+  records: {
+    id: number;
+    quantity: number;
+    washType: string;
+    processTypes: string[];
+    itemName: string;
+    itemId: string;
+    status: string;
+    trackingNumber: string;
+    createdAt: string;
+    updatedAt: string;
+  }[];
+}
+
+export interface BagLabelData {
+  orderId: number;
+  customerName: string;
+  bagNumber: number;
 }
 
 export const generateOrderReceipt = (orderData: OrderReceiptData): void => {
@@ -160,7 +192,7 @@ export const generateOrderReceiptA4 = (orderData: OrderReceiptData): void => {
   // Order details in a more spacious layout
   const details = [
     { label: 'Order ID', value: orderData.orderId.toString() },
-    { label: 'Reference Number', value: orderData.referenceNo },
+    { label: 'Reference Number', value: orderData.referenceNo || 'N/A' },
     { label: 'Customer Name', value: orderData.customerName },
     { label: 'Total Quantity', value: orderData.totalQuantity.toString() },
     { label: 'Order Date', value: new Date(orderData.orderDate).toLocaleDateString('en-US', {
@@ -224,7 +256,7 @@ export const generateOrderReceiptA4 = (orderData: OrderReceiptData): void => {
   doc.text(`Printed: ${printTime}`, 105, footerY + 20, { align: 'center' });
 
   // Generate filename
-  const filename = `Order_${orderData.referenceNo}_Receipt_A4.pdf`;
+  const filename = `Order_${orderData.referenceNo || orderData.orderId}_Receipt_A4.pdf`;
 
   // Save the PDF
   doc.save(filename);
@@ -311,6 +343,247 @@ export const generateAssignmentReceipt = (assignmentData: AssignmentReceiptData)
 
   // Generate filename
   const filename = `Assignment_${assignmentData.assignmentId}_Receipt.pdf`;
+
+  // Save the PDF
+  doc.save(filename);
+};
+
+export const generateGatepass = (gatepassData: GatepassData): void => {
+  // Create a new PDF document
+  // A4 size: 210 x 297 mm
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  // Set font
+  doc.setFont('helvetica');
+
+  // Colors
+  const primaryColor = '#1e293b'; 
+  const textColor = '#64748b';
+  const lightGray = '#94a3b8'; 
+  const borderColor = '#e2e8f0';
+
+  // Header
+  doc.setFontSize(20);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(primaryColor);
+  doc.text('GATEPASS', 105, 30, { align: 'center' });
+
+  // Line separator
+  doc.setDrawColor(lightGray);
+  doc.line(20, 40, 190, 40);
+
+  // Order details section
+  let yPosition = 60;
+
+  // Helper function to add a detail row
+  const addDetailRow = (label: string, value: string, isBold = false) => {
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(textColor);
+    doc.text(`${label}:`, 30, yPosition);
+    
+    doc.setFont('helvetica', isBold ? 'bold' : 'normal');
+    doc.text(value, 80, yPosition);
+    yPosition += 8;
+  };
+
+  // Order basic details
+  addDetailRow('Reference No', gatepassData.id.toString(), true);
+  addDetailRow('Customer Name', gatepassData.customerName, true);
+  addDetailRow('Order Date', new Date(gatepassData.createdDate).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  }));
+  addDetailRow('Total Quantity', gatepassData.totalQuantity.toString(), true);
+
+  // Add some space before records section
+  yPosition += 15;
+
+  // Records section header
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(primaryColor);
+  doc.text('ORDER RECORDS', 30, yPosition);
+  yPosition += 10;
+
+  // Table headers
+  const tableStartY = yPosition;
+  const tableWidth = 160;
+  const colWidths = [20, 30, 25, 35, 25, 25]; // Quantity, Wash Type, Process Types, Item Name, Item ID, Tracking
+  let currentX = 30;
+
+  // Draw table header background
+  doc.setFillColor(240, 240, 240);
+  doc.rect(30, tableStartY - 5, tableWidth, 10, 'F');
+
+  // Table headers
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(primaryColor);
+  
+  const headers = ['Qty', 'Wash Type', 'Process Types', 'Item', 'Item ID', 'Tracking'];
+  headers.forEach((header, index) => {
+    doc.text(header, currentX + 2, tableStartY + 2);
+    currentX += colWidths[index];
+  });
+
+  // Draw header border
+  doc.setDrawColor(borderColor);
+  doc.rect(30, tableStartY - 5, tableWidth, 10);
+
+  yPosition = tableStartY + 10;
+
+  // Records data
+  gatepassData.records.forEach((record, index) => {
+    const rowY = yPosition + (index * 12);
+    
+    // Alternate row background
+    if (index % 2 === 0) {
+      doc.setFillColor(250, 250, 250);
+      doc.rect(30, rowY - 2, tableWidth, 12, 'F');
+    }
+
+    // Draw row border
+    doc.setDrawColor(borderColor);
+    doc.rect(30, rowY - 2, tableWidth, 12);
+
+    // Record data
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(textColor);
+
+    currentX = 30;
+    const rowData = [
+      record.quantity.toString(),
+      record.washType,
+      record.processTypes.join(', '),
+      record.itemName,
+      record.itemId,
+      record.trackingNumber
+    ];
+
+    rowData.forEach((data, colIndex) => {
+      // Truncate long text
+      const maxWidth = colWidths[colIndex] - 4;
+      const truncatedData = doc.splitTextToSize(data, maxWidth)[0];
+      doc.text(truncatedData, currentX + 2, rowY + 6);
+      currentX += colWidths[colIndex];
+    });
+  });
+
+  // Add space after table
+  yPosition += (gatepassData.records.length * 12) + 20;
+
+  // Notes section (if provided)
+  if (gatepassData.notes && gatepassData.notes.trim()) {
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(textColor);
+    doc.text('Notes:', 30, yPosition);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    const notesLines = doc.splitTextToSize(gatepassData.notes, 150);
+    doc.text(notesLines, 30, yPosition + 8);
+    yPosition += 8 + (notesLines.length * 4);
+  }
+
+  // Footer
+  const footerY = Math.max(250, yPosition + 30);
+  doc.setDrawColor(lightGray);
+  doc.line(20, footerY, 190, footerY);
+  
+  // Print date and time
+  const now = new Date();
+  const printTime = now.toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+  doc.setFontSize(10);
+  doc.setTextColor(lightGray);
+  doc.text(`Printed: ${printTime}`, 105, footerY + 10, { align: 'center' });
+
+  // Generate filename
+  const filename = `Gatepass_${gatepassData.referenceNo}.pdf`;
+
+  // Save the PDF
+  doc.save(filename);
+};
+
+export const generateBagLabel = (bagData: BagLabelData): void => {
+  // Create a new PDF document - A4 size like other receipts
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  // Set font
+  doc.setFont('helvetica');
+
+  // Colors
+  const primaryColor = '#1e293b'; 
+  const textColor = '#64748b';
+  const lightGray = '#94a3b8';
+
+  // Header
+  doc.setFontSize(20);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(primaryColor);
+  doc.text('BAG LABEL', 105, 30, { align: 'center' });
+
+  // Line separator
+  doc.setDrawColor(lightGray);
+  doc.line(20, 40, 190, 40);
+
+  // Bag details with better spacing
+  let yPosition = 60;
+
+  // Helper function to add a detail row with proper spacing
+  const addDetailRow = (label: string, value: string, isBold = false) => {
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(textColor);
+    doc.text(`${label}:`, 30, yPosition);
+    
+    doc.setFont('helvetica', isBold ? 'bold' : 'normal');
+    doc.text(value, 80, yPosition);
+    yPosition += 12;
+  };
+
+  // Bag details
+  addDetailRow('Reference No', bagData.orderId.toString(), true);
+  addDetailRow('Customer Name', bagData.customerName, true);
+  addDetailRow('Bag Number', bagData.bagNumber.toString(), true);
+
+  // Footer
+  const footerY = 250;
+  doc.setDrawColor(lightGray);
+  doc.line(20, footerY, 190, footerY);
+  
+  // Print date and time
+  const now = new Date();
+  const printTime = now.toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+  doc.setFontSize(10);
+  doc.setTextColor(lightGray);
+  doc.text(`Printed: ${printTime}`, 105, footerY + 10, { align: 'center' });
+
+  // Generate filename
+  const filename = `Bag_Label_${bagData.orderId}_${bagData.bagNumber}.pdf`;
 
   // Save the PDF
   doc.save(filename);

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Modal, Box, Menu, MenuItem, IconButton } from '@mui/material';
-import { MoreVert, Print } from '@mui/icons-material';
+import { MoreVert, Print, Inventory } from '@mui/icons-material';
 import type { GridColDef, GridRowParams } from '@mui/x-data-grid';
 import PrimaryButton from '../components/common/PrimaryButton';
 import PrimaryTable from '../components/common/PrimaryTable';
@@ -10,7 +10,9 @@ import ConfirmationDialog from '../components/common/ConfirmationDialog';
 import colors from '../styles/colors';
 import { orderService, type CreateOrderRequest, type ErrorResponse } from '../services/orderService';
 import CustomerService from '../services/customerService';
-import { generateOrderReceipt, type OrderReceiptData } from '../utils/pdfUtils';
+import { generateOrderReceipt, generateBagLabel, type OrderReceiptData, type BagLabelData } from '../utils/pdfUtils';
+import { useAuth } from '../hooks/useAuth';
+import { hasPermission } from '../utils/roleUtils';
 import toast from 'react-hot-toast';
 
 // We'll define columns inside the component to access the handler functions
@@ -44,6 +46,7 @@ type OrderRow = {
 
 export default function OrdersPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [search, setSearch] = useState('');
   const [rows, setRows] = useState<OrderRow[]>([]);
   const [open, setOpen] = useState(false);
@@ -56,6 +59,17 @@ export default function OrdersPage() {
     title: '',
     message: '',
     onConfirm: () => { },
+  });
+
+  // Permission checks
+  const canEdit = hasPermission(user, 'canEdit');
+  const canDelete = hasPermission(user, 'canDelete');
+
+  // Bag printing modal state
+  const [bagModal, setBagModal] = useState({
+    open: false,
+    order: null as OrderRow | null,
+    numberOfBags: '',
   });
 
   // State for dropdown options
@@ -311,6 +325,64 @@ export default function OrdersPage() {
     }
   };
 
+  // Bag printing handlers
+  const handleBagPrintClick = (orderRow: OrderRow) => {
+    setBagModal({
+      open: true,
+      order: orderRow,
+      numberOfBags: '',
+    });
+  };
+
+  const handleBagModalClose = () => {
+    setBagModal({
+      open: false,
+      order: null,
+      numberOfBags: '',
+    });
+  };
+
+  const handleNumberOfBagsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Only allow numbers
+    if (value === '' || /^\d+$/.test(value)) {
+      setBagModal(prev => ({
+        ...prev,
+        numberOfBags: value,
+      }));
+    }
+  };
+
+  const handlePrintBags = () => {
+    if (!bagModal.order || !bagModal.numberOfBags) {
+      toast.error('Please enter the number of bags');
+      return;
+    }
+
+    const numberOfBags = parseInt(bagModal.numberOfBags);
+    if (numberOfBags <= 0) {
+      toast.error('Number of bags must be greater than 0');
+      return;
+    }
+
+    try {
+      // Generate bag labels for each bag
+      for (let i = 1; i <= numberOfBags; i++) {
+        generateBagLabel({
+          orderId: bagModal.order.id,
+          customerName: bagModal.order.customerName,
+          bagNumber: i,
+        });
+      }
+
+      toast.success(`${numberOfBags} bag label(s) printed successfully!`);
+      handleBagModalClose();
+    } catch (error) {
+      console.error('Error printing bag labels:', error);
+      toast.error('Failed to print bag labels. Please try again.');
+    }
+  };
+
   // Define columns inside component to access handler functions
   const columns: GridColDef[] = [
     { field: 'date', headerName: 'Date', flex: 0.8, minWidth: 110 },
@@ -322,16 +394,19 @@ export default function OrdersPage() {
       flex: 0.8,
       minWidth: 100,
       type: 'number',
-      renderCell: (params) => (
-        <span
-          className={`px-3 py-1 rounded-xl text-sm font-semibold ${params.row.complete
-            ? 'bg-green-100 text-green-800'
-            : 'bg-red-100 text-red-800'
-            }`}
-        >
-          {params.value}
-        </span>
-      )
+      renderCell: (params) => {
+        const isComplete = (params.row.status || '').toLowerCase() === 'complete';
+        return (
+          <span
+            className={`px-3 py-1 rounded-xl text-sm font-semibold ${isComplete
+              ? 'bg-green-100 text-green-800'
+              : 'bg-red-100 text-red-800'
+              }`}
+          >
+            {params.value}
+          </span>
+        );
+      }
     },
     { field: 'recordsCount', headerName: 'Records', flex: 0.6, minWidth: 80, type: 'number' },
     { field: 'deliveryDate', headerName: 'Delivery Date', flex: 1, minWidth: 120 },
@@ -340,20 +415,37 @@ export default function OrdersPage() {
       headerName: 'Status',
       flex: 1,
       minWidth: 120,
-      renderCell: (params) => (
-        <span
-          className={`px-3 py-1 rounded-xl text-sm font-semibold ${params.row.complete
-            ? 'bg-green-100 text-green-800'
-            : params.row.status === 'in_progress'
-              ? 'bg-yellow-100 text-yellow-800'
-              : params.row.status === 'pending'
-                ? 'bg-blue-100 text-blue-800'
-                : 'bg-gray-100 text-gray-800'
-            }`}
-        >
-          {params.row.complete ? 'Complete' : params.row.status || 'Pending'}
-        </span>
-      )
+      renderCell: (params) => {
+        const status = params.row.status || 'Pending';
+        const getStatusStyle = (status: string) => {
+          switch (status.toLowerCase()) {
+            case 'complete':
+              return 'bg-green-100 text-green-800';
+            case 'completed':
+              return 'bg-green-100 text-green-800';
+            case 'in progress':
+              return 'bg-yellow-100 text-yellow-800';
+            case 'pending':
+              return 'bg-blue-100 text-blue-800';
+            case 'confirmed':
+              return 'bg-purple-100 text-purple-800';
+            case 'processing':
+              return 'bg-orange-100 text-orange-800';
+            case 'delivered':
+              return 'bg-gray-100 text-gray-800';
+            default:
+              return 'bg-gray-100 text-gray-800';
+          }
+        };
+
+        return (
+          <span
+            className={`px-3 py-1 rounded-xl text-sm font-semibold ${getStatusStyle(status)}`}
+          >
+            {status}
+          </span>
+        );
+      }
     },
     {
       field: 'print',
@@ -376,23 +468,57 @@ export default function OrdersPage() {
       )
     },
     {
+      field: 'bagPrint',
+      headerName: 'Bag',
+      flex: 0.3,
+      minWidth: 60,
+      sortable: false,
+      renderCell: (params) => {
+        const isComplete = (params.row.status || '').toLowerCase() === 'complete';
+        return (
+          <IconButton
+            onClick={(e) => {
+              e.stopPropagation();
+              handleBagPrintClick(params.row);
+            }}
+            size="small"
+            sx={{
+              color: isComplete ? colors.button.primary : colors.text.disabled,
+              opacity: isComplete ? 1 : 0.3
+            }}
+            title={isComplete ? "Print Bag Labels" : "Order must be complete to print bags"}
+            disabled={!isComplete}
+          >
+            <Inventory />
+          </IconButton>
+        );
+      }
+    },
+    {
       field: 'actions',
       headerName: 'Actions',
       flex: 0.5,
       minWidth: 80,
       sortable: false,
-      renderCell: (params) => (
-        <IconButton
-          onClick={(e) => {
-            e.stopPropagation();
-            handleMenuOpen(e, params.row);
-          }}
-          size="small"
-          sx={{ color: colors.text.secondary }}
-        >
-          <MoreVert />
-        </IconButton>
-      )
+      renderCell: (params) => {
+        // Only show actions menu if user has edit or delete permissions
+        if (!canEdit && !canDelete) {
+          return null;
+        }
+
+        return (
+          <IconButton
+            onClick={(e) => {
+              e.stopPropagation();
+              handleMenuOpen(e, params.row);
+            }}
+            size="small"
+            sx={{ color: colors.text.secondary }}
+          >
+            <MoreVert />
+          </IconButton>
+        );
+      }
     },
   ];
 
@@ -568,12 +694,16 @@ export default function OrdersPage() {
           horizontal: 'right',
         }}
       >
-        <MenuItem onClick={handleEditClick}>
-          Edit Order
-        </MenuItem>
-        <MenuItem onClick={handleDeleteOrder} sx={{ color: 'error.main' }}>
-          Delete Order
-        </MenuItem>
+        {canEdit && (
+          <MenuItem onClick={handleEditClick}>
+            Edit Order
+          </MenuItem>
+        )}
+        {canDelete && (
+          <MenuItem onClick={handleDeleteOrder} sx={{ color: 'error.main' }}>
+            Delete Order
+          </MenuItem>
+        )}
       </Menu>
 
       {/* Confirmation Dialog */}
@@ -659,6 +789,84 @@ export default function OrdersPage() {
               </PrimaryButton>
             </div>
           </form>
+        </Box>
+      </Modal>
+
+      {/* Bag Printing Modal */}
+      <Modal open={bagModal.open} onClose={handleBagModalClose}>
+        <Box
+          sx={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            bgcolor: 'background.paper',
+            boxShadow: 24,
+            borderRadius: 2,
+            p: 4,
+            width: { xs: '90vw', sm: '400px' },
+            maxWidth: '95vw',
+          }}
+        >
+          <div className="flex flex-col gap-4">
+            <h3 className="text-xl font-bold text-center" style={{ color: colors.text.primary }}>
+              Print Bag Labels
+            </h3>
+
+            {bagModal.order && (
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <p className="text-sm text-gray-600">
+                  <strong>Order:</strong> {bagModal.order.id}
+                </p>
+                <p className="text-sm text-gray-600">
+                  <strong>Customer:</strong> {bagModal.order.customerName}
+                </p>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium" style={{ color: colors.text.primary }}>
+                Number of Bags:
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={bagModal.numberOfBags}
+                onChange={handleNumberOfBagsChange}
+                placeholder="Enter number of bags"
+                className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                style={{ borderColor: colors.border.light }}
+                autoFocus
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <PrimaryButton
+                onClick={handleBagModalClose}
+                style={{
+                  backgroundColor: colors.secondary[500],
+                  color: colors.text.white,
+                  border: 'none',
+                  borderRadius: '8px',
+                }}
+              >
+                Cancel
+              </PrimaryButton>
+              <PrimaryButton
+                onClick={handlePrintBags}
+                disabled={!bagModal.numberOfBags || parseInt(bagModal.numberOfBags) <= 0}
+                style={{
+                  backgroundColor: colors.primary[500],
+                  color: colors.text.white,
+                  border: 'none',
+                  borderRadius: '8px',
+                }}
+              >
+                Print Bags
+              </PrimaryButton>
+            </div>
+          </div>
         </Box>
       </Modal>
     </div>

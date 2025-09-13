@@ -12,6 +12,8 @@ import EmployeeService, { type Employee } from '../services/employeeService';
 import recordService, { type ProcessRecord, type MachineAssignment } from '../services/recordService';
 import machineService, { type Machine } from '../services/machineService';
 import { generateAssignmentReceipt, type AssignmentReceiptData } from '../utils/pdfUtils';
+import { useAuth } from '../hooks/useAuth';
+import { hasPermission } from '../utils/roleUtils';
 import toast from 'react-hot-toast';
 
 // Types are now imported from services
@@ -21,11 +23,16 @@ import toast from 'react-hot-toast';
 export default function RecordAssignmentsPage() {
     const { recordId } = useParams<{ recordId: string }>();
     const navigate = useNavigate();
+    const { user } = useAuth();
     const [record, setRecord] = useState<ProcessRecord | null>(null);
     const [assignments, setAssignments] = useState<MachineAssignment[]>([]);
     const [loading, setLoading] = useState(true);
     const [open, setOpen] = useState(false);
     const [saving, setSaving] = useState(false);
+
+    // Permission checks
+    const canEdit = hasPermission(user, 'canEdit');
+    const canDelete = hasPermission(user, 'canDelete');
     const [form, setForm] = useState({
         assignedBy: '',
         quantity: 1,
@@ -125,18 +132,25 @@ export default function RecordAssignmentsPage() {
             flex: 0.5,
             minWidth: 80,
             sortable: false,
-            renderCell: (params) => (
-                <IconButton
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        handleMenuOpen(e, params.row);
-                    }}
-                    size="small"
-                    sx={{ color: colors.text.secondary }}
-                >
-                    <MoreVert />
-                </IconButton>
-            )
+            renderCell: (params) => {
+                // Only show actions menu if user has edit or delete permissions
+                if (!canEdit && !canDelete) {
+                    return null;
+                }
+
+                return (
+                    <IconButton
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleMenuOpen(e, params.row);
+                        }}
+                        size="small"
+                        sx={{ color: colors.text.secondary }}
+                    >
+                        <MoreVert />
+                    </IconButton>
+                );
+            }
         },
     ];
 
@@ -665,12 +679,13 @@ export default function RecordAssignmentsPage() {
                 }}
             >
                 <MenuItem onClick={handlePrintAssignment}>
-
                     Print Assignment
                 </MenuItem>
-                <MenuItem onClick={handleDeleteAssignment} sx={{ color: 'error.main' }}>
-                    Delete Assignment
-                </MenuItem>
+                {canDelete && (
+                    <MenuItem onClick={handleDeleteAssignment} sx={{ color: 'error.main' }}>
+                        Delete Assignment
+                    </MenuItem>
+                )}
             </Menu>
 
             {/* Confirmation Dialog */}

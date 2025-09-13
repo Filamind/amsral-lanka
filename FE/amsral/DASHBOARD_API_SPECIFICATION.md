@@ -1,139 +1,14 @@
 # Dashboard API Specification
 
-This document outlines the API endpoints required for the dashboard functionality in the AMSRAL application.
-
-## Overview
-
-The dashboard provides analytics and insights for order management, including metrics, charts, and recent activity. All endpoints should return data based on the authenticated user's permissions and role.
-
-## Base URL
-
-```
-/api/dashboard
-```
-
-## Authentication
-
-All endpoints require authentication via Bearer token in the Authorization header:
-
-```
-Authorization: Bearer <token>
-```
-
-## Endpoints
-
-### 1. Main Dashboard Analytics
-
-**Endpoint:** `GET /api/dashboard/analytics`
-
-**Description:** Returns comprehensive dashboard data including summary metrics, trends, and recent orders.
-
-**Query Parameters:**
-
-- `startDate` (optional): Start date in YYYY-MM-DD format
-- `endDate` (optional): End date in YYYY-MM-DD format
-- `period` (optional): Predefined period - `today`, `week`, `month`, `quarter`, `year`
-
-**Example Request:**
-
-```
-GET /api/dashboard/analytics?startDate=2024-01-01&endDate=2024-01-31&period=month
-```
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "data": {
-    "summary": {
-      "totalOrders": 150,
-      "completedOrders": 120,
-      "pendingOrders": 20,
-      "inProgressOrders": 10,
-      "totalRevenue": 45000,
-      "averageOrderValue": 300
-    },
-    "trends": {
-      "dailyOrders": [
-        {
-          "date": "2024-01-01T00:00:00Z",
-          "orders": 5,
-          "revenue": 1500
-        },
-        {
-          "date": "2024-01-02T00:00:00Z",
-          "orders": 8,
-          "revenue": 2400
-        }
-      ],
-      "orderStatusDistribution": [
-        {
-          "status": "Completed",
-          "count": 120,
-          "percentage": 80
-        },
-        {
-          "status": "Pending",
-          "count": 20,
-          "percentage": 13.3
-        },
-        {
-          "status": "In Progress",
-          "count": 10,
-          "percentage": 6.7
-        }
-      ]
-    },
-    "recentOrders": [
-      {
-        "id": 123,
-        "customerName": "John Doe",
-        "status": "Completed",
-        "totalAmount": 500,
-        "orderDate": "2024-01-15T10:30:00Z"
-      },
-      {
-        "id": 124,
-        "customerName": "Jane Smith",
-        "status": "Pending",
-        "totalAmount": 750,
-        "orderDate": "2024-01-14T14:20:00Z"
-      }
-    ]
-  }
-}
-```
-
-### 2. Quick Stats (Optional)
-
-**Endpoint:** `GET /api/dashboard/quick-stats`
-
-**Description:** Returns only the summary metrics for quick loading.
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "data": {
-    "totalOrders": 150,
-    "completedOrders": 120,
-    "pendingOrders": 20,
-    "inProgressOrders": 10,
-    "totalRevenue": 45000,
-    "averageOrderValue": 300
-  }
-}
-```
-
-### 3. Orders Trend (Optional)
+## 1. Orders Trend API
 
 **Endpoint:** `GET /api/dashboard/orders-trend`
 
-**Description:** Returns daily order data for trend charts.
+**Query Parameters:**
 
-**Query Parameters:** Same as main analytics endpoint
+- `startDate` (string, required): Start date in YYYY-MM-DD format
+- `endDate` (string, required): End date in YYYY-MM-DD format
+- `period` (string, optional): 'week', 'month', 'quarter' (default: 'month')
 
 **Response:**
 
@@ -142,61 +17,28 @@ GET /api/dashboard/analytics?startDate=2024-01-01&endDate=2024-01-31&period=mont
   "success": true,
   "data": [
     {
-      "date": "2024-01-01T00:00:00Z",
+      "date": "2025-01-01",
       "orders": 5,
-      "revenue": 1500
+      "revenue": 2500
     },
     {
-      "date": "2024-01-02T00:00:00Z",
-      "orders": 8,
-      "revenue": 2400
+      "date": "2025-01-02",
+      "orders": 3,
+      "revenue": 1800
     }
   ]
 }
 ```
 
-### 4. Order Status Distribution (Optional)
+## 2. Orders Count API
 
-**Endpoint:** `GET /api/dashboard/order-status-distribution`
-
-**Description:** Returns order status breakdown for pie charts.
-
-**Query Parameters:** Same as main analytics endpoint
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "status": "Completed",
-      "count": 120,
-      "percentage": 80
-    },
-    {
-      "status": "Pending",
-      "count": 20,
-      "percentage": 13.3
-    },
-    {
-      "status": "In Progress",
-      "count": 10,
-      "percentage": 6.7
-    }
-  ]
-}
-```
-
-### 5. Recent Orders (Optional)
-
-**Endpoint:** `GET /api/dashboard/recent-orders`
-
-**Description:** Returns recent orders for the activity table.
+**Endpoint:** `GET /api/dashboard/orders-count`
 
 **Query Parameters:**
 
-- `limit` (optional): Number of orders to return (default: 10)
+- `startDate` (string, required): Start date in YYYY-MM-DD format
+- `endDate` (string, required): End date in YYYY-MM-DD format
+- `period` (string, optional): 'week', 'month', 'quarter' (default: 'month')
 
 **Response:**
 
@@ -205,87 +47,116 @@ GET /api/dashboard/analytics?startDate=2024-01-01&endDate=2024-01-31&period=mont
   "success": true,
   "data": [
     {
-      "id": 123,
-      "customerName": "John Doe",
-      "status": "Completed",
-      "totalAmount": 500,
-      "orderDate": "2024-01-15T10:30:00Z"
+      "date": "2025-01-01",
+      "orders": 5
     },
     {
-      "id": 124,
-      "customerName": "Jane Smith",
-      "status": "Pending",
-      "totalAmount": 750,
-      "orderDate": "2024-01-14T14:20:00Z"
+      "date": "2025-01-02",
+      "orders": 3
     }
   ]
 }
 ```
 
-## Data Types
+## 3. Order Status Distribution API
 
-### Summary Metrics
+**Endpoint:** `GET /api/dashboard/order-status-distribution`
 
-- `totalOrders`: Total number of orders in the period
-- `completedOrders`: Number of completed orders
-- `pendingOrders`: Number of pending orders
-- `inProgressOrders`: Number of in-progress orders
-- `totalRevenue`: Total revenue in the period (in base currency)
-- `averageOrderValue`: Average order value (totalRevenue / totalOrders)
+**Query Parameters:**
 
-### Daily Order Data
+- `startDate` (string, required): Start date in YYYY-MM-DD format
+- `endDate` (string, required): End date in YYYY-MM-DD format
 
-- `date`: ISO 8601 date string
-- `orders`: Number of orders on that date
-- `revenue`: Revenue generated on that date
-
-### Order Status Distribution
-
-- `status`: Order status name (Completed, Pending, In Progress, etc.)
-- `count`: Number of orders with this status
-- `percentage`: Percentage of total orders
-
-### Recent Order
-
-- `id`: Order ID
-- `customerName`: Customer name
-- `status`: Current order status
-- `totalAmount`: Order total amount
-- `orderDate`: Order creation date (ISO 8601)
-
-## Error Responses
-
-All endpoints should return consistent error responses:
+**Response:**
 
 ```json
 {
-  "success": false,
-  "message": "Error description",
-  "error": "ERROR_CODE"
+  "success": true,
+  "data": [
+    {
+      "status": "Complete",
+      "count": 15,
+      "percentage": 60
+    },
+    {
+      "status": "Pending",
+      "count": 8,
+      "percentage": 32
+    },
+    {
+      "status": "In Progress",
+      "count": 2,
+      "percentage": 8
+    }
+  ]
 }
 ```
 
-Common HTTP status codes:
+## 4. Recent Orders API
 
-- `200`: Success
-- `400`: Bad Request (invalid parameters)
-- `401`: Unauthorized (invalid/missing token)
-- `403`: Forbidden (insufficient permissions)
-- `500`: Internal Server Error
+**Endpoint:** `GET /api/dashboard/recent-orders`
 
-## Role-Based Access
+**Query Parameters:**
 
-The dashboard should respect user roles:
+- `limit` (number, optional): Number of orders to return (default: 10)
 
-- **Admin**: Full access to all data
-- **Manager**: Access to orders and production data only
-- **User**: Read-only access to orders and production data only
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "referenceNo": "ORD001",
+      "customerName": "Customer 1",
+      "status": "Complete",
+      "quantity": 10,
+      "totalAmount": 1500,
+      "orderDate": "2025-01-01T10:00:00Z"
+    },
+    {
+      "id": 2,
+      "referenceNo": "ORD002",
+      "customerName": "Customer 2",
+      "status": "Pending",
+      "quantity": 5,
+      "totalAmount": 750,
+      "orderDate": "2025-01-02T14:30:00Z"
+    }
+  ]
+}
+```
+
+## 5. Quick Stats API
+
+**Endpoint:** `GET /api/dashboard/quick-stats`
+
+**Query Parameters:**
+
+- `startDate` (string, required): Start date in YYYY-MM-DD format
+- `endDate` (string, required): End date in YYYY-MM-DD format
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "totalOrders": 50,
+    "completedOrders": 30,
+    "pendingOrders": 15,
+    "inProgressOrders": 5,
+    "totalRevenue": 75000,
+    "averageOrderValue": 1500
+  }
+}
+```
 
 ## Notes
 
-1. All dates should be in ISO 8601 format
-2. Currency amounts should be in the base currency (no currency symbol in API)
-3. Percentages should be calculated to 1 decimal place
-4. The main analytics endpoint should be optimized for performance as it's called frequently
-5. Consider implementing caching for dashboard data to improve performance
-6. All endpoints should handle date range validation and return appropriate errors for invalid ranges
+- All dates should be in ISO 8601 format (YYYY-MM-DD)
+- All monetary values should be in the base currency unit
+- Order status values should match: "Complete", "Pending", "In Progress"
+- All APIs should return HTTP 200 on success
+- Error responses should follow the standard error format with appropriate HTTP status codes

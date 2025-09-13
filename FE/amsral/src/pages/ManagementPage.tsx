@@ -8,26 +8,16 @@ import PrimaryTable from '../components/common/PrimaryTable';
 import PrimaryDropdown from '../components/common/PrimaryDropdown';
 import PrimaryButton from '../components/common/PrimaryButton';
 import colors from '../styles/colors';
-import { orderService, type ManagementOrder, type OrderStatus } from '../services/orderService';
-import { generateOrderReceipt, type OrderReceiptData } from '../utils/pdfUtils';
+import { orderService, type ManagementOrder, type OrderStatus, type OrderSummaryData } from '../services/orderService';
+import { generateGatepass, type GatepassData } from '../utils/pdfUtils';
 import toast from 'react-hot-toast';
 
-const ORDER_STATUS_OPTIONS = [
-    { value: '', label: 'All Status' },
-    { value: 'Pending', label: 'Pending' },
-    { value: 'In Progress', label: 'In Progress' },
-    { value: 'Completed', label: 'Completed' },
-    { value: 'Confirmed', label: 'Confirmed' },
-    { value: 'Processing', label: 'Processing' },
-    { value: 'Delivered', label: 'Delivered' },
-];
 
 export default function ManagementPage() {
     const navigate = useNavigate();
     const [orders, setOrders] = useState<ManagementOrder[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-    const [statusFilter, setStatusFilter] = useState<OrderStatus | ''>('');
     const [orderIdFilter, setOrderIdFilter] = useState('');
     const [customerNameFilter, setCustomerNameFilter] = useState('');
 
@@ -137,9 +127,6 @@ export default function ManagementPage() {
             if (customerNameFilter) {
                 params.customerName = customerNameFilter;
             }
-            if (statusFilter) {
-                params.status = statusFilter;
-            }
 
             const response = await orderService.getManagementOrders(params);
 
@@ -160,7 +147,7 @@ export default function ManagementPage() {
         } finally {
             setLoading(false);
         }
-    }, [currentPage, pageSize, orderIdFilter, customerNameFilter, statusFilter]);
+    }, [currentPage, pageSize, orderIdFilter, customerNameFilter]);
 
     // Handle search with debouncing
     useEffect(() => {
@@ -194,38 +181,41 @@ export default function ManagementPage() {
         navigate(`/management/orders/${params.id}`);
     };
 
-    // Handle print order
-    const handlePrintOrder = (order: ManagementOrder) => {
+    // Handle print gatepass
+    const handlePrintOrder = async (order: ManagementOrder) => {
         try {
-            const receiptData: OrderReceiptData = {
-                orderId: order.id,
-                customerName: order.customerName,
-                totalQuantity: order.quantity,
-                orderDate: order.date,
-                notes: order.notes
-            };
-            generateOrderReceipt(receiptData);
-            toast.success('Order receipt downloaded successfully!');
+            // Fetch order summary data
+            const response = await orderService.getOrderSummary(order.id);
+
+            if (response.success) {
+                const gatepassData: GatepassData = {
+                    id: response.data.id,
+                    customerName: response.data.customerName,
+                    orderDate: response.data.orderDate,
+                    totalQuantity: response.data.totalQuantity,
+                    createdDate: response.data.createdDate,
+                    referenceNo: response.data.referenceNo,
+                    deliveryDate: response.data.deliveryDate,
+                    status: response.data.status,
+                    notes: response.data.notes,
+                    records: response.data.records
+                };
+
+                generateGatepass(gatepassData);
+                toast.success('Gatepass downloaded successfully!');
+            } else {
+                toast.error('Failed to fetch order details');
+            }
         } catch (error) {
-            console.error('Error generating receipt:', error);
-            toast.error('Failed to generate receipt');
+            console.error('Error generating gatepass:', error);
+            toast.error('Failed to generate gatepass');
         }
     };
 
-    // Handle pagination
-    const handlePageChange = (newPage: number) => {
-        setCurrentPage(newPage);
-    };
-
-    const handlePageSizeChange = (newPageSize: number) => {
-        setPageSize(newPageSize);
-        setCurrentPage(1);
-    };
 
     // Clear all filters
     const handleClearFilters = () => {
         setSearchTerm('');
-        setStatusFilter('');
         setOrderIdFilter('');
         setCustomerNameFilter('');
         setCurrentPage(1);
@@ -251,7 +241,7 @@ export default function ManagementPage() {
                     </Typography>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {/* Search */}
                     <div className="flex flex-col">
                         <label className="block text-sm font-medium mb-2">Search</label>
@@ -267,18 +257,6 @@ export default function ManagementPage() {
                                     </InputAdornment>
                                 ),
                             }}
-                            className="w-full"
-                        />
-                    </div>
-
-                    {/* Status Filter */}
-                    <div className="flex flex-col">
-                        <label className="block text-sm font-medium mb-2">Status</label>
-                        <PrimaryDropdown
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value as OrderStatus | '')}
-                            options={ORDER_STATUS_OPTIONS}
-                            placeholder="Select status"
                             className="w-full"
                         />
                     </div>
@@ -311,9 +289,16 @@ export default function ManagementPage() {
                         pageSize: pageSize
                     }}
                     rowCount={pagination.totalItems}
+                    height={600}
                     onPaginationModelChange={(model) => {
-                        handlePageChange(model.page + 1);
-                        handlePageSizeChange(model.pageSize);
+                        // Handle page size change
+                        if (model.pageSize !== pageSize) {
+                            setPageSize(model.pageSize);
+                            setCurrentPage(1);
+                        } else {
+                            // Handle page change
+                            setCurrentPage(model.page + 1);
+                        }
                     }}
                     getRowClassName={(params) =>
                         params.row.complete ? 'opacity-75' : ''

@@ -16,6 +16,8 @@ import { itemService } from '../services/itemService';
 import { washingTypeService } from '../services/washingTypeService';
 import { processTypeService } from '../services/processTypeService';
 import { generateOrderReceipt } from '../utils/pdfUtils';
+import { useAuth } from '../hooks/useAuth';
+import { hasPermission } from '../utils/roleUtils';
 import toast from 'react-hot-toast';
 
 interface ProcessRecord {
@@ -35,6 +37,7 @@ interface ProcessRecord {
 export default function OrderRecordsPage() {
     const { orderId } = useParams<{ orderId: string }>();
     const navigate = useNavigate();
+    const { user } = useAuth();
     const [order, setOrder] = useState<Order | null>(null);
     const [records, setRecords] = useState<ProcessRecord[]>([]);
     const [loading, setLoading] = useState(true);
@@ -48,6 +51,10 @@ export default function OrderRecordsPage() {
         onConfirm: () => { },
     });
     const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
+
+    // Permission checks
+    const canEdit = hasPermission(user, 'canEdit');
+    const canDelete = hasPermission(user, 'canDelete');
     const [selectedRecord, setSelectedRecord] = useState<ProcessRecord | null>(null);
 
     // New record form
@@ -502,18 +509,25 @@ export default function OrderRecordsPage() {
             flex: 0.5,
             minWidth: 80,
             sortable: false,
-            renderCell: (params) => (
-                <IconButton
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        handleMenuOpen(e, params.row);
-                    }}
-                    size="small"
-                    sx={{ color: colors.text.secondary }}
-                >
-                    <MoreVert />
-                </IconButton>
-            )
+            renderCell: (params) => {
+                // Only show actions menu if user has edit or delete permissions
+                if (!canEdit && !canDelete) {
+                    return null;
+                }
+
+                return (
+                    <IconButton
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleMenuOpen(e, params.row);
+                        }}
+                        size="small"
+                        sx={{ color: colors.text.secondary }}
+                    >
+                        <MoreVert />
+                    </IconButton>
+                );
+            }
         },
     ];
 
@@ -778,12 +792,16 @@ export default function OrderRecordsPage() {
                     horizontal: 'right',
                 }}
             >
-                <MenuItem onClick={handleEditRecordClick}>
-                    Edit Record
-                </MenuItem>
-                <MenuItem onClick={handleDeleteRecord} sx={{ color: 'error.main' }}>
-                    Delete Record
-                </MenuItem>
+                {canEdit && (
+                    <MenuItem onClick={handleEditRecordClick}>
+                        Edit Record
+                    </MenuItem>
+                )}
+                {canDelete && (
+                    <MenuItem onClick={handleDeleteRecord} sx={{ color: 'error.main' }}>
+                        Delete Record
+                    </MenuItem>
+                )}
             </Menu>
 
             {/* Confirmation Dialog */}

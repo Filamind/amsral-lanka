@@ -24,8 +24,10 @@ export interface OrderStatusDistribution {
 
 export interface RecentOrder {
   id: number;
+  referenceNo: string;
   customerName: string;
   status: string;
+  quantity: number;
   totalAmount: number;
   orderDate: string;
 }
@@ -42,7 +44,7 @@ export interface DashboardAnalytics {
 export interface DashboardFilters {
   startDate?: string;
   endDate?: string;
-  period?: 'today' | 'week' | 'month' | 'quarter' | 'year';
+  period?: 'today' | 'week' | 'month' | 'quarter' | 'year' | 'custom';
 }
 
 // Dashboard Service
@@ -56,7 +58,7 @@ export class DashboardService {
       if (filters.endDate) params.append('endDate', filters.endDate);
       if (filters.period) params.append('period', filters.period);
 
-      const response = await apiClient.get(`/api/dashboard/analytics?${params.toString()}`);
+      const response = await apiClient.get(`/dashboard/analytics?${params.toString()}`);
       
       if (response.data.success) {
         return response.data.data;
@@ -70,9 +72,14 @@ export class DashboardService {
   }
 
   // Get quick stats (for header cards)
-  static async getQuickStats(): Promise<DashboardSummary> {
+  static async getQuickStats(filters: DashboardFilters = {}): Promise<DashboardSummary> {
     try {
-      const response = await apiClient.get('/api/dashboard/quick-stats');
+      const params = new URLSearchParams();
+      
+      if (filters.startDate) params.append('startDate', filters.startDate);
+      if (filters.endDate) params.append('endDate', filters.endDate);
+
+      const response = await apiClient.get(`/dashboard/quick-stats?${params.toString()}`);
       
       if (response.data.success) {
         return response.data.data;
@@ -94,7 +101,12 @@ export class DashboardService {
       if (filters.endDate) params.append('endDate', filters.endDate);
       if (filters.period) params.append('period', filters.period);
 
-      const response = await apiClient.get(`/api/dashboard/orders-trend?${params.toString()}`);
+      const url = `/dashboard/orders-trend?${params.toString()}`;
+      console.log('Orders trend API call:', url);
+      console.log('Orders trend filters:', filters);
+
+      const response = await apiClient.get(url);
+      console.log('Orders trend API response:', response.data);
       
       if (response.data.success) {
         return response.data.data;
@@ -116,7 +128,7 @@ export class DashboardService {
       if (filters.endDate) params.append('endDate', filters.endDate);
       if (filters.period) params.append('period', filters.period);
 
-      const response = await apiClient.get(`/api/dashboard/order-status-distribution?${params.toString()}`);
+      const response = await apiClient.get(`/dashboard/order-status-distribution?${params.toString()}`);
       
       if (response.data.success) {
         return response.data.data;
@@ -132,7 +144,7 @@ export class DashboardService {
   // Get recent orders
   static async getRecentOrders(limit: number = 10): Promise<RecentOrder[]> {
     try {
-      const response = await apiClient.get(`/api/dashboard/recent-orders?limit=${limit}`);
+      const response = await apiClient.get(`/dashboard/recent-orders?limit=${limit}`);
       
       if (response.data.success) {
         return response.data.data;
