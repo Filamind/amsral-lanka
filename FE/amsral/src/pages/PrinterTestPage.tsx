@@ -267,36 +267,6 @@ const PrinterTestPage: React.FC = () => {
                                     >
                                         {isConnecting ? 'Reconnecting...' : 'Quick Reconnect'}
                                     </PrimaryButton>
-                                    <Button
-                                        onClick={async () => {
-                                            setIsConnecting(true);
-                                            setPrintStatus('Opening printer selection dialog...');
-                                            try {
-                                                // Force reset to clear any cached ports
-                                                await printerService.forceReset();
-
-                                                // Use clearCacheAndConnect to force port selection dialog
-                                                const status = await printerService.clearCacheAndConnect();
-                                                setPrinterConnected(status.connected);
-                                                if (status.connected) {
-                                                    setPrintStatus('Manual reconnect successful!');
-                                                } else {
-                                                    setPrintStatus(`Manual reconnect failed: ${status.error}`);
-                                                }
-                                            } catch (error) {
-                                                setPrintStatus(`Manual reconnect error: ${error}`);
-                                            } finally {
-                                                setIsConnecting(false);
-                                            }
-                                        }}
-                                        disabled={isPrinting || isConnecting}
-                                        startIcon={<UsbIcon />}
-                                        variant="outlined"
-                                        fullWidth
-                                        size="small"
-                                    >
-                                        {isConnecting ? 'Selecting...' : 'Manual Reconnect'}
-                                    </Button>
                                 </Box>
                             )}
                         </Box>

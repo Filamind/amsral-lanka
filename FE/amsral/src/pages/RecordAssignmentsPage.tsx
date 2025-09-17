@@ -1,7 +1,8 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Modal, Box, Typography, IconButton, Menu, MenuItem } from '@mui/material';
-import { ArrowBack, MoreVert, CheckCircle, RadioButtonUnchecked } from '@mui/icons-material';
+import { ArrowBack, MoreVert, CheckCircle, RadioButtonUnchecked, Print } from '@mui/icons-material';
 import type { GridColDef } from '@mui/x-data-grid';
 import PrimaryButton from '../components/common/PrimaryButton';
 import PrimaryTable from '../components/common/PrimaryTable';
@@ -12,6 +13,8 @@ import EmployeeService, { type Employee } from '../services/employeeService';
 import recordService, { type ProcessRecord, type MachineAssignment } from '../services/recordService';
 import machineService, { type Machine } from '../services/machineService';
 import { generateAssignmentReceipt, type AssignmentReceiptData } from '../utils/pdfUtils';
+import { usePrinter } from '../context/PrinterContext';
+import printerService from '../services/printerService';
 import { useAuth } from '../hooks/useAuth';
 import { hasPermission } from '../utils/roleUtils';
 import toast from 'react-hot-toast';
@@ -24,6 +27,7 @@ export default function RecordAssignmentsPage() {
     const { recordId } = useParams<{ recordId: string }>();
     const navigate = useNavigate();
     const { user } = useAuth();
+    const { isConnected, isConnecting, printStatus, connect } = usePrinter();
     const [record, setRecord] = useState<ProcessRecord | null>(null);
     const [assignments, setAssignments] = useState<MachineAssignment[]>([]);
     const [loading, setLoading] = useState(true);
@@ -127,6 +131,32 @@ export default function RecordAssignmentsPage() {
             )
         },
         {
+            field: 'print',
+            headerName: 'Print',
+            flex: 0.5,
+            minWidth: 80,
+            sortable: false,
+            renderCell: (params) => {
+                return (
+                    <IconButton
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handlePrintAssignmentDirect(params.row);
+                        }}
+                        size="small"
+                        sx={{
+                            color: isConnected ? colors.button.primary : colors.text.muted,
+                            opacity: isConnected ? 1 : 0.5
+                        }}
+                        title={isConnected ? "Print to Thermal Printer" : "Printer not connected"}
+                        disabled={!isConnected}
+                    >
+                        <Print />
+                    </IconButton>
+                );
+            }
+        },
+        {
             field: 'actions',
             headerName: 'Actions',
             flex: 0.5,
@@ -153,6 +183,7 @@ export default function RecordAssignmentsPage() {
             }
         },
     ];
+
 
     // Fetch record details and assignments
     const fetchRecordDetails = useCallback(async () => {
@@ -404,9 +435,7 @@ export default function RecordAssignmentsPage() {
 
         try {
             const receiptData: AssignmentReceiptData = {
-                assignmentId: Number(selectedAssignment.id) || 0,
-                orderId: Number(selectedAssignment.orderId) || 0,
-                recordId: recordId || 'N/A',
+                trackingNumber: selectedAssignment.trackingNumber || 'N/A',
                 itemName: selectedAssignment.item || 'N/A',
                 washType: record.washType || 'N/A',
                 processTypes: Array.isArray(record.processTypes) ? record.processTypes : [],
@@ -422,6 +451,35 @@ export default function RecordAssignmentsPage() {
         }
 
         handleMenuClose();
+    };
+
+    const handlePrintAssignmentDirect = async (assignment: MachineAssignment) => {
+        if (!record) return;
+
+        try {
+            const receiptData: AssignmentReceiptData = {
+                trackingNumber: assignment.trackingNumber || 'N/A',
+                itemName: assignment.item || 'N/A',
+                washType: record.washType || 'N/A',
+                processTypes: Array.isArray(record.processTypes) ? record.processTypes : [],
+                assignedTo: assignment.assignedTo || 'N/A',
+                quantity: Number(assignment.quantity) || 0
+            };
+
+            // Check if printer is connected
+            if (!isConnected) {
+                toast.error('Printer not connected. Please connect your printer first.');
+                return;
+            }
+
+            // Print directly to thermal printer
+            await printerService.printAssignmentReceipt(receiptData);
+            toast.success('Assignment receipt printed successfully!');
+
+        } catch (error) {
+            console.error('Error printing assignment:', error);
+            toast.error('Failed to print assignment. Please check printer connection.');
+        }
     };
 
     if (loading) {
@@ -521,13 +579,33 @@ export default function RecordAssignmentsPage() {
                         Total assigned: {record.quantity - record.remainingQuantity} / {record.quantity}
                     </p>
                 </div>
-                <PrimaryButton
-                    onClick={handleOpen}
-                    disabled={record.remainingQuantity === 0}
-                    style={{ minWidth: 160 }}
-                >
-                    Add Assignment
-                </PrimaryButton>
+                <div className="flex items-center gap-4">
+                    {/* Printer Status - Top Right */}
+                    {/* <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+                        <div className="flex items-center gap-2">
+                            <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                            <span className="text-sm font-medium text-gray-700">
+                                {isConnected ? 'Printer Connected' : 'Printer Disconnected'}
+                            </span>
+                        </div>
+                        {!isConnected && (
+                            <PrimaryButton
+                                onClick={connect}
+                                disabled={isConnecting}
+                                style={{ minWidth: 120, fontSize: '12px', padding: '6px 12px' }}
+                            >
+                                {isConnecting ? 'Connecting...' : 'Connect'}
+                            </PrimaryButton>
+                        )}
+                    </div> */}
+                    <PrimaryButton
+                        onClick={handleOpen}
+                        disabled={record.remainingQuantity === 0}
+                        style={{ minWidth: 160 }}
+                    >
+                        Add Assignment
+                    </PrimaryButton>
+                </div>
             </div>
 
 
@@ -679,7 +757,15 @@ export default function RecordAssignmentsPage() {
                 }}
             >
                 <MenuItem onClick={handlePrintAssignment}>
-                    Print Assignment
+                    Download PDF
+                </MenuItem>
+                <MenuItem onClick={() => {
+                    if (selectedAssignment) {
+                        handlePrintAssignmentDirect(selectedAssignment);
+                    }
+                    handleMenuClose();
+                }}>
+                    Print to Thermal
                 </MenuItem>
                 {canDelete && (
                     <MenuItem onClick={handleDeleteAssignment} sx={{ color: 'error.main' }}>

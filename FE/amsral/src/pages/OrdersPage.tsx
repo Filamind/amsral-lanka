@@ -11,6 +11,11 @@ import colors from '../styles/colors';
 import { orderService, type CreateOrderRequest, type ErrorResponse } from '../services/orderService';
 import CustomerService from '../services/customerService';
 import { generateOrderReceipt, generateBagLabel, type OrderReceiptData, type BagLabelData } from '../utils/pdfUtils';
+import { usePrinter } from '../context/PrinterContext';
+import bagLabelPrinterService from '../services/bagLabelPrinterService';
+import orderRecordPrinterService from '../services/orderRecordPrinterService';
+import orderRecordsService, { type OrderRecordsDetails, type OrderRecord } from '../services/orderRecordsService';
+import type { OrderRecordReceiptData } from '../services/printerService';
 import { useAuth } from '../hooks/useAuth';
 import { hasPermission } from '../utils/roleUtils';
 import toast from 'react-hot-toast';
@@ -23,6 +28,17 @@ type ProcessRecord = {
   quantity: number;
   washType: string;
   processTypes: string[];
+};
+
+type OrderRecordReceiptData = {
+  orderId: number;
+  customerName: string;
+  itemName: string;
+  quantity: number;
+  washType: string;
+  processTypes: string[];
+  trackingNumber?: string;
+  isRemaining?: boolean;
 };
 
 type OrderRow = {
@@ -47,6 +63,7 @@ type OrderRow = {
 export default function OrdersPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { isConnected, isConnecting, printStatus, connect } = usePrinter();
   const [search, setSearch] = useState('');
   const [rows, setRows] = useState<OrderRow[]>([]);
   const [open, setOpen] = useState(false);
@@ -70,6 +87,20 @@ export default function OrdersPage() {
     open: false,
     order: null as OrderRow | null,
     numberOfBags: '',
+  });
+
+  // Bag printing progress state
+  const [bagPrintingProgress, setBagPrintingProgress] = useState({
+    isPrinting: false,
+    current: 0,
+    total: 0,
+  });
+
+  // Order record printing progress state
+  const [orderRecordPrintingProgress, setOrderRecordPrintingProgress] = useState({
+    isPrinting: false,
+    current: 0,
+    total: 0,
   });
 
   // State for dropdown options
@@ -307,21 +338,95 @@ export default function OrdersPage() {
   };
 
 
-  const handlePrintOrder = (orderRow: OrderRow) => {
-    try {
-      const receiptData: OrderReceiptData = {
-        orderId: orderRow.id,
-        customerName: orderRow.customerName,
-        totalQuantity: orderRow.quantity,
-        orderDate: orderRow.date,
-        notes: orderRow.notes
-      };
+  const handlePrintOrder = async (orderRow: OrderRow) => {
+    // Check if printer is connected
+    if (!isConnected) {
+      toast.error('Printer not connected. Please connect your printer first.');
+      return;
+    }
 
-      generateOrderReceipt(receiptData);
-      toast.success('Order receipt downloaded successfully!');
+    try {
+      // Set printing state
+      setOrderRecordPrintingProgress({
+        isPrinting: true,
+        current: 0,
+        total: 0,
+      });
+
+      // Fetch order records details from API
+      const response = await orderRecordsService.getOrderRecordsDetails(orderRow.id);
+
+      if (!response.success) {
+        throw new Error('Failed to fetch order records details');
+      }
+
+      const orderDetails: OrderRecordsDetails = response.data;
+
+      // Prepare receipt data array
+      const receiptDataArray: OrderRecordReceiptData[] = [];
+
+      // Add receipts for each order record
+      for (const record of orderDetails.orderRecords) {
+        receiptDataArray.push({
+          orderId: orderDetails.orderId,
+          customerName: orderDetails.customerName,
+          itemName: record.itemName,
+          quantity: record.quantity,
+          washType: record.washType,
+          processTypes: record.processType.split(', '), // Convert comma-separated string to array
+          trackingNumber: record.trackingId,
+        });
+      }
+
+      // Add receipt for remaining quantity if any
+      if (orderDetails.remainingQuantity > 0) {
+        receiptDataArray.push({
+          orderId: orderDetails.orderId,
+          customerName: orderDetails.customerName,
+          itemName: 'Remaining Items',
+          quantity: orderDetails.remainingQuantity,
+          washType: 'Unknown',
+          processTypes: ['Unknown'],
+          isRemaining: true,
+        });
+      }
+
+      // Update total count
+      setOrderRecordPrintingProgress(prev => ({
+        ...prev,
+        total: receiptDataArray.length,
+      }));
+
+      // Print all order record receipts using the separate service with progress callback
+      await orderRecordPrinterService.printMultipleOrderRecords(
+        receiptDataArray,
+        (current, total) => {
+          setOrderRecordPrintingProgress({
+            isPrinting: true,
+            current,
+            total,
+          });
+        }
+      );
+
+      // Reset printing state
+      setOrderRecordPrintingProgress({
+        isPrinting: false,
+        current: 0,
+        total: 0,
+      });
+
+      toast.success(`${receiptDataArray.length} order record receipt(s) printed successfully!`);
     } catch (error) {
-      console.error('Error generating order receipt:', error);
-      toast.error('Failed to generate receipt. Please try again.');
+      console.error('Error printing order records:', error);
+      toast.error('Failed to print order records. Please check printer connection.');
+
+      // Reset printing state on error
+      setOrderRecordPrintingProgress({
+        isPrinting: false,
+        current: 0,
+        total: 0,
+      });
     }
   };
 
@@ -353,7 +458,7 @@ export default function OrdersPage() {
     }
   };
 
-  const handlePrintBags = () => {
+  const handlePrintBags = async () => {
     if (!bagModal.order || !bagModal.numberOfBags) {
       toast.error('Please enter the number of bags');
       return;
@@ -365,21 +470,61 @@ export default function OrdersPage() {
       return;
     }
 
+    // Check if printer is connected
+    if (!isConnected) {
+      toast.error('Printer not connected. Please connect your printer first.');
+      return;
+    }
+
     try {
-      // Generate bag labels for each bag
+      // Set printing state
+      setBagPrintingProgress({
+        isPrinting: true,
+        current: 0,
+        total: numberOfBags,
+      });
+
+      // Prepare bag data array
+      const bagDataArray: BagLabelData[] = [];
       for (let i = 1; i <= numberOfBags; i++) {
-        generateBagLabel({
+        bagDataArray.push({
           orderId: bagModal.order.id,
           customerName: bagModal.order.customerName,
           bagNumber: i,
         });
       }
 
+      // Print all bag labels using the separate service with progress callback
+      await bagLabelPrinterService.printMultipleBagLabels(
+        bagDataArray,
+        (current, total) => {
+          setBagPrintingProgress({
+            isPrinting: true,
+            current,
+            total,
+          });
+        }
+      );
+
+      // Reset printing state
+      setBagPrintingProgress({
+        isPrinting: false,
+        current: 0,
+        total: 0,
+      });
+
       toast.success(`${numberOfBags} bag label(s) printed successfully!`);
       handleBagModalClose();
     } catch (error) {
       console.error('Error printing bag labels:', error);
-      toast.error('Failed to print bag labels. Please try again.');
+      toast.error('Failed to print bag labels. Please check printer connection.');
+
+      // Reset printing state on error
+      setBagPrintingProgress({
+        isPrinting: false,
+        current: 0,
+        total: 0,
+      });
     }
   };
 
@@ -453,19 +598,36 @@ export default function OrdersPage() {
       flex: 0.3,
       minWidth: 60,
       sortable: false,
-      renderCell: (params) => (
-        <IconButton
-          onClick={(e) => {
-            e.stopPropagation();
-            handlePrintOrder(params.row);
-          }}
-          size="small"
-          sx={{ color: colors.button.primary }}
-          title="Print Order"
-        >
-          <Print />
-        </IconButton>
-      )
+      renderCell: (params) => {
+        const canPrint = isConnected && !orderRecordPrintingProgress.isPrinting;
+        return (
+          <IconButton
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!isConnected) {
+                toast.error('Printer not connected. Please connect your printer first.');
+                return;
+              }
+              handlePrintOrder(params.row);
+            }}
+            size="small"
+            sx={{
+              color: canPrint ? colors.button.primary : colors.text.muted,
+              opacity: canPrint ? 1 : 0.3
+            }}
+            title={
+              !isConnected
+                ? "Printer not connected"
+                : orderRecordPrintingProgress.isPrinting
+                  ? "Printing in progress..."
+                  : "Print Order Records"
+            }
+            disabled={!canPrint}
+          >
+            <Print />
+          </IconButton>
+        );
+      }
     },
     {
       field: 'bagPrint',
@@ -475,19 +637,30 @@ export default function OrdersPage() {
       sortable: false,
       renderCell: (params) => {
         const isComplete = (params.row.status || '').toLowerCase() === 'complete';
+        const canPrint = isComplete && isConnected;
         return (
           <IconButton
             onClick={(e) => {
               e.stopPropagation();
+              if (!isConnected) {
+                toast.error('Printer not connected. Please connect your printer first.');
+                return;
+              }
               handleBagPrintClick(params.row);
             }}
             size="small"
             sx={{
-              color: isComplete ? colors.button.primary : colors.text.disabled,
-              opacity: isComplete ? 1 : 0.3
+              color: canPrint ? colors.button.primary : colors.text.muted,
+              opacity: canPrint ? 1 : 0.3
             }}
-            title={isComplete ? "Print Bag Labels" : "Order must be complete to print bags"}
-            disabled={!isComplete}
+            title={
+              !isComplete
+                ? "Order must be complete to print bags"
+                : !isConnected
+                  ? "Printer not connected"
+                  : "Print Bag Labels"
+            }
+            disabled={!canPrint}
           >
             <Inventory />
           </IconButton>
@@ -647,13 +820,54 @@ export default function OrdersPage() {
               style={{ borderColor: colors.border.light, maxWidth: 300 }}
             />
           </div>
-          <div className="w-full sm:w-auto mt-1 sm:mt-0">
-            <PrimaryButton style={{ minWidth: 140, width: '100%' }} onClick={() => handleOpen()}>
-              + Add Order
-            </PrimaryButton>
+          <div className="flex items-center gap-4">
+            {/* Printer Status */}
+            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+              <div className="flex items-center gap-2">
+                <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                <span className="text-sm font-medium text-gray-700">
+                  {isConnected ? 'Printer Connected' : 'Printer Disconnected'}
+                </span>
+              </div>
+              {!isConnected && (
+                <PrimaryButton
+                  onClick={connect}
+                  disabled={isConnecting}
+                  style={{ minWidth: 120, fontSize: '12px', padding: '6px 12px' }}
+                >
+                  {isConnecting ? 'Connecting...' : 'Connect'}
+                </PrimaryButton>
+              )}
+            </div>
+            <div className="w-full sm:w-auto mt-1 sm:mt-0">
+              <PrimaryButton style={{ minWidth: 140, width: '100%' }} onClick={() => handleOpen()}>
+                + Add Order
+              </PrimaryButton>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Order Record Printing Progress */}
+      {orderRecordPrintingProgress.isPrinting && (
+        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center gap-3">
+            <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+            <span className="text-sm font-medium text-blue-700">
+              Printing order record {orderRecordPrintingProgress.current} of {orderRecordPrintingProgress.total}...
+            </span>
+          </div>
+          <div className="mt-2 w-full bg-blue-200 rounded-full h-2">
+            <div
+              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${(orderRecordPrintingProgress.current / orderRecordPrintingProgress.total) * 100}%` }}
+            ></div>
+          </div>
+          <p className="text-xs text-blue-600 mt-1">
+            Each receipt prints with a 5-second delay for easy removal
+          </p>
+        </div>
+      )}
 
       <div className="mt-1">
         <PrimaryTable
@@ -841,6 +1055,39 @@ export default function OrdersPage() {
               />
             </div>
 
+            {/* Printer Status in Modal */}
+            {!isConnected && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                  <span className="text-sm text-red-700">
+                    Printer not connected. Please connect your printer first.
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Printing Progress */}
+            {bagPrintingProgress.isPrinting && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                  <span className="text-sm text-blue-700">
+                    Printing bag {bagPrintingProgress.current} of {bagPrintingProgress.total}...
+                  </span>
+                </div>
+                <div className="mt-2 w-full bg-blue-200 rounded-full h-2">
+                  <div
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${(bagPrintingProgress.current / bagPrintingProgress.total) * 100}%` }}
+                  ></div>
+                </div>
+                <p className="text-xs text-blue-600 mt-1">
+                  Each bag prints with a 2-second delay for easy removal
+                </p>
+              </div>
+            )}
+
             <div className="flex justify-end gap-3 pt-2">
               <PrimaryButton
                 onClick={handleBagModalClose}
@@ -855,15 +1102,20 @@ export default function OrdersPage() {
               </PrimaryButton>
               <PrimaryButton
                 onClick={handlePrintBags}
-                disabled={!bagModal.numberOfBags || parseInt(bagModal.numberOfBags) <= 0}
+                disabled={!bagModal.numberOfBags || parseInt(bagModal.numberOfBags) <= 0 || !isConnected || bagPrintingProgress.isPrinting}
                 style={{
-                  backgroundColor: colors.primary[500],
+                  backgroundColor: bagPrintingProgress.isPrinting ? colors.secondary[500] : colors.primary[500],
                   color: colors.text.white,
                   border: 'none',
                   borderRadius: '8px',
                 }}
               >
-                Print Bags
+                {bagPrintingProgress.isPrinting
+                  ? `Printing... (${bagPrintingProgress.current}/${bagPrintingProgress.total})`
+                  : !isConnected
+                    ? 'Connect Printer First'
+                    : 'Print Bags'
+                }
               </PrimaryButton>
             </div>
           </div>

@@ -3,6 +3,19 @@
  * Supports MP80-04 and similar ESC/POS compatible printers
  */
 
+import type { AssignmentReceiptData, BagLabelData } from '../utils/pdfUtils';
+
+export interface OrderRecordReceiptData {
+  orderId: number;
+  customerName: string;
+  itemName: string;
+  quantity: number;
+  washType: string;
+  processTypes: string[];
+  trackingNumber?: string;
+  isRemaining?: boolean;
+}
+
 // Web Serial API type declarations
 declare global {
   interface Navigator {
@@ -682,6 +695,140 @@ class PrinterService {
       console.log('All protocols tested');
     } catch (error) {
       console.error('Protocol test error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Print assignment receipt to thermal printer
+   */
+  async printAssignmentReceipt(assignmentData: AssignmentReceiptData): Promise<void> {
+    if (!this.isConnected()) {
+      throw new Error('Printer not connected');
+    }
+
+    if (!this.writer) {
+      throw new Error('Writer not available');
+    }
+
+    try {
+      // Initialize printer
+      await this.sendCommand(new Uint8Array([0x1B, 0x40])); // ESC @
+      
+      // Print header
+      await this.writer.write(new TextEncoder().encode('MACHINE ASSIGNMENT\n'));
+      await this.writer.write(new TextEncoder().encode('==================\n\n'));
+      
+      // Print assignment details
+      await this.writer.write(new TextEncoder().encode(`Tracking ID: ${assignmentData.trackingNumber}\n`));
+      await this.writer.write(new TextEncoder().encode(`Item: ${assignmentData.itemName}\n`));
+      await this.writer.write(new TextEncoder().encode(`Wash Type: ${assignmentData.washType}\n`));
+      await this.writer.write(new TextEncoder().encode(`Process: ${assignmentData.processTypes.join(', ')}\n`));
+      await this.writer.write(new TextEncoder().encode(`Assigned To: ${assignmentData.assignedTo}\n`));
+      await this.writer.write(new TextEncoder().encode(`Quantity: ${assignmentData.quantity}\n\n`));
+      
+      // Print footer
+      await this.writer.write(new TextEncoder().encode('==================\n'));
+      await this.writer.write(new TextEncoder().encode('Generated: ' + new Date().toLocaleString() + '\n\n'));
+      
+      // Feed paper and cut
+      await this.writer.write(new TextEncoder().encode('\n\n\n'));
+      await this.sendCommand(new Uint8Array([0x1D, 0x56, 0x00])); // Paper cut
+      
+    } catch (error) {
+      console.error('Error printing assignment receipt:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Print bag label to thermal printer
+   */
+  async printBagLabel(bagData: BagLabelData): Promise<void> {
+    if (!this.isConnected()) {
+      throw new Error('Printer not connected');
+    }
+
+    if (!this.writer) {
+      throw new Error('Writer not available');
+    }
+
+    try {
+      // Initialize printer
+      await this.sendCommand(new Uint8Array([0x1B, 0x40])); // ESC @
+      
+      // Print header
+      await this.writer.write(new TextEncoder().encode('BAG LABEL\n'));
+      await this.writer.write(new TextEncoder().encode('==========\n\n'));
+      
+      // Print bag details
+      await this.writer.write(new TextEncoder().encode(`Reference No: ${bagData.orderId}\n`));
+      await this.writer.write(new TextEncoder().encode(`Customer: ${bagData.customerName}\n`));
+      await this.writer.write(new TextEncoder().encode(`Bag Number: ${bagData.bagNumber}\n\n`));
+      
+      // Print footer
+      await this.writer.write(new TextEncoder().encode('==========\n'));
+      await this.writer.write(new TextEncoder().encode('Generated: ' + new Date().toLocaleString() + '\n\n'));
+      
+      // Feed paper and cut
+      await this.writer.write(new TextEncoder().encode('\n\n\n'));
+      await this.sendCommand(new Uint8Array([0x1D, 0x56, 0x00])); // Paper cut
+      
+    } catch (error) {
+      console.error('Error printing bag label:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Print order record receipt to thermal printer
+   */
+  async printOrderRecordReceipt(receiptData: OrderRecordReceiptData): Promise<void> {
+    if (!this.isConnected()) {
+      throw new Error('Printer not connected');
+    }
+
+    if (!this.writer) {
+      throw new Error('Writer not available');
+    }
+
+    try {
+      // Initialize printer
+      await this.sendCommand(new Uint8Array([0x1B, 0x40])); // ESC @
+      
+      // Print header
+      await this.writer.write(new TextEncoder().encode('ORDER RECORD\n'));
+      await this.writer.write(new TextEncoder().encode('=============\n\n'));
+      
+      // Print order record details
+      await this.writer.write(new TextEncoder().encode(`Order ID: ${receiptData.orderId}\n`));
+      await this.writer.write(new TextEncoder().encode(`Customer: ${receiptData.customerName}\n`));
+      await this.writer.write(new TextEncoder().encode(`Item: ${receiptData.itemName}\n`));
+      await this.writer.write(new TextEncoder().encode(`Quantity: ${receiptData.quantity}\n`));
+      
+      if (receiptData.trackingNumber) {
+        await this.writer.write(new TextEncoder().encode(`Tracking: ${receiptData.trackingNumber}\n`));
+      }
+      
+      if (receiptData.isRemaining) {
+        await this.writer.write(new TextEncoder().encode(`Wash Type: Unknown\n`));
+        await this.writer.write(new TextEncoder().encode(`Process: Unknown\n`));
+        await this.writer.write(new TextEncoder().encode(`Status: Remaining Quantity\n`));
+      } else {
+        await this.writer.write(new TextEncoder().encode(`Wash Type: ${receiptData.washType}\n`));
+        await this.writer.write(new TextEncoder().encode(`Process: ${receiptData.processTypes.join(', ')}\n`));
+      }
+      
+      // Print footer
+      await this.writer.write(new TextEncoder().encode('\n=============\n'));
+      await this.writer.write(new TextEncoder().encode('Generated: ' + new Date().toLocaleString() + '\n\n'));
+      
+      // Feed paper and cut
+      await this.writer.write(new TextEncoder().encode('\n\n\n'));
+      await this.sendCommand(new Uint8Array([0x1D, 0x56, 0x00])); // Paper cut
+      
+    } catch (error) {
+      console.error('Error printing order record receipt:', error);
       throw error;
     }
   }
