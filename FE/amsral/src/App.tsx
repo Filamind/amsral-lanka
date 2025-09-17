@@ -17,6 +17,8 @@ import SystemDataPage from './pages/SystemDataPage';
 import ManagementPage from './pages/ManagementPage';
 import OrderDetailsPage from './pages/OrderDetailsPage';
 import ProfilePage from './pages/ProfilePage';
+import BillingPage from './pages/BillingPage';
+import PrinterTestPage from './pages/PrinterTestPage';
 
 function App() {
   return (
@@ -65,6 +67,8 @@ function App() {
             <Route path="production/record/:recordId" element={<RecordAssignmentsPage />} />
             <Route path="management" element={<ManagementPage />} />
             <Route path="management/orders/:orderId" element={<OrderDetailsPage />} />
+            <Route path="billing" element={<BillingPage />} />
+            <Route path="printer-test" element={<PrinterTestPage />} />
             <Route path="users" element={<UserPage />} />
             <Route path="employees" element={
               <ErrorBoundary>

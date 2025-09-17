@@ -5,11 +5,15 @@ import {
   ShoppingCart,
   CheckCircle,
   Pending,
-  AttachMoney
+  AttachMoney,
+  AccountBalance,
+  Warning,
+  TrendingUp
 } from '@mui/icons-material';
 import { useAuth } from '../hooks/useAuth';
 import { hasPermission } from '../utils/roleUtils';
 import DashboardService from '../services/dashboardService';
+import IncomeService, { type IncomeSummaryData, type IncomeByPeriod, type TopCustomer } from '../services/incomeService';
 
 // Local type definitions to avoid import issues
 interface DashboardSummary {
@@ -52,6 +56,8 @@ import MetricCard from '../components/dashboard/MetricCard';
 import DateRangeFilter from '../components/dashboard/DateRangeFilter';
 import { OrdersTrendChart, OrderStatusPieChart } from '../components/dashboard/OrdersChart';
 import RecentOrdersTable from '../components/dashboard/RecentOrdersTable';
+import IncomeTrendsChart from '../components/dashboard/IncomeTrendsChart';
+import TopCustomersWidget from '../components/dashboard/TopCustomersWidget';
 import colors from '../styles/colors';
 import toast from 'react-hot-toast';
 
@@ -91,6 +97,11 @@ export default function DashboardPage() {
   const [orderStatusDistribution, setOrderStatusDistribution] = useState<OrderStatusDistribution[]>([]);
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
 
+  // Income-related state
+  const [incomeSummary, setIncomeSummary] = useState<IncomeSummaryData | null>(null);
+  const [incomeTrends, setIncomeTrends] = useState<IncomeByPeriod[]>([]);
+  const [topCustomers, setTopCustomers] = useState<TopCustomer[]>([]);
+
   const [dateRange, setDateRange] = useState<DateRange>({
     startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Last 30 days
     endDate: new Date(),
@@ -116,11 +127,22 @@ export default function DashboardPage() {
       console.log('Dashboard filters being sent:', filters);
 
       // Fetch all data in parallel for better performance
-      const [quickStatsData, ordersTrendData, statusDistributionData, recentOrdersData] = await Promise.allSettled([
+      const [quickStatsData, ordersTrendData, statusDistributionData, recentOrdersData, incomeSummaryData, incomeTrendsData, topCustomersData] = await Promise.allSettled([
         DashboardService.getQuickStats(filters),
         DashboardService.getOrdersTrend(filters),
         DashboardService.getOrderStatusDistribution(filters),
-        DashboardService.getRecentOrders(10)
+        DashboardService.getRecentOrders(10),
+        IncomeService.getIncomeSummary('month'),
+        IncomeService.getIncomeTrends({
+          startDate: filters.startDate,
+          endDate: filters.endDate,
+          groupBy: 'day',
+          limit: 30
+        }),
+        IncomeService.getTopCustomers({
+          startDate: filters.startDate,
+          endDate: filters.endDate
+        })
       ]);
 
       // Handle quick stats
@@ -158,6 +180,27 @@ export default function DashboardPage() {
         setRecentOrders(recentOrdersData.value);
       } else {
         console.error('Error fetching recent orders:', recentOrdersData.reason);
+      }
+
+      // Handle income summary
+      if (incomeSummaryData.status === 'fulfilled') {
+        setIncomeSummary(incomeSummaryData.value);
+      } else {
+        console.error('Error fetching income summary:', incomeSummaryData.reason);
+      }
+
+      // Handle income trends
+      if (incomeTrendsData.status === 'fulfilled') {
+        setIncomeTrends(incomeTrendsData.value.trends);
+      } else {
+        console.error('Error fetching income trends:', incomeTrendsData.reason);
+      }
+
+      // Handle top customers
+      if (topCustomersData.status === 'fulfilled') {
+        setTopCustomers(topCustomersData.value);
+      } else {
+        console.error('Error fetching top customers:', topCustomersData.reason);
       }
 
     } catch (err) {
@@ -261,6 +304,53 @@ export default function DashboardPage() {
             />
           </Box>
 
+          {/* Income Metrics Cards */}
+          <Box sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' },
+            gap: 3,
+            mb: 4
+          }}>
+            <MetricCard
+              title="Total Income"
+              value={`$${incomeSummary?.currentPeriod.totalIncome.toLocaleString() || '0'}`}
+              subtitle={`${incomeSummary?.currentPeriod.invoiceCount || 0} invoices`}
+              icon={<AccountBalance />}
+              color="success"
+              trend={{
+                value: incomeSummary?.growth.percentage || 0,
+                isPositive: (incomeSummary?.growth.percentage || 0) >= 0
+              }}
+            />
+            <MetricCard
+              title="Pending Income"
+              value={`$${incomeSummary?.currentPeriod.totalIncome.toLocaleString() || '0'}`}
+              subtitle={`${incomeSummary?.currentPeriod.invoiceCount || 0} pending invoices`}
+              icon={<Warning />}
+              color="warning"
+              trend={{ value: 0, isPositive: false }}
+            />
+            <MetricCard
+              title="Average Invoice"
+              value={`$${incomeSummary?.currentPeriod.averageInvoiceValue.toLocaleString() || '0'}`}
+              subtitle="Per invoice"
+              icon={<TrendingUp />}
+              color="info"
+              trend={{ value: 0, isPositive: true }}
+            />
+            <MetricCard
+              title="Growth Rate"
+              value={`${incomeSummary?.growth.percentage.toFixed(1) || '0'}%`}
+              subtitle={`$${incomeSummary?.growth.amount.toLocaleString() || '0'} vs last period`}
+              icon={<TrendingUp />}
+              color={(incomeSummary?.growth.percentage || 0) >= 0 ? "success" : "error"}
+              trend={{
+                value: incomeSummary?.growth.percentage || 0,
+                isPositive: (incomeSummary?.growth.percentage || 0) >= 0
+              }}
+            />
+          </Box>
+
           {/* Charts Row - Better proportions */}
           <Box sx={{
             display: 'grid',
@@ -274,6 +364,23 @@ export default function DashboardPage() {
             />
             <OrderStatusPieChart
               data={orderStatusDistribution}
+              loading={loading}
+            />
+          </Box>
+
+          {/* Income Charts Row */}
+          <Box sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', lg: '7fr 5fr' },
+            gap: 3,
+            mb: 4
+          }}>
+            <IncomeTrendsChart
+              data={incomeTrends}
+              loading={loading}
+            />
+            <TopCustomersWidget
+              customers={topCustomers}
               loading={loading}
             />
           </Box>

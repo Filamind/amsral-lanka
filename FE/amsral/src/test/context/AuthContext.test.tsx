@@ -6,10 +6,17 @@ import { mockUser } from '../utils'
 
 // Mock the auth service
 vi.mock('../../services/authService', () => ({
+    default: {
+        login: vi.fn(),
+        logout: vi.fn(),
+        getCurrentUser: vi.fn(),
+        isAuthenticated: vi.fn(),
+    },
     AuthService: {
         login: vi.fn(),
         logout: vi.fn(),
         getCurrentUser: vi.fn(),
+        isAuthenticated: vi.fn(),
     }
 }))
 
@@ -49,10 +56,9 @@ describe('AuthContext', () => {
     it('should handle login with valid credentials', async () => {
         const mockLoginResponse = {
             success: true,
-            data: {
-                user: mockUser,
-                token: 'mock-token'
-            }
+            message: 'Login successful',
+            user: mockUser,
+            token: 'mock-token'
         }
 
         const { AuthService } = await import('../../services/authService')
@@ -137,14 +143,22 @@ describe('AuthContext', () => {
         expect(result.current.isAuthenticated).toBe(true)
     })
 
-    it('should restore user from localStorage on mount', () => {
-        mockLocalStorage.getItem.mockReturnValue(JSON.stringify(mockUser))
+    it('should restore user from localStorage on mount', async () => {
+        const { AuthService } = await import('../../services/authService')
+
+        vi.mocked(AuthService.getCurrentUser).mockReturnValue(mockUser)
+        vi.mocked(AuthService.isAuthenticated).mockReturnValue(true)
 
         const wrapper = ({ children }: { children: React.ReactNode }) => (
             <AuthProvider>{children}</AuthProvider>
         )
 
         const { result } = renderHook(() => useAuth(), { wrapper })
+
+        // Wait for useEffect to complete
+        await act(async () => {
+            await new Promise(resolve => setTimeout(resolve, 0))
+        })
 
         expect(result.current.user).toEqual(mockUser)
         expect(result.current.isAuthenticated).toBe(true)

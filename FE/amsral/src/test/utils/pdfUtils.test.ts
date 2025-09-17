@@ -13,13 +13,38 @@ vi.mock('jspdf', () => ({
     line: vi.fn(),
     rect: vi.fn(),
     save: vi.fn(),
+    setDrawColor: vi.fn(),
+    setLineWidth: vi.fn(),
+    setFillColor: vi.fn(),
+    setTextAlign: vi.fn(),
+    setLineDash: vi.fn(),
+    circle: vi.fn(),
+    ellipse: vi.fn(),
+    triangle: vi.fn(),
     getPageWidth: vi.fn(() => 210),
     getPageHeight: vi.fn(() => 297),
+    getTextWidth: vi.fn(() => 50),
+    getTextDimensions: vi.fn(() => ({ w: 50, h: 10 })),
+    splitTextToSize: vi.fn((text) => [text]),
+    setGState: vi.fn(),
+    getFontSize: vi.fn(() => 12),
+    getFont: vi.fn(() => 'helvetica'),
+    getTextColor: vi.fn(() => '#000000'),
+    getDrawColor: vi.fn(() => '#000000'),
+    getFillColor: vi.fn(() => '#000000'),
+    getLineWidth: vi.fn(() => 1),
+    getTextAlign: vi.fn(() => 'left'),
+    getStringUnitWidth: vi.fn(() => 0.5),
+    getCharWidthsArray: vi.fn(() => []),
+    getLineHeight: vi.fn(() => 10),
+    getLastAutoTable: vi.fn(() => ({ finalY: 100 })),
     internal: {
       pageSize: {
         getWidth: vi.fn(() => 210),
         getHeight: vi.fn(() => 297)
-      }
+      },
+      scaleFactor: 1,
+      pageNumber: 1
     }
   }))
 }))

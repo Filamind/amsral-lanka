@@ -2,10 +2,13 @@ import React from "react";
 import { CircularProgress } from "@mui/material";
 import colors from "../../styles/colors";
 
-interface PrimaryButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'loading'> {
+interface PrimaryButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'loading' | 'startIcon' | 'endIcon' | 'fullWidth'> {
     children: React.ReactNode;
     className?: string;
     loading?: boolean;
+    startIcon?: React.ReactNode;
+    endIcon?: React.ReactNode;
+    fullWidth?: boolean;
 }
 
 const PrimaryButton: React.FC<PrimaryButtonProps> = ({
@@ -14,6 +17,9 @@ const PrimaryButton: React.FC<PrimaryButtonProps> = ({
     style,
     loading = false,
     disabled,
+    startIcon,
+    endIcon,
+    fullWidth,
     ...props
 }) => {
     return (
@@ -31,7 +37,9 @@ const PrimaryButton: React.FC<PrimaryButtonProps> = ({
             {...props}
         >
             {loading && <CircularProgress size={16} color="inherit" />}
+            {!loading && startIcon && <span className="flex items-center">{startIcon}</span>}
             {children}
+            {!loading && endIcon && <span className="flex items-center">{endIcon}</span>}
         </button>
     );
 };

@@ -8,9 +8,29 @@ interface PrimaryTableProps extends Partial<DataGridProps> {
     columns: GridColDef[];
     rows: any[];
     height?: number | string | 'auto';
+    paginationModel?: { page: number; pageSize: number };
+    onPaginationModelChange?: (model: { page: number; pageSize: number }) => void;
+    rowCount?: number;
+    pageSizeOptions?: number[];
+    checkboxSelection?: boolean;
+    onRowSelectionModelChange?: (newSelection: any) => void;
+    rowSelectionModel?: any[];
 }
 
-export default function PrimaryTable({ columns, rows, height = 400, onRowClick, ...props }: PrimaryTableProps) {
+export default function PrimaryTable({
+    columns,
+    rows,
+    height = 400,
+    onRowClick,
+    paginationModel,
+    onPaginationModelChange,
+    rowCount,
+    pageSizeOptions = [5, 10, 25, 50],
+    checkboxSelection,
+    onRowSelectionModelChange,
+    rowSelectionModel,
+    ...props
+}: PrimaryTableProps) {
     // Calculate dynamic height based on number of rows
     const calculateHeight = () => {
         if (height === 'auto') {
@@ -41,6 +61,10 @@ export default function PrimaryTable({ columns, rows, height = 400, onRowClick, 
             <DataGrid
                 rows={rows}
                 columns={columns}
+                pagination={false}
+                checkboxSelection={checkboxSelection}
+                onRowSelectionModelChange={onRowSelectionModelChange}
+                rowSelectionModel={rowSelectionModel}
                 sx={{
                     border: 0,
                     background: 'transparent',

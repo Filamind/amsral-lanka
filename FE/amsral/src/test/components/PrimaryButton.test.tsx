@@ -47,7 +47,7 @@ describe('PrimaryButton', () => {
         const customStyle = { backgroundColor: 'red' }
         render(<PrimaryButton style={customStyle}>Click me</PrimaryButton>)
 
-        expect(screen.getByRole('button')).toHaveStyle('background-color: red')
+        expect(screen.getByRole('button')).toHaveStyle('background-color: rgb(255, 0, 0)')
     })
 
     it('should handle different button types', () => {

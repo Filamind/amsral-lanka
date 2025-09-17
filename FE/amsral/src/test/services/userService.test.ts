@@ -1,10 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { UserService } from '../../services/userService'
-import { mockApiClient } from '../mocks'
 
 // Mock the API client
 vi.mock('../../config/api', () => ({
-  default: mockApiClient
+  default: {
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+  }
 }))
 
 describe('UserService', () => {
@@ -33,7 +37,8 @@ describe('UserService', () => {
         }
       }
 
-      mockApiClient.get.mockResolvedValue(mockResponse)
+      const { default: mockApiClient } = await import('../../config/api')
+      vi.mocked(mockApiClient.get).mockResolvedValue(mockResponse)
 
       const result = await UserService.getAllUsers()
 
