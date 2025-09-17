@@ -170,10 +170,20 @@ const PrinterTestPage: React.FC = () => {
             if (printerService.hasPersistentConnection()) {
                 const persistentInfo = printerService.getPersistentConnectionInfo();
                 setHasPreviousConnection(true);
-                setPrintStatus(`Found previous connection to ${persistentInfo?.portName}. Click "Quick Reconnect" to reconnect to the same printer.`);
+                setPrintStatus(`Found previous connection to ${persistentInfo?.portName}. Attempting quick reconnect...`);
 
-                // Don't auto-reconnect, just show the option
-                setPrinterConnected(false);
+                // Try to auto-reconnect
+                try {
+                    const status = await printerService.quickReconnect();
+                    setPrinterConnected(status.connected);
+                    if (status.connected) {
+                        setPrintStatus('Auto-reconnect successful! Ready to print.');
+                    } else {
+                        setPrintStatus(`Auto-reconnect failed: ${status.error}. Click "Quick Reconnect" to try again.`);
+                    }
+                } catch (error) {
+                    setPrintStatus(`Auto-reconnect error: ${error}. Click "Quick Reconnect" to try again.`);
+                }
             } else {
                 setHasPreviousConnection(false);
                 setPrintStatus('No previous printer connection found. Click "Connect Printer" to select a printer.');
@@ -241,14 +251,7 @@ const PrinterTestPage: React.FC = () => {
                                                 const status = await printerService.quickReconnect();
                                                 setPrinterConnected(status.connected);
                                                 if (status.connected) {
-                                                    setPrintStatus('Quick reconnect successful! Testing printer communication...');
-                                                    // Test the connection immediately
-                                                    try {
-                                                        await printerService.sendSimpleTest();
-                                                        setPrintStatus('Quick reconnect successful! Printer communication test passed.');
-                                                    } catch (testError) {
-                                                        setPrintStatus(`Quick reconnect successful but printer test failed: ${testError}. Try printing a receipt.`);
-                                                    }
+                                                    setPrintStatus('Quick reconnect successful! Ready to print.');
                                                 } else {
                                                     setPrintStatus(`Quick reconnect failed: ${status.error}`);
                                                 }
@@ -298,24 +301,47 @@ const PrinterTestPage: React.FC = () => {
                             )}
                         </Box>
                     ) : (
-                        <Box sx={{ display: 'flex', gap: 2 }}>
-                            <PrimaryButton
-                                onClick={printSampleReceipt}
-                                disabled={isPrinting}
-                                startIcon={<PrintIcon />}
-                                fullWidth
-                            >
-                                {isPrinting ? 'Printing...' : 'Print Receipt'}
-                            </PrimaryButton>
+                        <Box sx={{ display: 'flex', gap: 2, flexDirection: 'column' }}>
+                            <Box sx={{ display: 'flex', gap: 2 }}>
+                                <PrimaryButton
+                                    onClick={printSampleReceipt}
+                                    disabled={isPrinting}
+                                    startIcon={<PrintIcon />}
+                                    fullWidth
+                                >
+                                    {isPrinting ? 'Printing...' : 'Print Receipt'}
+                                </PrimaryButton>
+                                <Button
+                                    onClick={connectToPrinter}
+                                    disabled={isPrinting}
+                                    startIcon={<UsbIcon />}
+                                    variant="outlined"
+                                    size="large"
+                                    fullWidth
+                                >
+                                    Disconnect
+                                </Button>
+                            </Box>
                             <Button
-                                onClick={connectToPrinter}
+                                onClick={async () => {
+                                    setIsPrinting(true);
+                                    setPrintStatus('Testing printer communication...');
+                                    try {
+                                        await printerService.sendSimpleTest();
+                                        setPrintStatus('Printer test completed! Check if anything printed.');
+                                    } catch (error) {
+                                        setPrintStatus(`Printer test failed: ${error}`);
+                                    } finally {
+                                        setIsPrinting(false);
+                                    }
+                                }}
                                 disabled={isPrinting}
-                                startIcon={<UsbIcon />}
+                                startIcon={<RefreshIcon />}
                                 variant="outlined"
-                                size="large"
+                                size="small"
                                 fullWidth
                             >
-                                Disconnect
+                                {isPrinting ? 'Testing...' : 'Simple Test'}
                             </Button>
                         </Box>
                     )}
