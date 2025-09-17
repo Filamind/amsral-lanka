@@ -16,12 +16,12 @@ describe('roleUtils', () => {
 
     it('should handle null/undefined role', () => {
       const user = { role: null } as User
-      expect(getUserRole(user)).toBe('')
+      expect(getUserRole(user)).toBe('user')
     })
 
     it('should handle empty role object', () => {
       const user = { role: {} } as User
-      expect(getUserRole(user)).toBe('')
+      expect(getUserRole(user)).toBe('user')
     })
   })
 

@@ -161,6 +161,7 @@ export interface Order {
   notes: string;
   deliveryDate: string;
   status: OrderStatus;
+  billingStatus?: 'pending' | 'invoiced' | 'paid';
   recordsCount: number;
   complete: boolean;
   createdAt: string;
@@ -323,6 +324,9 @@ class OrderService {
     page?: number;
     limit?: number;
     search?: string;
+    customerName?: string;
+    orderId?: string;
+    billingStatus?: string;
   }): Promise<OrdersResponse> {
     try {
       const queryParams = new URLSearchParams();
@@ -330,6 +334,9 @@ class OrderService {
       if (params?.page) queryParams.append('page', params.page.toString());
       if (params?.limit) queryParams.append('limit', params.limit.toString());
       if (params?.search) queryParams.append('search', params.search);
+      if (params?.customerName) queryParams.append('customerName', params.customerName);
+      if (params?.orderId) queryParams.append('orderId', params.orderId);
+      if (params?.billingStatus) queryParams.append('billingStatus', params.billingStatus);
       
       const response = await apiClient.get(`/orders?${queryParams.toString()}`);
       return response.data;
@@ -460,3 +467,4 @@ class OrderService {
 }
 
 export const orderService = new OrderService();
+export { OrderService };

@@ -15,6 +15,8 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import StorageIcon from '@mui/icons-material/Storage';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import PersonIcon from '@mui/icons-material/Person';
+import ReceiptIcon from '@mui/icons-material/Receipt';
+import PrintIcon from '@mui/icons-material/Print';
 import toast from 'react-hot-toast';
 import colors from '../../styles/colors';
 import { useState, useMemo } from 'react';
@@ -29,6 +31,8 @@ const NAVIGATION: NavigationItem[] = [
     { segment: 'orders', title: 'Orders', icon: <ShoppingCartIcon /> },
     { segment: 'production', title: 'Production Flow', icon: <SettingsApplicationsIcon /> },
     { segment: 'management', title: 'Management', icon: <ManageAccountsIcon /> },
+    { segment: 'billing', title: 'Billing', icon: <ReceiptIcon /> },
+    { segment: 'printer-test', title: 'Printer', icon: <PrintIcon /> },
     { kind: 'divider' },
     { segment: 'users', title: 'Users', icon: <PeopleIcon /> },
     { segment: 'employees', title: 'Employees', icon: <BadgeIcon /> },
@@ -60,6 +64,10 @@ function SideBarNavigation({ navigation, expanded, onToggle }: { navigation: Nav
                     return permissions.canViewProduction;
                 case 'management':
                     return permissions.canViewManagement;
+                case 'billing':
+                    return permissions.canViewBilling;
+                case 'printer-test':
+                    return permissions.canViewPrinter;
                 case 'users':
                     return permissions.canViewUsers;
                 case 'employees':

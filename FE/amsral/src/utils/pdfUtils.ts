@@ -13,9 +13,7 @@ export interface OrderReceiptData {
 }
 
 export interface AssignmentReceiptData {
-  assignmentId: number;
-  orderId: number;
-  recordId: string;
+  trackingNumber: string;
   itemName: string;
   washType: string;
   processTypes: string[];
@@ -308,9 +306,7 @@ export const generateAssignmentReceipt = (assignmentData: AssignmentReceiptData)
   };
 
   // Assignment details with safe data handling
-  addDetailRow('Assignment ID', assignmentData.assignmentId);
-  addDetailRow('Order ID', assignmentData.orderId);
-  addDetailRow('Record ID', assignmentData.recordId);
+  addDetailRow('Tracking ID', assignmentData.trackingNumber);
   addDetailRow('Item Name', assignmentData.itemName);
   addDetailRow('Wash Type', assignmentData.washType);
   
