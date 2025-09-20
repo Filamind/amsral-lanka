@@ -2,12 +2,14 @@ import apiClient from '../config/api';
 
 export interface CreateItemRequest {
   name: string;
+  code: string;
   description?: string;
 }
 
 export interface Item {
   id: string;
   name: string;
+  code: string;
   description?: string;
   createdAt: string;
   updatedAt: string;

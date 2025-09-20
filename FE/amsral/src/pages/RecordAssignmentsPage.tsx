@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Modal, Box, Typography, IconButton, Menu, MenuItem } from '@mui/material';
-import { ArrowBack, MoreVert, CheckCircle, RadioButtonUnchecked, Print } from '@mui/icons-material';
+import { Modal, Box, Typography, IconButton, Menu, MenuItem, Fab, Tooltip } from '@mui/material';
+import { ArrowBack, MoreVert, CheckCircle, RadioButtonUnchecked, Print, PrintOutlined, PrintDisabled } from '@mui/icons-material';
 import type { GridColDef } from '@mui/x-data-grid';
 import PrimaryButton from '../components/common/PrimaryButton';
 import PrimaryTable from '../components/common/PrimaryTable';
@@ -783,6 +783,30 @@ export default function RecordAssignmentsPage() {
                 onCancel={() => setConfirmDialog(prev => ({ ...prev, open: false }))}
                 loading={saving}
             />
+
+            {/* Floating Printer Status Button */}
+            <Tooltip title={isConnected ? 'Printer Connected' : 'Printer Disconnected'} arrow>
+                <Fab
+                    color={isConnected ? 'success' : 'error'}
+                    aria-label="printer status"
+                    onClick={!isConnected ? connect : undefined}
+                    disabled={isConnecting}
+                    sx={{
+                        position: 'fixed',
+                        bottom: { xs: 24, sm: 24, md: 32, lg: 24 },
+                        right: { xs: 24, sm: 24, md: 32, lg: 24 },
+                        zIndex: 1000,
+                        width: { xs: 56, sm: 56, md: 64, lg: 56 },
+                        height: { xs: 56, sm: 56, md: 64, lg: 56 },
+                        '&:hover': {
+                            transform: 'scale(1.1)',
+                            transition: 'transform 0.2s ease-in-out',
+                        },
+                    }}
+                >
+                    {isConnected ? <PrintOutlined /> : <PrintDisabled />}
+                </Fab>
+            </Tooltip>
         </div>
     );
 }

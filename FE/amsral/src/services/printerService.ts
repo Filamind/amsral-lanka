@@ -714,27 +714,32 @@ class PrinterService {
     try {
       // Initialize printer
       await this.sendCommand(new Uint8Array([0x1B, 0x40])); // ESC @
-      
-      // Print header
-      await this.writer.write(new TextEncoder().encode('MACHINE ASSIGNMENT\n'));
-      await this.writer.write(new TextEncoder().encode('==================\n\n'));
-      
-      // Print assignment details
-      await this.writer.write(new TextEncoder().encode(`Tracking ID: ${assignmentData.trackingNumber}\n`));
-      await this.writer.write(new TextEncoder().encode(`Item: ${assignmentData.itemName}\n`));
-      await this.writer.write(new TextEncoder().encode(`Wash Type: ${assignmentData.washType}\n`));
-      await this.writer.write(new TextEncoder().encode(`Process: ${assignmentData.processTypes.join(', ')}\n`));
-      await this.writer.write(new TextEncoder().encode(`Assigned To: ${assignmentData.assignedTo}\n`));
-      await this.writer.write(new TextEncoder().encode(`Quantity: ${assignmentData.quantity}\n\n`));
-      
-      // Print footer
-      await this.writer.write(new TextEncoder().encode('==================\n'));
-      await this.writer.write(new TextEncoder().encode('Generated: ' + new Date().toLocaleString() + '\n\n'));
-      
+
+      // Print header with LARGE text
+      await this.printText('MACHINE ASSIGNMENT', { align: 'center', bold: true, doubleHeight: true, doubleWidth: true });
+      await this.printSeparator('=', 24);
+      await this.printText(''); // Empty line
+
+      // Print assignment details with LARGE text and aligned colons
+      await this.printText(`Tracking ID:      ${assignmentData.trackingNumber}`, { bold: true, doubleHeight: true, align: 'left' });
+      await this.printText(`Item:             ${assignmentData.itemName}`, { bold: true, doubleHeight: true, align: 'left' });
+      await this.printText(`Wash Type:        ${assignmentData.washType}`, { bold: true, doubleHeight: true, align: 'left' });
+      await this.printText(`Process:          ${assignmentData.processTypes.join(', ')}`, { bold: true, doubleHeight: true, align: 'left' });
+      await this.printText(`Assigned To:      ${assignmentData.assignedTo}`, { bold: true, doubleHeight: true, align: 'left' });
+      await this.printText(`Quantity:         ${assignmentData.quantity}`, { bold: true, doubleHeight: true, align: 'left' });
+
+      await this.printText(''); // Empty line
+
+      // Print footer with smaller text
+      await this.printSeparator('=', 24);
+      await this.printText('Generated: ' + new Date().toLocaleString(), { align: 'center' });
+      await this.printText(''); // Empty line
+
       // Feed paper and cut
-      await this.writer.write(new TextEncoder().encode('\n\n\n'));
+      await this.printText(''); // Empty line
+      await this.printText(''); // Empty line
       await this.sendCommand(new Uint8Array([0x1D, 0x56, 0x00])); // Paper cut
-      
+
     } catch (error) {
       console.error('Error printing assignment receipt:', error);
       throw error;

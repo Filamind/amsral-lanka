@@ -520,21 +520,52 @@ export default function OrdersPage() {
 
   // Define columns inside component to access handler functions
   const columns: GridColDef[] = [
-    { field: 'date', headerName: 'Date', flex: 0.8, minWidth: 110 },
-    { field: 'id', headerName: 'Reference No', flex: 0.8, minWidth: 100, type: 'number' },
-    { field: 'customerName', headerName: 'Customer', flex: 1.5, minWidth: 180 },
+    {
+      field: 'date',
+      headerName: 'Date',
+      flex: 0.6,
+      minWidth: 90,
+      renderCell: (params) => (
+        <span className="text-sm lg:text-base" style={{ color: colors.text.secondary }}>
+          {new Date(params.value).toLocaleDateString()}
+        </span>
+      )
+    },
+    {
+      field: 'id',
+      headerName: 'Ref No',
+      flex: 0.5,
+      minWidth: 80,
+      type: 'number',
+      renderCell: (params) => (
+        <span className="font-semibold text-sm lg:text-base" style={{ color: colors.text.primary }}>
+          {params.value}
+        </span>
+      )
+    },
+    {
+      field: 'customerName',
+      headerName: 'Customer',
+      flex: 1.2,
+      minWidth: 150,
+      renderCell: (params) => (
+        <span className="text-sm lg:text-base" style={{ color: colors.text.primary }}>
+          {params.value}
+        </span>
+      )
+    },
     {
       field: 'quantity',
       headerName: 'Total Qty',
-      flex: 0.8,
-      minWidth: 100,
+      flex: 0.6,
+      minWidth: 90,
       type: 'number',
       renderCell: (params) => {
         // Use the complete boolean field from API response for Total Qty coloring
         const isComplete = params.row.complete;
         return (
           <span
-            className={`px-3 py-1 rounded-xl text-sm font-semibold ${isComplete
+            className={`px-2 py-1 lg:px-3 lg:py-1 rounded-xl text-xs lg:text-sm font-semibold ${isComplete
               ? 'bg-green-100 text-green-800'
               : 'bg-red-100 text-red-800'
               }`}
@@ -544,13 +575,40 @@ export default function OrdersPage() {
         );
       }
     },
-    { field: 'recordsCount', headerName: 'Records', flex: 0.6, minWidth: 80, type: 'number' },
-    { field: 'deliveryDate', headerName: 'Delivery Date', flex: 1, minWidth: 120 },
+    {
+      field: 'recordsCount',
+      headerName: 'Records',
+      flex: 0.4,
+      minWidth: 70,
+      type: 'number',
+      renderCell: (params) => (
+        <span
+          className="px-2 py-1 rounded-lg text-xs lg:text-sm font-medium"
+          style={{
+            backgroundColor: params.value > 0 ? '#dcfce7' : colors.secondary[100],
+            color: params.value > 0 ? '#166534' : colors.text.muted,
+          }}
+        >
+          {params.value}
+        </span>
+      )
+    },
+    {
+      field: 'deliveryDate',
+      headerName: 'Delivery',
+      flex: 0.7,
+      minWidth: 100,
+      renderCell: (params) => (
+        <span className="text-sm lg:text-base" style={{ color: colors.text.secondary }}>
+          {new Date(params.value).toLocaleDateString()}
+        </span>
+      )
+    },
     {
       field: 'status',
       headerName: 'Status',
-      flex: 1,
-      minWidth: 120,
+      flex: 0.8,
+      minWidth: 100,
       renderCell: (params) => {
         const status = params.row.status || 'Pending';
         const normalizedStatus = normalizeStatus(status, 'order');
@@ -559,7 +617,7 @@ export default function OrdersPage() {
 
         return (
           <span
-            className={`px-3 py-1 rounded-xl text-sm font-semibold ${statusColor}`}
+            className={`px-2 py-1 lg:px-3 lg:py-1 rounded-xl text-xs lg:text-sm font-semibold ${statusColor}`}
           >
             {statusLabel}
           </span>
@@ -569,8 +627,8 @@ export default function OrdersPage() {
     {
       field: 'print',
       headerName: 'Print',
-      flex: 0.3,
-      minWidth: 60,
+      flex: 0.25,
+      minWidth: 50,
       sortable: false,
       renderCell: (params) => {
         const canPrint = isConnected && !orderRecordPrintingProgress.isPrinting;
@@ -587,7 +645,8 @@ export default function OrdersPage() {
             size="small"
             sx={{
               color: canPrint ? colors.button.primary : colors.text.muted,
-              opacity: canPrint ? 1 : 0.3
+              opacity: canPrint ? 1 : 0.3,
+              padding: '4px'
             }}
             title={
               !isConnected
@@ -598,7 +657,7 @@ export default function OrdersPage() {
             }
             disabled={!canPrint}
           >
-            <Print />
+            <Print fontSize="small" />
           </IconButton>
         );
       }
@@ -606,8 +665,8 @@ export default function OrdersPage() {
     {
       field: 'bagPrint',
       headerName: 'Bag',
-      flex: 0.3,
-      minWidth: 60,
+      flex: 0.25,
+      minWidth: 50,
       sortable: false,
       renderCell: (params) => {
         const isComplete = (params.row.status || '').toLowerCase() === 'complete';
@@ -625,7 +684,8 @@ export default function OrdersPage() {
             size="small"
             sx={{
               color: canPrint ? colors.button.primary : colors.text.muted,
-              opacity: canPrint ? 1 : 0.3
+              opacity: canPrint ? 1 : 0.3,
+              padding: '4px'
             }}
             title={
               !isComplete
@@ -636,7 +696,7 @@ export default function OrdersPage() {
             }
             disabled={!canPrint}
           >
-            <Inventory />
+            <Inventory fontSize="small" />
           </IconButton>
         );
       }
@@ -644,8 +704,8 @@ export default function OrdersPage() {
     {
       field: 'actions',
       headerName: 'Actions',
-      flex: 0.5,
-      minWidth: 80,
+      flex: 0.3,
+      minWidth: 60,
       sortable: false,
       renderCell: (params) => {
         // Only show actions menu if user has edit or delete permissions
@@ -660,9 +720,12 @@ export default function OrdersPage() {
               handleMenuOpen(e, params.row);
             }}
             size="small"
-            sx={{ color: colors.text.secondary }}
+            sx={{
+              color: colors.text.secondary,
+              padding: '4px'
+            }}
           >
-            <MoreVert />
+            <MoreVert fontSize="small" />
           </IconButton>
         );
       }
@@ -782,23 +845,31 @@ export default function OrdersPage() {
 
 
   return (
-    <div className="w-full mx-auto px-1 sm:px-3 md:px-4 py-3">
-      <div className="flex flex-col gap-2 sm:gap-3 mb-4">
-        <h2 className="text-xl md:text-2xl font-bold" style={{ color: colors.text.primary }}>Orders</h2>
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 w-full">
-          <div className="flex flex-1 items-center w-full sm:w-auto">
+    <div className="w-full mx-auto px-1 sm:px-3 md:px-4 lg:px-6 py-3">
+      <div className="flex flex-col gap-2 sm:gap-3 lg:gap-4 mb-4">
+        <h2 className="text-xl md:text-2xl lg:text-3xl font-bold" style={{ color: colors.text.primary }}>Orders</h2>
+        <div className="flex flex-col sm:flex-row lg:flex-row items-center justify-between gap-2 lg:gap-4 w-full">
+          <div className="flex flex-1 items-center w-full sm:w-auto lg:w-auto">
             <input
               type="text"
               placeholder="Search by reference or customer..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="flex-1 px-3 py-2 border rounded-xl focus:outline-none text-sm sm:text-base"
-              style={{ borderColor: colors.border.light, maxWidth: 300 }}
+              className="flex-1 px-3 py-2 lg:py-3 border rounded-xl focus:outline-none text-sm sm:text-base lg:text-lg"
+              style={{ borderColor: colors.border.light, maxWidth: 400 }}
             />
           </div>
           <div className="flex items-center gap-4">
-            <div className="w-full sm:w-auto mt-1 sm:mt-0">
-              <PrimaryButton style={{ minWidth: 140, width: '100%' }} onClick={() => handleOpen()}>
+            <div className="w-full sm:w-auto lg:w-auto mt-1 sm:mt-0 lg:mt-0">
+              <PrimaryButton
+                style={{
+                  minWidth: 160,
+                  width: '100%',
+                  fontSize: '14px',
+                  padding: '10px 20px'
+                }}
+                onClick={() => handleOpen()}
+              >
                 + Add Order
               </PrimaryButton>
             </div>
@@ -808,10 +879,10 @@ export default function OrdersPage() {
 
       {/* Order Record Printing Progress */}
       {orderRecordPrintingProgress.isPrinting && (
-        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="mb-4 p-3 md:p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="flex items-center gap-3">
             <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
-            <span className="text-sm font-medium text-blue-700">
+            <span className="text-sm md:text-base font-medium text-blue-700">
               Printing order record {orderRecordPrintingProgress.current} of {orderRecordPrintingProgress.total}...
             </span>
           </div>
@@ -821,7 +892,7 @@ export default function OrdersPage() {
               style={{ width: `${(orderRecordPrintingProgress.current / orderRecordPrintingProgress.total) * 100}%` }}
             ></div>
           </div>
-          <p className="text-xs text-blue-600 mt-1">
+          <p className="text-xs md:text-sm text-blue-600 mt-1">
             Each receipt prints with a 5-second delay for easy removal
           </p>
         </div>
@@ -901,8 +972,14 @@ export default function OrdersPage() {
             bgcolor: 'background.paper',
             boxShadow: 24,
             borderRadius: 2,
-            p: { xs: 4, sm: 5, md: 6 },
-            width: { xs: '95vw', sm: '90vw', md: '80vw', lg: '1200px', xl: '1400px' },
+            p: { xs: 4, sm: 5, md: 6, lg: 6 },
+            width: {
+              xs: '95vw',
+              sm: '90vw',
+              md: '85vw',
+              lg: '1200px',
+              xl: '1400px'
+            },
             maxWidth: '95vw',
             maxHeight: '95vh',
             overflowY: 'auto',
@@ -975,8 +1052,8 @@ export default function OrdersPage() {
             bgcolor: 'background.paper',
             boxShadow: 24,
             borderRadius: 2,
-            p: 4,
-            width: { xs: '90vw', sm: '400px' },
+            p: { xs: 4, sm: 4, md: 5 },
+            width: { xs: '90vw', sm: '400px', md: '450px' },
             maxWidth: '95vw',
           }}
         >
@@ -1048,10 +1125,10 @@ export default function OrdersPage() {
 
             {/* Printing Progress */}
             {bagPrintingProgress.isPrinting && (
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="p-3 md:p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                  <span className="text-sm text-blue-700">
+                  <span className="text-sm md:text-base text-blue-700">
                     Printing bag {bagPrintingProgress.current} of {bagPrintingProgress.total}...
                   </span>
                 </div>
@@ -1061,7 +1138,7 @@ export default function OrdersPage() {
                     style={{ width: `${(bagPrintingProgress.current / bagPrintingProgress.total) * 100}%` }}
                   ></div>
                 </div>
-                <p className="text-xs text-blue-600 mt-1">
+                <p className="text-xs md:text-sm text-blue-600 mt-1">
                   Each bag prints with a 2-second delay for easy removal
                 </p>
               </div>
@@ -1110,11 +1187,11 @@ export default function OrdersPage() {
           disabled={isConnecting}
           sx={{
             position: 'fixed',
-            bottom: 24,
-            right: 24,
+            bottom: { xs: 24, sm: 24, md: 32, lg: 24 },
+            right: { xs: 24, sm: 24, md: 32, lg: 24 },
             zIndex: 1000,
-            width: 56,
-            height: 56,
+            width: { xs: 56, sm: 56, md: 64, lg: 56 },
+            height: { xs: 56, sm: 56, md: 64, lg: 56 },
             '&:hover': {
               transform: 'scale(1.1)',
               transition: 'transform 0.2s ease-in-out',

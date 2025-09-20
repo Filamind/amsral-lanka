@@ -263,70 +263,77 @@ export const generateOrderReceiptA4 = (orderData: OrderReceiptData): void => {
 };
 
 export const generateAssignmentReceipt = (assignmentData: AssignmentReceiptData): void => {
-  // Create a new PDF document
-  // A4 size: 210 x 297 mm, 1/4 size: 105 x 148.5 mm
+  // Create a new PDF document - Use smaller format for larger text
   const doc = new jsPDF({
-    orientation: 'portrait',
+    orientation: 'landscape',
     unit: 'mm',
-    format: [105, 148.5] // 1/4 A4 size
+    format: [100, 150] // Custom smaller size for larger text
   });
 
   // Set font
   doc.setFont('helvetica');
 
-  // Colors
-  const primaryColor = '#1e293b'; 
-  const textColor = '#64748b';
-  const lightGray = '#94a3b8'; 
+  // Colors - pure black for maximum contrast
+  const primaryColor = '#000000';
+  const textColor = '#000000';
+  const lightGray = '#666666';
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
 
-  // Header (no logo for internal use)
-  doc.setFontSize(16);
+  // Header with LARGE text
+  doc.setFontSize(24);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(primaryColor);
-  doc.text('MACHINE ASSIGNMENT', 52.5, 20, { align: 'center' });
+  doc.text('MACHINE ASSIGNMENT', pageWidth / 2, 20, { align: 'center' });
 
   // Line separator
   doc.setDrawColor(lightGray);
-  doc.line(10, 25, 95, 25);
+  doc.setLineWidth(1);
+  doc.line(10, 25, pageWidth - 10, 25);
 
-  // Order details with better spacing
-  let yPosition = 35;
+  // Assignment details with LARGE text and better spacing
+  let yPosition = 40;
 
-  // Helper function to add a detail row with proper spacing
+  // Helper function to add a detail row with LARGE fonts
   const addDetailRow = (label: string, value: string | number | undefined | null, isBold = false) => {
     // Ensure value is a valid string
     const safeValue = value !== null && value !== undefined ? String(value) : 'N/A';
     
-    doc.setFontSize(11);
+    // Label with readable font
+    doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(textColor);
     doc.text(`${label}:`, 10, yPosition);
     
-    doc.setFont('helvetica', isBold ? 'bold' : 'normal');
-    doc.text(safeValue, 45, yPosition); // Increased spacing from 40 to 45
-    yPosition += 7; // Reduced spacing between rows to fit better
+    // Value with LARGE font
+    doc.setFont('helvetica', isBold ? 'bold' : 'bold');
+    doc.setFontSize(20);
+    doc.setTextColor(primaryColor);
+    // Center the value text
+    doc.text(safeValue, pageWidth / 2, yPosition + 8, { align: 'center' });
+    yPosition += 25; // Increased spacing
   };
 
   // Assignment details with safe data handling
-  addDetailRow('Tracking ID', assignmentData.trackingNumber);
-  addDetailRow('Item Name', assignmentData.itemName);
-  addDetailRow('Wash Type', assignmentData.washType);
+  addDetailRow('Tracking ID', assignmentData.trackingNumber, true);
+  addDetailRow('Item Name', assignmentData.itemName, true);
+  addDetailRow('Wash Type', assignmentData.washType, true);
   
   // Process Types (handle array safely)
   const processTypesText = Array.isArray(assignmentData.processTypes) 
     ? assignmentData.processTypes.join(', ') 
     : 'N/A';
-  addDetailRow('Process Types', processTypesText);
+  addDetailRow('Process Types', processTypesText, true);
   
-  addDetailRow('Assigned To', assignmentData.assignedTo);
-  addDetailRow('Quantity', assignmentData.quantity);
+  addDetailRow('Assigned To', assignmentData.assignedTo, true);
+  addDetailRow('Quantity', assignmentData.quantity, true);
 
-  // Footer (no thank you message for internal use)
-  const footerY = Math.max(120, yPosition + 15); // Dynamic footer position
+  // Footer at bottom
+  const footerY = pageHeight - 20;
   doc.setDrawColor(lightGray);
-  doc.line(10, footerY, 95, footerY);
+  doc.line(10, footerY - 5, pageWidth - 10, footerY - 5);
   
-  // Print date and time
+  // Print date and time with larger font
   const now = new Date();
   const printTime = now.toLocaleString('en-US', {
     year: 'numeric',
@@ -337,13 +344,26 @@ export const generateAssignmentReceipt = (assignmentData: AssignmentReceiptData)
   });
   doc.setFontSize(10);
   doc.setTextColor(lightGray);
-  doc.text(`Printed: ${printTime}`, 52.5, footerY + 8, { align: 'center' });
+  doc.text(`Printed: ${printTime}`, pageWidth / 2, footerY, { align: 'center' });
 
-  // Generate filename
-  const filename = `Assignment_${assignmentData.trackingNumber}_Receipt.pdf`;
+  // Generate filename with timestamp to avoid caching
+  const timestamp = new Date().getTime();
+  const filename = `Assignment_${assignmentData.trackingNumber}_${timestamp}.pdf`;
 
-  // Save the PDF
+  // Save and open the PDF
   doc.save(filename);
+  // Also open in new window for immediate viewing/printing
+  const pdfOutput = doc.output('blob');
+  const pdfUrl = URL.createObjectURL(pdfOutput);
+  const printWindow = window.open(pdfUrl, '_blank');
+  // Optional: Auto-print when opened
+  if (printWindow) {
+    printWindow.onload = () => {
+      printWindow.print();
+    };
+  }
+  // Clean up
+  setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
 };
 
 export const generateGatepass = (gatepassData: GatepassData): void => {
