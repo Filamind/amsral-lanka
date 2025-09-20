@@ -82,7 +82,7 @@ export interface LegacyIncomeSummaryData {
 export interface IncomeFilters {
   startDate?: string;
   endDate?: string;
-  period?: 'day' | 'week' | 'month' | 'year';
+  period?: 'day' | 'week' | 'month' | 'year' | 'today' | 'quarter' | 'custom';
   groupBy?: 'day' | 'week' | 'month' | 'year';
   limit?: number;
 }
@@ -116,6 +116,28 @@ export class IncomeService {
   static async getIncomeSummary(period: string = 'month'): Promise<IncomeSummaryData> {
     try {
       const response = await apiClient.get(`/billing/income/summary?period=${period}`);
+      
+      if (response.data.success) {
+        return response.data.data;
+      }
+      
+      throw new Error(response.data.message || 'Failed to fetch income summary');
+    } catch (error) {
+      console.error('Error fetching income summary:', error);
+      throw error;
+    }
+  }
+
+  // Get income summary with date filters
+  static async getIncomeSummaryWithFilters(filters: IncomeFilters = {}): Promise<IncomeSummaryData> {
+    try {
+      const params = new URLSearchParams();
+      
+      if (filters.startDate) params.append('startDate', filters.startDate);
+      if (filters.endDate) params.append('endDate', filters.endDate);
+      if (filters.period) params.append('period', filters.period);
+
+      const response = await apiClient.get(`/billing/income?${params.toString()}`);
       
       if (response.data.success) {
         return response.data.data;

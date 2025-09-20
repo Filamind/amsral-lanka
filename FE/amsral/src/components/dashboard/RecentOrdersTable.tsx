@@ -1,5 +1,4 @@
-import React from 'react';
-import { Box, Typography, Card, CardContent, Chip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material';
+import { Box, Typography, Card, CardContent, Chip, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import colors from '../../styles/colors';
 
@@ -127,7 +126,7 @@ export default function RecentOrdersTable({ orders, loading = false }: RecentOrd
                                                     backgroundColor: colors.primary[50],
                                                 },
                                                 '&:nth-of-type(even)': {
-                                                    backgroundColor: colors.primary[25],
+                                                    backgroundColor: colors.primary[50],
                                                 },
                                             }}
                                         >

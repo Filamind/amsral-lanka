@@ -1,7 +1,6 @@
 import React from 'react';
 import { Box, Typography, Collapse, IconButton } from '@mui/material';
 import { ExpandMore, ExpandLess } from '@mui/icons-material';
-import PrimaryNumberInput from '../common/PrimaryNumberInput';
 import PrimaryDatePicker from '../common/PrimaryDatePicker';
 import PrimaryDropdown from '../common/PrimaryDropdown';
 import colors from '../../styles/colors';

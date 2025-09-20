@@ -71,7 +71,7 @@ const PaymentStatusPieChart: React.FC<PaymentStatusPieChartProps> = ({
                                 cx="50%"
                                 cy="50%"
                                 labelLine={false}
-                                label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(1)}%)`}
+                                label={({ name, value }) => `${name}: ${value}`}
                                 outerRadius={80}
                                 dataKey="value"
                             >

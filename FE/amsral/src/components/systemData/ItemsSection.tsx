@@ -202,6 +202,7 @@ export default function ItemsSection() {
                 // Update existing item
                 const response = await itemService.updateItem(selectedItem.id, {
                     name: form.name,
+                    code: form.code,
                     description: form.description || undefined,
                 });
                 setRows(prev => prev.map(item =>
@@ -212,6 +213,7 @@ export default function ItemsSection() {
                 // Create new item
                 const response = await itemService.createItem({
                     name: form.name,
+                    code: form.code,
                     description: form.description || undefined,
                 });
                 setRows(prev => [response.data, ...prev]);

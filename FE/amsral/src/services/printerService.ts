@@ -237,7 +237,6 @@ class PrinterService {
           error: 'Web Serial API not supported. Please use Chrome or Edge browser.'
         };
       }
-
       // Check if already connected
       if (this.isConnected()) {
         console.log('✅ Printer already connected');

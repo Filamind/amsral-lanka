@@ -1,5 +1,5 @@
 import apiClient from '../config/api';
-import type { ErrorResponse } from '../config/api';
+// ErrorResponse is defined locally in this file
 
 // Types
 export interface ProcessRecord {
@@ -96,7 +96,7 @@ class RecordService {
       const response = await apiClient.get(`/records/${recordId}`);
       return response.data.data;
     } catch (error: unknown) {
-      const apiError = error as { response?: { data?: ErrorResponse } };
+      const apiError = error as { response?: { data?: { success: false; message: string } } };
       throw apiError.response?.data || { success: false, message: 'Failed to fetch record details' };
     }
   }
@@ -117,7 +117,7 @@ class RecordService {
       const response = await apiClient.get(`/records/${recordId}/assignments?${queryParams.toString()}`);
       return response.data;
     } catch (error: unknown) {
-      const apiError = error as { response?: { data?: ErrorResponse } };
+      const apiError = error as { response?: { data?: { success: false; message: string } } };
       throw apiError.response?.data || { success: false, message: 'Failed to fetch assignments' };
     }
   }
@@ -131,7 +131,7 @@ class RecordService {
       const response = await apiClient.post(`/records/${recordId}/assignments`, assignmentData);
       return response.data.data;
     } catch (error: unknown) {
-      const apiError = error as { response?: { data?: ErrorResponse } };
+      const apiError = error as { response?: { data?: { success: false; message: string } } };
       throw apiError.response?.data || { success: false, message: 'Failed to create assignment' };
     }
   }
@@ -146,7 +146,7 @@ class RecordService {
       const response = await apiClient.put(`/records/${recordId}/assignments/${assignmentId}`, assignmentData);
       return response.data.data;
     } catch (error: unknown) {
-      const apiError = error as { response?: { data?: ErrorResponse } };
+      const apiError = error as { response?: { data?: { success: false; message: string } } };
       throw apiError.response?.data || { success: false, message: 'Failed to update assignment' };
     }
   }
@@ -156,7 +156,7 @@ class RecordService {
     try {
       await apiClient.delete(`/records/${recordId}/assignments/${assignmentId}`);
     } catch (error: unknown) {
-      const apiError = error as { response?: { data?: ErrorResponse } };
+      const apiError = error as { response?: { data?: { success: false; message: string } } };
       throw apiError.response?.data || { success: false, message: 'Failed to delete assignment' };
     }
   }
@@ -167,7 +167,7 @@ class RecordService {
       const response = await apiClient.put(`/records/${recordId}/assignments/${assignmentId}/complete`);
       return response.data.data;
     } catch (error: unknown) {
-      const apiError = error as { response?: { data?: ErrorResponse } };
+      const apiError = error as { response?: { data?: { success: false; message: string } } };
       throw apiError.response?.data || { success: false, message: 'Failed to complete assignment' };
     }
   }
@@ -180,7 +180,7 @@ class RecordService {
       });
       return response.data.data;
     } catch (error: unknown) {
-      const apiError = error as { response?: { data?: ErrorResponse } };
+      const apiError = error as { response?: { data?: { success: false; message: string } } };
       throw apiError.response?.data || { success: false, message: 'Failed to set assignment to In Progress' };
     }
   }
@@ -191,7 +191,7 @@ class RecordService {
       const response = await apiClient.get(`/records/${recordId}/assignments/stats`);
       return response.data.data;
     } catch (error: unknown) {
-      const apiError = error as { response?: { data?: ErrorResponse } };
+      const apiError = error as { response?: { data?: { success: false; message: string } } };
       throw apiError.response?.data || { success: false, message: 'Failed to fetch assignment statistics' };
     }
   }

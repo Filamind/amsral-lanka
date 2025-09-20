@@ -1,21 +1,21 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { DataGrid, type GridColDef, type DataGridProps } from '@mui/x-data-grid';
+import { DataGrid, type GridColDef, type DataGridProps, type GridRowSelectionModel } from '@mui/x-data-grid';
 import Paper from '@mui/material/Paper';
 import colors from '../../styles/colors';
 
-interface PrimaryTableProps extends Partial<DataGridProps> {
+interface PrimaryTableProps extends Omit<Partial<DataGridProps>, 'rowSelectionModel' | 'onRowSelectionModelChange' | 'pagination'> {
     columns: GridColDef[];
     rows: any[];
     height?: number | string | 'auto';
-    pagination?: boolean;
+    pagination?: boolean | undefined;
     paginationModel?: { page: number; pageSize: number };
     onPaginationModelChange?: (model: { page: number; pageSize: number }) => void;
     rowCount?: number;
     pageSizeOptions?: number[];
     checkboxSelection?: boolean;
     onRowSelectionModelChange?: (newSelection: any) => void;
-    rowSelectionModel?: any[];
+    rowSelectionModel?: GridRowSelectionModel; 
 }
 
 export default function PrimaryTable({
@@ -63,7 +63,8 @@ export default function PrimaryTable({
             <DataGrid
                 rows={rows}
                 columns={columns}
-                pagination={pagination}
+
+                {...(pagination && { pagination: true })}
                 paginationModel={paginationModel}
                 onPaginationModelChange={onPaginationModelChange}
                 rowCount={rowCount}

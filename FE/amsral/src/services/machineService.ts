@@ -1,5 +1,5 @@
 import apiClient from '../config/api';
-import type { ErrorResponse } from '../config/api';
+// ErrorResponse is defined locally in this file
 
 // Types
 export interface Machine {
@@ -27,7 +27,7 @@ class MachineService {
       const response = await apiClient.get(`/machines?${queryParams.toString()}`);
       return response.data.data.machines;
     } catch (error: unknown) {
-      const apiError = error as { response?: { data?: ErrorResponse } };
+      const apiError = error as { response?: { data?: { success: false; message: string } } };
       throw apiError.response?.data || { success: false, message: 'Failed to fetch machines' };
     }
   }

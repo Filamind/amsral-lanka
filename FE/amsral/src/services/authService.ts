@@ -7,7 +7,10 @@ export interface User {
   email: string;
   firstName: string;
   lastName: string;
-  role: string;
+  role: string | { name: string };
+  phone?: string;
+  dateOfBirth?: string;
+  username?: string;
 }
 
 // Login response interface
