@@ -14,6 +14,7 @@ export interface CreateOrderRequest {
   date: string;
   customerId: string;
   quantity: number;
+  gpNo?: string;
   notes?: string;
   deliveryDate: string;
   records: CreateOrderRecordRequest[]; // Empty array initially, records are added separately

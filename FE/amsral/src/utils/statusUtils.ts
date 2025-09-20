@@ -23,10 +23,7 @@ export const STATUS_COLORS = {
   'invoiced': 'bg-blue-100 text-blue-800',           // Same as Delivered (blue)
   'paid': 'bg-green-100 text-green-800',             // Same as Completed (green)
   
-  // Assignment Status Colors
-  'Pending': 'bg-yellow-100 text-yellow-800',        // Consistent with other pending
-  'In Progress': 'bg-yellow-100 text-yellow-800',
-  'Completed': 'bg-green-100 text-green-800',
+  // Assignment Status Colors (removed duplicates - using same keys as order status)
   
   // Special statuses
   'Assigned': 'bg-blue-100 text-blue-800',           // Same as Delivered
@@ -44,8 +41,7 @@ export const STATUS_LABELS = {
   'delivered': 'Delivered',
   'complete': 'Completed', // Map 'complete' to 'Completed' for consistency
   
-  // Billing Status Labels - now using sentence case
-  'pending': 'Pending',
+  // Billing Status Labels - now using sentence case (removed duplicate 'pending')
   'invoiced': 'Invoiced',
   'paid': 'Paid',
 } as const;

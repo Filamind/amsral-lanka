@@ -38,6 +38,7 @@ type OrderRow = {
   customerId: string;
   customerName: string;
   quantity: number;
+  gpNo?: string;
   notes: string;
   records: ProcessRecord[];
   recordsCount: number;
@@ -47,7 +48,7 @@ type OrderRow = {
   createdAt: string;
   updatedAt: string;
   actions: number;
-  [key: string]: string | number | boolean | ProcessRecord[];
+  [key: string]: string | number | boolean | ProcessRecord[] | undefined;
 };
 
 
@@ -78,6 +79,7 @@ export default function OrdersPage() {
     open: false,
     order: null as OrderRow | null,
     numberOfBags: '',
+    quantity: '',
   });
 
   // Bag printing progress state
@@ -102,6 +104,7 @@ export default function OrdersPage() {
     date: new Date().toISOString().split('T')[0], // Today's date as default
     customerId: '',
     quantity: 1,
+    gpNo: '',
     notes: '',
     deliveryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 2 weeks from now
   });
@@ -242,6 +245,7 @@ export default function OrdersPage() {
         date: order.date,
         customerId: order.customerId,
         quantity: order.quantity,
+        gpNo: order.gpNo || '',
         notes: order.notes,
         deliveryDate: order.deliveryDate,
       });
@@ -252,6 +256,7 @@ export default function OrdersPage() {
         date: new Date().toISOString().split('T')[0],
         customerId: '',
         quantity: 1,
+        gpNo: '',
         notes: '',
         deliveryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 2 weeks from now
       });
@@ -428,6 +433,7 @@ export default function OrdersPage() {
       open: true,
       order: orderRow,
       numberOfBags: '',
+      quantity: '',
     });
   };
 
@@ -436,6 +442,7 @@ export default function OrdersPage() {
       open: false,
       order: null,
       numberOfBags: '',
+      quantity: '',
     });
   };
 
@@ -450,18 +457,18 @@ export default function OrdersPage() {
     }
   };
 
+  const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Only allow numbers
+    if (value === '' || /^\d+$/.test(value)) {
+      setBagModal(prev => ({
+        ...prev,
+        quantity: value,
+      }));
+    }
+  };
+
   const handlePrintBags = async () => {
-    if (!bagModal.order || !bagModal.numberOfBags) {
-      toast.error('Please enter the number of bags');
-      return;
-    }
-
-    const numberOfBags = parseInt(bagModal.numberOfBags);
-    if (numberOfBags <= 0) {
-      toast.error('Number of bags must be greater than 0');
-      return;
-    }
-
     // Check if printer is connected
     if (!isConnected) {
       toast.error('Printer not connected. Please connect your printer first.');
@@ -473,30 +480,20 @@ export default function OrdersPage() {
       setBagPrintingProgress({
         isPrinting: true,
         current: 0,
-        total: numberOfBags,
+        total: 1,
       });
 
-      // Prepare bag data array
-      const bagDataArray: BagLabelData[] = [];
-      for (let i = 1; i <= numberOfBags; i++) {
-        bagDataArray.push({
-          orderId: bagModal.order.id,
-          customerName: bagModal.order.customerName,
-          bagNumber: i,
-        });
-      }
+      // Prepare single bag receipt data
+      const bagData: BagLabelData = {
+        orderId: bagModal.order!.id,
+        customerName: bagModal.order!.customerName,
+        bagNumber: 1, // Single receipt
+        numberOfBags: bagModal.numberOfBags || '',
+        quantity: bagModal.quantity || '',
+      };
 
-      // Print all bag labels using the separate service with progress callback
-      await bagLabelPrinterService.printMultipleBagLabels(
-        bagDataArray,
-        (current, total) => {
-          setBagPrintingProgress({
-            isPrinting: true,
-            current,
-            total,
-          });
-        }
-      );
+      // Print single bag receipt
+      await bagLabelPrinterService.printSingleBagReceipt(bagData);
 
       // Reset printing state
       setBagPrintingProgress({
@@ -505,11 +502,11 @@ export default function OrdersPage() {
         total: 0,
       });
 
-      toast.success(`${numberOfBags} bag label(s) printed successfully!`);
+      toast.success('Bag receipt printed successfully!');
       handleBagModalClose();
     } catch (error) {
-      console.error('Error printing bag labels:', error);
-      toast.error('Failed to print bag labels. Please check printer connection.');
+      console.error('Error printing bag receipt:', error);
+      toast.error('Failed to print bag receipt. Please check printer connection.');
 
       // Reset printing state on error
       setBagPrintingProgress({
@@ -533,7 +530,8 @@ export default function OrdersPage() {
       minWidth: 100,
       type: 'number',
       renderCell: (params) => {
-        const isComplete = isCompletedStatus(params.row.status || '');
+        // Use the complete boolean field from API response for Total Qty coloring
+        const isComplete = params.row.complete;
         return (
           <span
             className={`px-3 py-1 rounded-xl text-sm font-semibold ${isComplete
@@ -718,6 +716,7 @@ export default function OrdersPage() {
           date: form.date,
           customerId: form.customerId,
           quantity: form.quantity,
+          gpNo: form.gpNo || undefined,
           notes: form.notes || undefined,
           deliveryDate: form.deliveryDate,
           records: [] // Start with empty records
@@ -760,6 +759,7 @@ export default function OrdersPage() {
         date: new Date().toISOString().split('T')[0],
         customerId: '',
         quantity: 1,
+        gpNo: '',
         notes: '',
         deliveryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       });
@@ -901,8 +901,8 @@ export default function OrdersPage() {
             bgcolor: 'background.paper',
             boxShadow: 24,
             borderRadius: 2,
-            p: { xs: 3, sm: 4, md: 5 },
-            width: { xs: '95vw', sm: '90vw', md: '85vw', lg: '900px', xl: '1000px' },
+            p: { xs: 4, sm: 5, md: 6 },
+            width: { xs: '95vw', sm: '90vw', md: '80vw', lg: '1200px', xl: '1400px' },
             maxWidth: '95vw',
             maxHeight: '95vh',
             overflowY: 'auto',
@@ -988,29 +988,50 @@ export default function OrdersPage() {
             {bagModal.order && (
               <div className="bg-gray-50 p-3 rounded-lg">
                 <p className="text-sm text-gray-600">
-                  <strong>Order:</strong> {bagModal.order.id}
+                  <strong>Reference No:</strong> {bagModal.order.id}
                 </p>
                 <p className="text-sm text-gray-600">
                   <strong>Customer:</strong> {bagModal.order.customerName}
                 </p>
+                <p className="text-sm text-gray-600">
+                  <strong>Quantity:</strong> {bagModal.order.quantity}
+                </p>
               </div>
             )}
 
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium" style={{ color: colors.text.primary }}>
-                Number of Bags:
-              </label>
-              <input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                value={bagModal.numberOfBags}
-                onChange={handleNumberOfBagsChange}
-                placeholder="Enter number of bags"
-                className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                style={{ borderColor: colors.border.light }}
-                autoFocus
-              />
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium" style={{ color: colors.text.primary }}>
+                  Number of Bags (Optional):
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={bagModal.numberOfBags}
+                  onChange={handleNumberOfBagsChange}
+                  placeholder="Enter number of bags"
+                  className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  style={{ borderColor: colors.border.light }}
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium" style={{ color: colors.text.primary }}>
+                  Quantity (Optional):
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={bagModal.quantity}
+                  onChange={handleQuantityChange}
+                  placeholder="Enter quantity"
+                  className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  style={{ borderColor: colors.border.light }}
+                />
+              </div>
             </div>
 
             {/* Printer Status in Modal */}
@@ -1060,7 +1081,7 @@ export default function OrdersPage() {
               </PrimaryButton>
               <PrimaryButton
                 onClick={handlePrintBags}
-                disabled={!bagModal.numberOfBags || parseInt(bagModal.numberOfBags) <= 0 || !isConnected || bagPrintingProgress.isPrinting}
+                disabled={!isConnected || bagPrintingProgress.isPrinting}
                 style={{
                   backgroundColor: bagPrintingProgress.isPrinting ? colors.secondary[500] : colors.primary[500],
                   color: colors.text.white,
@@ -1069,10 +1090,10 @@ export default function OrdersPage() {
                 }}
               >
                 {bagPrintingProgress.isPrinting
-                  ? `Printing... (${bagPrintingProgress.current}/${bagPrintingProgress.total})`
+                  ? 'Printing...'
                   : !isConnected
                     ? 'Connect Printer First'
-                    : 'Print Bags'
+                    : 'Print Receipt'
                 }
               </PrimaryButton>
             </div>

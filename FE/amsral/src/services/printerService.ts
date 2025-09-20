@@ -757,21 +757,29 @@ class PrinterService {
       // Initialize printer
       await this.sendCommand(new Uint8Array([0x1B, 0x40])); // ESC @
       
-      // Print header
-      await this.writer.write(new TextEncoder().encode('BAG LABEL\n'));
-      await this.writer.write(new TextEncoder().encode('==========\n\n'));
+      // Print header with LARGE text
+      await this.printText('BAG LABEL', { align: 'center', bold: true, doubleHeight: true, doubleWidth: true });
+      await this.printSeparator('=', 24);
+      await this.printText(''); // Empty line
       
-      // Print bag details
-      await this.writer.write(new TextEncoder().encode(`Reference No: ${bagData.orderId}\n`));
-      await this.writer.write(new TextEncoder().encode(`Customer: ${bagData.customerName}\n`));
-      await this.writer.write(new TextEncoder().encode(`Bag Number: ${bagData.bagNumber}\n\n`));
+       // Print bag details with LARGE text and aligned colons
+       await this.printText(`Reference No:     ${bagData.orderId}`, { bold: true, doubleHeight: true, align: 'left' });
+       await this.printText(`Customer:         ${bagData.customerName}`, { bold: true, doubleHeight: true, align: 'left' });
+       
+       // Always show Number of Bags and Quantity with LARGE text
+       await this.printText(`Number of Bags:   ${bagData.numberOfBags || ''}`, { bold: true, doubleHeight: true, align: 'left' });
+       await this.printText(`Quantity:         ${bagData.quantity || ''}`, { bold: true, doubleHeight: true, align: 'left' });
       
-      // Print footer
-      await this.writer.write(new TextEncoder().encode('==========\n'));
-      await this.writer.write(new TextEncoder().encode('Generated: ' + new Date().toLocaleString() + '\n\n'));
+      await this.printText(''); // Empty line
+      
+      // Print footer with smaller text
+      await this.printSeparator('=', 24);
+      await this.printText('Generated: ' + new Date().toLocaleString(), { align: 'center' });
+      await this.printText(''); // Empty line
       
       // Feed paper and cut
-      await this.writer.write(new TextEncoder().encode('\n\n\n'));
+      await this.printText(''); // Empty line
+      await this.printText(''); // Empty line
       await this.sendCommand(new Uint8Array([0x1D, 0x56, 0x00])); // Paper cut
       
     } catch (error) {
@@ -796,35 +804,40 @@ class PrinterService {
       // Initialize printer
       await this.sendCommand(new Uint8Array([0x1B, 0x40])); // ESC @
       
-      // Print header
-      await this.writer.write(new TextEncoder().encode('ORDER RECORD\n'));
-      await this.writer.write(new TextEncoder().encode('=============\n\n'));
+      // Print header with LARGE text
+      await this.printText('ORDER RECORD', { align: 'center', bold: true, doubleHeight: true, doubleWidth: true });
+      await this.printSeparator('=', 24);
+      await this.printText(''); // Empty line
       
-      // Print order record details
-      await this.writer.write(new TextEncoder().encode(`Order ID: ${receiptData.orderId}\n`));
-      await this.writer.write(new TextEncoder().encode(`Customer: ${receiptData.customerName}\n`));
-      await this.writer.write(new TextEncoder().encode(`Item: ${receiptData.itemName}\n`));
-      await this.writer.write(new TextEncoder().encode(`Quantity: ${receiptData.quantity}\n`));
+      // Print order record details with LARGE text and aligned colons
+      await this.printText(`Order ID:         ${receiptData.orderId}`, { bold: true, doubleHeight: true, align: 'left' });
+      await this.printText(`Customer:         ${receiptData.customerName}`, { bold: true, doubleHeight: true, align: 'left' });
+      await this.printText(`Item:             ${receiptData.itemName}`, { bold: true, doubleHeight: true, align: 'left' });
+      await this.printText(`Quantity:         ${receiptData.quantity}`, { bold: true, doubleHeight: true, align: 'left' });
       
       if (receiptData.trackingNumber) {
-        await this.writer.write(new TextEncoder().encode(`Tracking: ${receiptData.trackingNumber}\n`));
+        await this.printText(`Tracking:         ${receiptData.trackingNumber}`, { bold: true, doubleHeight: true, align: 'left' });
       }
       
       if (receiptData.isRemaining) {
-        await this.writer.write(new TextEncoder().encode(`Wash Type: Unknown\n`));
-        await this.writer.write(new TextEncoder().encode(`Process: Unknown\n`));
-        await this.writer.write(new TextEncoder().encode(`Status: Remaining Quantity\n`));
+        await this.printText(`Wash Type:        Unknown`, { bold: true, doubleHeight: true, align: 'left' });
+        await this.printText(`Process:          Unknown`, { bold: true, doubleHeight: true, align: 'left' });
+        await this.printText(`Status:           Remaining Quantity`, { bold: true, doubleHeight: true, align: 'left' });
       } else {
-        await this.writer.write(new TextEncoder().encode(`Wash Type: ${receiptData.washType}\n`));
-        await this.writer.write(new TextEncoder().encode(`Process: ${receiptData.processTypes.join(', ')}\n`));
+        await this.printText(`Wash Type:        ${receiptData.washType}`, { bold: true, doubleHeight: true, align: 'left' });
+        await this.printText(`Process:          ${receiptData.processTypes.join(', ')}`, { bold: true, doubleHeight: true, align: 'left' });
       }
       
-      // Print footer
-      await this.writer.write(new TextEncoder().encode('\n=============\n'));
-      await this.writer.write(new TextEncoder().encode('Generated: ' + new Date().toLocaleString() + '\n\n'));
+      await this.printText(''); // Empty line
+      
+      // Print footer with smaller text
+      await this.printSeparator('=', 24);
+      await this.printText('Generated: ' + new Date().toLocaleString(), { align: 'center' });
+      await this.printText(''); // Empty line
       
       // Feed paper and cut
-      await this.writer.write(new TextEncoder().encode('\n\n\n'));
+      await this.printText(''); // Empty line
+      await this.printText(''); // Empty line
       await this.sendCommand(new Uint8Array([0x1D, 0x56, 0x00])); // Paper cut
       
     } catch (error) {

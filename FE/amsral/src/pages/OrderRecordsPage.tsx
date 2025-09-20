@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Typography, IconButton, Menu, MenuItem } from '@mui/material';
-import { ArrowBack, MoreVert, Print } from '@mui/icons-material';
+import { ArrowBack, MoreVert } from '@mui/icons-material';
 import type { GridColDef } from '@mui/x-data-grid';
 import PrimaryButton from '../components/common/PrimaryButton';
 import PrimaryTable from '../components/common/PrimaryTable';
@@ -15,7 +15,6 @@ import { orderService, type Order, type CreateOrderRecordRequest, type UpdateOrd
 import { itemService } from '../services/itemService';
 import { washingTypeService } from '../services/washingTypeService';
 import { processTypeService } from '../services/processTypeService';
-import { generateOrderReceipt } from '../utils/pdfUtils';
 import { useAuth } from '../hooks/useAuth';
 import { hasPermission } from '../utils/roleUtils';
 import { getStatusColor, getStatusLabel, normalizeStatus } from '../utils/statusUtils';
@@ -325,25 +324,6 @@ export default function OrderRecordsPage() {
         setSelectedRecord(null);
     };
 
-    const handlePrintRecord = (record: ProcessRecord) => {
-        if (!order) return;
-
-        try {
-            const receiptData = {
-                orderId: order.id,
-                customerName: order.customerName,
-                totalQuantity: record.quantity,
-                orderDate: order.date,
-                notes: order.itemId ? `Item: ${record.itemId}, Wash Type: ${record.washType}, Process Types: ${record.processTypes.join(', ')}` : order.notes
-            };
-
-            generateOrderReceipt(receiptData);
-            toast.success('Record receipt downloaded successfully!');
-        } catch (error) {
-            console.error('Error generating record receipt:', error);
-            toast.error('Failed to generate receipt. Please try again.');
-        }
-    };
 
     const handleEditRecordClick = () => {
         if (selectedRecord) {
@@ -481,26 +461,6 @@ export default function OrderRecordsPage() {
                     </span>
                 );
             }
-        },
-        {
-            field: 'print',
-            headerName: 'Print',
-            flex: 0.3,
-            minWidth: 60,
-            sortable: false,
-            renderCell: (params) => (
-                <IconButton
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        handlePrintRecord(params.row);
-                    }}
-                    size="small"
-                    sx={{ color: colors.button.primary }}
-                    title="Print Record"
-                >
-                    <Print />
-                </IconButton>
-            )
         },
         {
             field: 'actions',
@@ -643,68 +603,246 @@ export default function OrderRecordsPage() {
             {/* Add/Edit Record Form */}
             {showAddForm && (
                 <div className="mb-6 p-4 border border-gray-200 rounded-lg bg-white">
+                    <style>
+                        {`
+                            .grid > div {
+                                display: flex !important;
+                                flex-direction: column !important;
+                                align-items: stretch !important;
+                                width: 100% !important;
+                                margin: 0 !important;
+                                padding: 0 !important;
+                            }
+                            .grid > div > label {
+                                margin-bottom: 8px !important;
+                                height: 24px !important;
+                                display: flex !important;
+                                align-items: center !important;
+                                line-height: 1 !important;
+                            }
+                            .uniform-height-dropdown {
+                                height: 48px !important;
+                                display: flex !important;
+                                align-items: center !important;
+                                width: 100% !important;
+                                margin: 0 !important;
+                                padding: 0 !important;
+                                position: relative !important;
+                                top: 0 !important;
+                                left: 0 !important;
+                                min-width: 100% !important;
+                                max-width: 100% !important;
+                            }
+                            .uniform-height-multiselect {
+                                height: 48px !important;
+                                display: flex !important;
+                                align-items: center !important;
+                                width: 100% !important;
+                                margin: 0 !important;
+                                padding: 0 !important;
+                                margin-left: 0 !important;
+                                margin-right: 0 !important;
+                                padding-left: 0 !important;
+                                padding-right: 0 !important;
+                                position: relative !important;
+                                top: 0 !important;
+                                left: 0 !important;
+                                min-width: 100% !important;
+                                max-width: 100% !important;
+                            }
+                            .uniform-height-number-input {
+                                height: 48px !important;
+                                display: flex !important;
+                                align-items: center !important;
+                                width: 100% !important;
+                                margin: 0 !important;
+                                padding: 0 !important;
+                                position: relative !important;
+                                top: 0 !important;
+                                left: 0 !important;
+                                min-width: 100% !important;
+                                max-width: 100% !important;
+                            }
+                            .uniform-height-dropdown .MuiSelect-select {
+                                padding: 16px 16px !important;
+                                height: 48px !important;
+                                min-height: 48px !important;
+                                display: flex !important;
+                                align-items: center !important;
+                                box-sizing: border-box !important;
+                            }
+                            .uniform-height-multiselect .MuiSelect-select {
+                                padding: 16px 16px !important;
+                                height: 48px !important;
+                                min-height: 48px !important;
+                                display: flex !important;
+                                align-items: center !important;
+                                box-sizing: border-box !important;
+                                margin: 0 !important;
+                                border-radius: 12px !important;
+                            }
+                            .uniform-height-dropdown .MuiOutlinedInput-root {
+                                height: 48px !important;
+                                display: flex !important;
+                                align-items: center !important;
+                                width: 100% !important;
+                                min-width: 100% !important;
+                                max-width: 100% !important;
+                                margin: 0 !important;
+                                padding: 0 !important;
+                            }
+                            .uniform-height-multiselect .MuiOutlinedInput-root {
+                                height: 48px !important;
+                                display: flex !important;
+                                align-items: center !important;
+                                margin: 0 !important;
+                                padding: 0 !important;
+                                margin-left: 0 !important;
+                                margin-right: 0 !important;
+                                padding-left: 0 !important;
+                                padding-right: 0 !important;
+                                border-radius: 12px !important;
+                                width: 100% !important;
+                                min-width: 100% !important;
+                                max-width: 100% !important;
+                            }
+                            .uniform-height-number-input input[type="number"] {
+                                padding: 16px 16px !important;
+                                height: 48px !important;
+                                min-height: 48px !important;
+                                max-height: 48px !important;
+                                display: flex !important;
+                                align-items: center !important;
+                                box-sizing: border-box !important;
+                                margin: 0 !important;
+                                border-radius: 12px !important;
+                            }
+                            .uniform-height-number-input > div {
+                                height: 48px !important;
+                                display: flex !important;
+                                align-items: center !important;
+                                margin: 0 !important;
+                                padding: 0 !important;
+                                border-radius: 12px !important;
+                                width: 100% !important;
+                                min-width: 100% !important;
+                                max-width: 100% !important;
+                            }
+                            .uniform-height-number-input > * {
+                                margin: 0 !important;
+                                padding: 0 !important;
+                                width: 100% !important;
+                                min-width: 100% !important;
+                                max-width: 100% !important;
+                            }
+                            .uniform-height-dropdown .MuiTypography-root {
+                                display: flex !important;
+                                align-items: center !important;
+                                height: 100% !important;
+                            }
+                            .uniform-height-multiselect .MuiTypography-root {
+                                display: flex !important;
+                                align-items: center !important;
+                                height: 100% !important;
+                            }
+                            .uniform-height-multiselect > * {
+                                margin: 0 !important;
+                                padding: 0 !important;
+                                width: 100% !important;
+                                min-width: 100% !important;
+                                max-width: 100% !important;
+                            }
+                            .uniform-height-multiselect .MuiFormControl-root {
+                                width: 100% !important;
+                                min-width: 100% !important;
+                                max-width: 100% !important;
+                                margin: 0 !important;
+                            }
+                            .uniform-height-dropdown > * {
+                                margin: 0 !important;
+                                padding: 0 !important;
+                                width: 100% !important;
+                                min-width: 100% !important;
+                                max-width: 100% !important;
+                            }
+                            .uniform-height-dropdown .MuiFormControl-root {
+                                width: 100% !important;
+                                min-width: 100% !important;
+                                max-width: 100% !important;
+                                margin: 0 !important;
+                            }
+                        `}
+                    </style>
                     <Typography variant="h6" className="mb-4">
                         {editingRecord ? 'Edit Record' : 'Add New Record'}
                     </Typography>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4 items-start">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Item *</label>
-                            <PrimaryDropdown
-                                name="itemId"
-                                value={newRecord.itemId}
-                                onChange={(e) => handleRecordChange('itemId', e.target.value)}
-                                options={itemOptions}
-                                placeholder={optionsLoading ? "Loading items..." : "Select an item"}
-                                error={!!errors.itemId}
-                                disabled={optionsLoading}
-                                className="px-4 py-3 text-base"
-                                style={{ borderColor: errors.itemId ? '#ef4444' : colors.border.light }}
-                            />
+                            <div className="uniform-height-dropdown">
+                                <PrimaryDropdown
+                                    name="itemId"
+                                    value={newRecord.itemId}
+                                    onChange={(e) => handleRecordChange('itemId', e.target.value)}
+                                    options={itemOptions}
+                                    placeholder={optionsLoading ? "Loading items..." : "Select an item"}
+                                    error={!!errors.itemId}
+                                    disabled={optionsLoading}
+                                    className="px-4 py-4 text-base"
+                                    style={{ borderColor: errors.itemId ? '#ef4444' : colors.border.light }}
+                                />
+                            </div>
                             {errors.itemId && <span className="text-xs text-red-500 mt-1 block">{errors.itemId}</span>}
                         </div>
 
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Quantity *</label>
-                            <PrimaryNumberInput
-                                value={newRecord.quantity}
-                                onChange={(e) => handleRecordChange('quantity', Number(e.target.value))}
-                                label=""
-                                placeholder="Enter quantity"
-                                min={1}
-                                error={!!errors.quantity}
-                                helperText={errors.quantity}
-                                className="text-base"
-                            />
+                            <div className="uniform-height-number-input">
+                                <PrimaryNumberInput
+                                    value={newRecord.quantity}
+                                    onChange={(e) => handleRecordChange('quantity', Number(e.target.value))}
+                                    label=""
+                                    placeholder="Enter quantity"
+                                    min={1}
+                                    error={!!errors.quantity}
+                                    helperText={errors.quantity}
+                                    className="px-4 py-4 text-base"
+                                />
+                            </div>
                         </div>
 
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Wash Type *</label>
-                            <PrimaryDropdown
-                                name="washType"
-                                value={newRecord.washType}
-                                onChange={(e) => handleRecordChange('washType', e.target.value)}
-                                options={washTypeOptions}
-                                placeholder={optionsLoading ? "Loading wash types..." : "Select wash type"}
-                                error={!!errors.washType}
-                                disabled={optionsLoading}
-                                className="px-4 py-3 text-base"
-                                style={{ borderColor: errors.washType ? '#ef4444' : colors.border.light }}
-                            />
+                            <div className="uniform-height-dropdown">
+                                <PrimaryDropdown
+                                    name="washType"
+                                    value={newRecord.washType}
+                                    onChange={(e) => handleRecordChange('washType', e.target.value)}
+                                    options={washTypeOptions}
+                                    placeholder={optionsLoading ? "Loading wash types..." : "Select wash type"}
+                                    error={!!errors.washType}
+                                    disabled={optionsLoading}
+                                    className="px-4 py-4 text-base"
+                                    style={{ borderColor: errors.washType ? '#ef4444' : colors.border.light }}
+                                />
+                            </div>
                             {errors.washType && <span className="text-xs text-red-500 mt-1 block">{errors.washType}</span>}
                         </div>
 
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Process Types *</label>
-                            <PrimaryMultiSelect
-                                name="processTypes"
-                                value={newRecord.processTypes}
-                                onChange={handleMultiSelectChange('processTypes')}
-                                options={processTypeOptions}
-                                placeholder={optionsLoading ? "Loading process types..." : "Select process types"}
-                                className="text-base"
-                                style={{ borderColor: colors.border.light }}
-                            />
+                            <div className="uniform-height-multiselect">
+                                <PrimaryMultiSelect
+                                    name="processTypes"
+                                    value={newRecord.processTypes}
+                                    onChange={handleMultiSelectChange('processTypes')}
+                                    options={processTypeOptions}
+                                    placeholder={optionsLoading ? "Loading process types..." : "Select process types"}
+                                    className="px-4 py-4 text-base"
+                                    style={{ borderColor: errors.processTypes ? '#ef4444' : colors.border.light }}
+                                />
+                            </div>
                             {errors.processTypes && <span className="text-xs text-red-500 mt-1 block">{errors.processTypes}</span>}
                         </div>
                     </div>
