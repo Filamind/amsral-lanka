@@ -440,6 +440,7 @@ export default function EmployeesPage() {
                             }
                         }}
                         loading={loading}
+                        height="auto"
                     />
                 )}
             </div>

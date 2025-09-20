@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Box, Typography, Card, CardContent, TextField, Button, Divider, Alert, CircularProgress, InputAdornment, IconButton } from '@mui/material';
-import { Person, Lock, Edit, Visibility, VisibilityOff } from '@mui/icons-material';
+import { Box, Typography, Card, CardContent, TextField, Button, Alert, CircularProgress, InputAdornment, IconButton, Tabs, Tab, Paper, Avatar, Chip } from '@mui/material';
+import { Person, Lock, Edit, Visibility, VisibilityOff, AccountCircle, Security, PersonPin } from '@mui/icons-material';
 import PrimaryButton from '../components/common/PrimaryButton';
 import ConfirmationDialog from '../components/common/ConfirmationDialog';
 import colors from '../styles/colors';
@@ -230,61 +230,165 @@ export default function ProfilePage() {
     }
 
     return (
-        <Box sx={{ p: 3 }}>
-            <Typography variant="h4" sx={{ mb: 3, color: colors.text.primary, fontWeight: 600 }}>
-                Profile Settings
-            </Typography>
+        <Box sx={{
+            p: { xs: 2, sm: 3, md: 4 },
+            background: colors.background.secondary,
+            minHeight: '100vh'
+        }}>
+            {/* Header Section */}
+            <Box sx={{ mb: 4 }}>
+                <Typography
+                    variant="h4"
+                    sx={{
+                        color: colors.text.primary,
+                        fontWeight: 700,
+                        mb: 1,
+                        fontSize: { xs: '1.75rem', sm: '2rem', md: '2.5rem' }
+                    }}
+                >
+                    Profile Settings
+                </Typography>
+                <Typography
+                    variant="body1"
+                    sx={{
+                        color: colors.text.secondary,
+                        fontSize: '1.1rem'
+                    }}
+                >
+                    Manage your account information and security settings
+                </Typography>
+            </Box>
+
+            {/* User Info Card */}
+            <Card sx={{
+                mb: 4,
+                background: colors.gradients.loginCard,
+                border: `1px solid ${colors.border.light}`,
+                borderRadius: 3,
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+            }}>
+                <CardContent sx={{ p: 3 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <Avatar
+                            sx={{
+                                width: 80,
+                                height: 80,
+                                background: colors.gradients.primaryBlue,
+                                fontSize: '2rem',
+                                fontWeight: 600
+                            }}
+                        >
+                            {user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}
+                        </Avatar>
+                        <Box sx={{ flex: 1 }}>
+                            <Typography
+                                variant="h5"
+                                sx={{
+                                    color: colors.text.primary,
+                                    fontWeight: 600,
+                                    mb: 0.5
+                                }}
+                            >
+                                {user?.firstName} {user?.lastName}
+                            </Typography>
+                            <Typography
+                                variant="body1"
+                                sx={{
+                                    color: colors.text.secondary,
+                                    mb: 1
+                                }}
+                            >
+                                @{user?.username}
+                            </Typography>
+                            <Chip
+                                label={user?.role?.name || user?.role || 'User'}
+                                sx={{
+                                    background: colors.primary[100],
+                                    color: colors.primary[700],
+                                    fontWeight: 600,
+                                    fontSize: '0.875rem'
+                                }}
+                            />
+                        </Box>
+                    </Box>
+                </CardContent>
+            </Card>
 
             {/* Tab Navigation */}
-            <Box sx={{ mb: 3, display: 'flex', gap: 1 }}>
-                <Button
-                    variant={activeTab === 'profile' ? 'contained' : 'outlined'}
-                    onClick={() => setActiveTab('profile')}
-                    startIcon={<Person />}
+            <Paper sx={{
+                mb: 3,
+                borderRadius: 2,
+                border: `1px solid ${colors.border.light}`,
+                overflow: 'hidden'
+            }}>
+                <Tabs
+                    value={activeTab}
+                    onChange={(_, newValue) => setActiveTab(newValue)}
+                    variant="fullWidth"
                     sx={{
-                        borderRadius: 2,
-                        textTransform: 'none',
-                        fontWeight: 600,
+                        '& .MuiTab-root': {
+                            textTransform: 'none',
+                            fontWeight: 600,
+                            fontSize: '1rem',
+                            py: 2,
+                            minHeight: 60,
+                            color: colors.text.secondary,
+                            '&.Mui-selected': {
+                                color: colors.primary[600],
+                                background: colors.primary[50]
+                            }
+                        },
+                        '& .MuiTabs-indicator': {
+                            height: 3,
+                            background: colors.gradients.primaryBlue
+                        }
                     }}
                 >
-                    Profile Information
-                </Button>
-                <Button
-                    variant={activeTab === 'password' ? 'contained' : 'outlined'}
-                    onClick={() => setActiveTab('password')}
-                    startIcon={<Lock />}
-                    sx={{
-                        borderRadius: 2,
-                        textTransform: 'none',
-                        fontWeight: 600,
-                    }}
-                >
-                    Change Password
-                </Button>
-                <Button
-                    variant={activeTab === 'username' ? 'contained' : 'outlined'}
-                    onClick={() => setActiveTab('username')}
-                    startIcon={<Edit />}
-                    sx={{
-                        borderRadius: 2,
-                        textTransform: 'none',
-                        fontWeight: 600,
-                    }}
-                >
-                    Change Username
-                </Button>
-            </Box>
+                    <Tab
+                        value="profile"
+                        label="Profile Information"
+                        icon={<Person />}
+                        iconPosition="start"
+                    />
+                    <Tab
+                        value="password"
+                        label="Change Password"
+                        icon={<Security />}
+                        iconPosition="start"
+                    />
+                    <Tab
+                        value="username"
+                        label="Change Username"
+                        icon={<PersonPin />}
+                        iconPosition="start"
+                    />
+                </Tabs>
+            </Paper>
 
             {/* Profile Information Tab */}
             {activeTab === 'profile' && (
-                <Card sx={{ maxWidth: 600 }}>
-                    <CardContent>
-                        <Typography variant="h6" sx={{ mb: 3, color: colors.text.primary, fontWeight: 600 }}>
-                            Personal Information
-                        </Typography>
+                <Card sx={{
+                    width: '100%',
+                    background: colors.background.card,
+                    border: `1px solid ${colors.border.light}`,
+                    borderRadius: 3,
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+                }}>
+                    <CardContent sx={{ p: 4 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 4 }}>
+                            <AccountCircle sx={{ color: colors.primary[500], fontSize: 28 }} />
+                            <Typography variant="h5" sx={{ color: colors.text.primary, fontWeight: 600 }}>
+                                Personal Information
+                            </Typography>
+                        </Box>
 
                         <form onSubmit={handleProfileSubmit}>
-                            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
+                            <Box sx={{
+                                display: 'grid',
+                                gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' },
+                                gap: 3,
+                                mb: 3
+                            }}>
                                 <TextField
                                     label="First Name"
                                     value={profileForm.firstName}
@@ -293,6 +397,17 @@ export default function ProfilePage() {
                                     helperText={errors.firstName}
                                     fullWidth
                                     required
+                                    sx={{
+                                        '& .MuiOutlinedInput-root': {
+                                            borderRadius: 2,
+                                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: colors.primary[300]
+                                            },
+                                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: colors.primary[500]
+                                            }
+                                        }
+                                    }}
                                 />
                                 <TextField
                                     label="Last Name"
@@ -302,10 +417,26 @@ export default function ProfilePage() {
                                     helperText={errors.lastName}
                                     fullWidth
                                     required
+                                    sx={{
+                                        '& .MuiOutlinedInput-root': {
+                                            borderRadius: 2,
+                                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: colors.primary[300]
+                                            },
+                                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: colors.primary[500]
+                                            }
+                                        }
+                                    }}
                                 />
                             </Box>
 
-                            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 3 }}>
+                            <Box sx={{
+                                display: 'grid',
+                                gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' },
+                                gap: 3,
+                                mb: 4
+                            }}>
                                 <TextField
                                     label="Phone Number"
                                     value={profileForm.phone}
@@ -313,6 +444,17 @@ export default function ProfilePage() {
                                     error={!!errors.phone}
                                     helperText={errors.phone}
                                     fullWidth
+                                    sx={{
+                                        '& .MuiOutlinedInput-root': {
+                                            borderRadius: 2,
+                                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: colors.primary[300]
+                                            },
+                                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: colors.primary[500]
+                                            }
+                                        }
+                                    }}
                                 />
                                 <TextField
                                     label="Date of Birth"
@@ -321,17 +463,35 @@ export default function ProfilePage() {
                                     onChange={(e) => setProfileForm(prev => ({ ...prev, dateOfBirth: e.target.value }))}
                                     InputLabelProps={{ shrink: true }}
                                     fullWidth
+                                    sx={{
+                                        '& .MuiOutlinedInput-root': {
+                                            borderRadius: 2,
+                                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: colors.primary[300]
+                                            },
+                                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: colors.primary[500]
+                                            }
+                                        }
+                                    }}
                                 />
                             </Box>
 
-                            <PrimaryButton
-                                type="submit"
-                                loading={loading}
-                                disabled={loading}
-                                sx={{ minWidth: 120 }}
-                            >
-                                Update Profile
-                            </PrimaryButton>
+                            <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                <PrimaryButton
+                                    type="submit"
+                                    loading={loading}
+                                    disabled={loading}
+                                    sx={{
+                                        minWidth: 120,
+                                        height: 44,
+                                        fontSize: '0.95rem',
+                                        fontWeight: 600
+                                    }}
+                                >
+                                    Update Profile
+                                </PrimaryButton>
+                            </Box>
                         </form>
                     </CardContent>
                 </Card>
@@ -339,100 +499,167 @@ export default function ProfilePage() {
 
             {/* Change Password Tab */}
             {activeTab === 'password' && (
-                <Card sx={{ maxWidth: 600 }}>
-                    <CardContent>
-                        <Typography variant="h6" sx={{ mb: 3, color: colors.text.primary, fontWeight: 600 }}>
-                            Change Password
-                        </Typography>
+                <Card sx={{
+                    width: '100%',
+                    background: colors.background.card,
+                    border: `1px solid ${colors.border.light}`,
+                    borderRadius: 3,
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+                }}>
+                    <CardContent sx={{ p: 4 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 4 }}>
+                            <Security sx={{ color: colors.primary[500], fontSize: 28 }} />
+                            <Typography variant="h5" sx={{ color: colors.text.primary, fontWeight: 600 }}>
+                                Change Password
+                            </Typography>
+                        </Box>
 
-                        <Alert severity="info" sx={{ mb: 3 }}>
-                            Your password must be at least 6 characters long.
+                        <Alert
+                            severity="info"
+                            sx={{
+                                mb: 4,
+                                borderRadius: 2,
+                                background: colors.primary[50],
+                                border: `1px solid ${colors.primary[200]}`,
+                                '& .MuiAlert-icon': {
+                                    color: colors.primary[600]
+                                }
+                            }}
+                        >
+                            Your password must be at least 6 characters long for security purposes.
                         </Alert>
 
                         <form onSubmit={handlePasswordSubmit}>
-                            <TextField
-                                label="Current Password"
-                                type={showPasswords.current ? "text" : "password"}
-                                value={passwordForm.currentPassword}
-                                onChange={(e) => setPasswordForm(prev => ({ ...prev, currentPassword: e.target.value }))}
-                                error={!!errors.currentPassword}
-                                helperText={errors.currentPassword}
-                                fullWidth
-                                sx={{ mb: 2 }}
-                                required
-                                InputProps={{
-                                    endAdornment: (
-                                        <InputAdornment position="end">
-                                            <IconButton
-                                                onClick={() => togglePasswordVisibility('current')}
-                                                edge="end"
-                                                size="small"
-                                            >
-                                                {showPasswords.current ? <VisibilityOff /> : <Visibility />}
-                                            </IconButton>
-                                        </InputAdornment>
-                                    ),
-                                }}
-                            />
+                            <Box sx={{
+                                maxWidth: { xs: '100%', sm: 600, md: 800 }
+                            }}>
+                                <TextField
+                                    label="Current Password"
+                                    type={showPasswords.current ? "text" : "password"}
+                                    value={passwordForm.currentPassword}
+                                    onChange={(e) => setPasswordForm(prev => ({ ...prev, currentPassword: e.target.value }))}
+                                    error={!!errors.currentPassword}
+                                    helperText={errors.currentPassword}
+                                    fullWidth
+                                    sx={{
+                                        mb: 3,
+                                        '& .MuiOutlinedInput-root': {
+                                            borderRadius: 2,
+                                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: colors.primary[300]
+                                            },
+                                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: colors.primary[500]
+                                            }
+                                        }
+                                    }}
+                                    required
+                                    InputProps={{
+                                        endAdornment: (
+                                            <InputAdornment position="end">
+                                                <IconButton
+                                                    onClick={() => togglePasswordVisibility('current')}
+                                                    edge="end"
+                                                    size="small"
+                                                    sx={{ color: colors.text.secondary }}
+                                                >
+                                                    {showPasswords.current ? <VisibilityOff /> : <Visibility />}
+                                                </IconButton>
+                                            </InputAdornment>
+                                        ),
+                                    }}
+                                />
 
-                            <TextField
-                                label="New Password"
-                                type={showPasswords.new ? "text" : "password"}
-                                value={passwordForm.newPassword}
-                                onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
-                                error={!!errors.newPassword}
-                                helperText={errors.newPassword}
-                                fullWidth
-                                sx={{ mb: 2 }}
-                                required
-                                InputProps={{
-                                    endAdornment: (
-                                        <InputAdornment position="end">
-                                            <IconButton
-                                                onClick={() => togglePasswordVisibility('new')}
-                                                edge="end"
-                                                size="small"
-                                            >
-                                                {showPasswords.new ? <VisibilityOff /> : <Visibility />}
-                                            </IconButton>
-                                        </InputAdornment>
-                                    ),
-                                }}
-                            />
+                                <TextField
+                                    label="New Password"
+                                    type={showPasswords.new ? "text" : "password"}
+                                    value={passwordForm.newPassword}
+                                    onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
+                                    error={!!errors.newPassword}
+                                    helperText={errors.newPassword}
+                                    fullWidth
+                                    sx={{
+                                        mb: 3,
+                                        '& .MuiOutlinedInput-root': {
+                                            borderRadius: 2,
+                                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: colors.primary[300]
+                                            },
+                                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: colors.primary[500]
+                                            }
+                                        }
+                                    }}
+                                    required
+                                    InputProps={{
+                                        endAdornment: (
+                                            <InputAdornment position="end">
+                                                <IconButton
+                                                    onClick={() => togglePasswordVisibility('new')}
+                                                    edge="end"
+                                                    size="small"
+                                                    sx={{ color: colors.text.secondary }}
+                                                >
+                                                    {showPasswords.new ? <VisibilityOff /> : <Visibility />}
+                                                </IconButton>
+                                            </InputAdornment>
+                                        ),
+                                    }}
+                                />
 
-                            <TextField
-                                label="Confirm New Password"
-                                type={showPasswords.confirm ? "text" : "password"}
-                                value={passwordForm.confirmPassword}
-                                onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                                error={!!errors.confirmPassword}
-                                helperText={errors.confirmPassword}
-                                fullWidth
-                                sx={{ mb: 3 }}
-                                required
-                                InputProps={{
-                                    endAdornment: (
-                                        <InputAdornment position="end">
-                                            <IconButton
-                                                onClick={() => togglePasswordVisibility('confirm')}
-                                                edge="end"
-                                                size="small"
-                                            >
-                                                {showPasswords.confirm ? <VisibilityOff /> : <Visibility />}
-                                            </IconButton>
-                                        </InputAdornment>
-                                    ),
-                                }}
-                            />
+                                <TextField
+                                    label="Confirm New Password"
+                                    type={showPasswords.confirm ? "text" : "password"}
+                                    value={passwordForm.confirmPassword}
+                                    onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                                    error={!!errors.confirmPassword}
+                                    helperText={errors.confirmPassword}
+                                    fullWidth
+                                    sx={{
+                                        mb: 4,
+                                        '& .MuiOutlinedInput-root': {
+                                            borderRadius: 2,
+                                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: colors.primary[300]
+                                            },
+                                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: colors.primary[500]
+                                            }
+                                        }
+                                    }}
+                                    required
+                                    InputProps={{
+                                        endAdornment: (
+                                            <InputAdornment position="end">
+                                                <IconButton
+                                                    onClick={() => togglePasswordVisibility('confirm')}
+                                                    edge="end"
+                                                    size="small"
+                                                    sx={{ color: colors.text.secondary }}
+                                                >
+                                                    {showPasswords.confirm ? <VisibilityOff /> : <Visibility />}
+                                                </IconButton>
+                                            </InputAdornment>
+                                        ),
+                                    }}
+                                />
 
-                            <PrimaryButton
-                                type="submit"
-                                loading={loading}
-                                disabled={loading}
-                                sx={{ minWidth: 120 }}
-                            >
-                                Change Password
-                            </PrimaryButton>
+                                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                    <PrimaryButton
+                                        type="submit"
+                                        loading={loading}
+                                        disabled={loading}
+                                        sx={{
+                                            minWidth: 140,
+                                            height: 44,
+                                            fontSize: '0.95rem',
+                                            fontWeight: 600
+                                        }}
+                                    >
+                                        Change Password
+                                    </PrimaryButton>
+                                </Box>
+                            </Box>
                         </form>
                     </CardContent>
                 </Card>
@@ -440,36 +667,78 @@ export default function ProfilePage() {
 
             {/* Change Username Tab */}
             {activeTab === 'username' && (
-                <Card sx={{ maxWidth: 600 }}>
-                    <CardContent>
-                        <Typography variant="h6" sx={{ mb: 3, color: colors.text.primary, fontWeight: 600 }}>
-                            Change Username
-                        </Typography>
+                <Card sx={{
+                    width: '100%',
+                    background: colors.background.card,
+                    border: `1px solid ${colors.border.light}`,
+                    borderRadius: 3,
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+                }}>
+                    <CardContent sx={{ p: 4 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 4 }}>
+                            <PersonPin sx={{ color: colors.primary[500], fontSize: 28 }} />
+                            <Typography variant="h5" sx={{ color: colors.text.primary, fontWeight: 600 }}>
+                                Change Username
+                            </Typography>
+                        </Box>
 
-                        <Alert severity="warning" sx={{ mb: 3 }}>
-                            Changing your username will require you to log in again with your new username.
+                        <Alert
+                            severity="warning"
+                            sx={{
+                                mb: 4,
+                                borderRadius: 2,
+                                background: colors.warning + '15',
+                                border: `1px solid ${colors.warning}40`,
+                                '& .MuiAlert-icon': {
+                                    color: colors.warning
+                                }
+                            }}
+                        >
+                            Changing your username will require you to log in again with your new username. Make sure you remember your new username.
                         </Alert>
 
                         <form onSubmit={handleUsernameSubmit}>
-                            <TextField
-                                label="New Username"
-                                value={usernameForm.newUsername}
-                                onChange={(e) => setUsernameForm(prev => ({ ...prev, newUsername: e.target.value }))}
-                                error={!!errors.newUsername}
-                                helperText={errors.newUsername}
-                                fullWidth
-                                sx={{ mb: 3 }}
-                                required
-                            />
+                            <Box sx={{
+                                maxWidth: { xs: '100%', sm: 600, md: 800 }
+                            }}>
+                                <TextField
+                                    label="New Username"
+                                    value={usernameForm.newUsername}
+                                    onChange={(e) => setUsernameForm(prev => ({ ...prev, newUsername: e.target.value }))}
+                                    error={!!errors.newUsername}
+                                    helperText={errors.newUsername}
+                                    fullWidth
+                                    sx={{
+                                        mb: 4,
+                                        '& .MuiOutlinedInput-root': {
+                                            borderRadius: 2,
+                                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: colors.primary[300]
+                                            },
+                                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                                borderColor: colors.primary[500]
+                                            }
+                                        }
+                                    }}
+                                    required
+                                />
 
-                            <PrimaryButton
-                                type="submit"
-                                loading={loading}
-                                disabled={loading}
-                                sx={{ minWidth: 120 }}
-                            >
-                                Change Username
-                            </PrimaryButton>
+                                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                    <PrimaryButton
+                                        type="submit"
+                                        loading={loading}
+                                        disabled={loading}
+                                        sx={{
+                                            minWidth: 140,
+                                            height: 44,
+                                            fontSize: '0.95rem',
+                                            fontWeight: 600
+                                        }}
+                                    >
+                                        Change Username
+                                    </PrimaryButton>
+                                </Box>
+                            </Box>
                         </form>
                     </CardContent>
                 </Card>

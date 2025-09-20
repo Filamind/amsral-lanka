@@ -26,7 +26,7 @@ export const STATUS_COLORS = {
   // Assignment Status Colors (removed duplicates - using same keys as order status)
   
   // Special statuses
-  'Assigned': 'bg-blue-100 text-blue-800',           // Same as Delivered
+  'Assigned': 'bg-cyan-100 text-cyan-800',           // Cyan for assigned (different from Pending and Delivered)
   'Complete': 'bg-green-100 text-green-800',         // For backward compatibility
 } as const;
 
@@ -39,6 +39,7 @@ export const STATUS_LABELS = {
   'confirmed': 'Confirmed',
   'processing': 'Processing',
   'delivered': 'Delivered',
+  'assigned': 'Assigned',
   'complete': 'Completed', // Map 'complete' to 'Completed' for consistency
   
   // Billing Status Labels - now using sentence case (removed duplicate 'pending')
@@ -87,6 +88,8 @@ export const normalizeStatus = (status: string, type: 'order' | 'billing' | 'ass
         return 'Processing';
       case 'delivered':
         return 'Delivered';
+      case 'assigned':
+        return 'Assigned';
       default:
         return 'Pending';
     }

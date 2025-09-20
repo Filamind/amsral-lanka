@@ -643,9 +643,9 @@ export default function RecordAssignmentsPage() {
                         bgcolor: 'background.paper',
                         boxShadow: 24,
                         borderRadius: 2,
-                        p: { xs: 2, sm: 3, md: 4 },
-                        width: { xs: '95vw', sm: '90vw', md: '700px' },
-                        maxWidth: '95vw',
+                        p: { xs: 4, sm: 5, md: 6, lg: 8, xl: 10 },
+                        width: { xs: '98vw', sm: '95vw', md: '1200px', lg: '1400px', xl: '1600px' },
+                        maxWidth: '98vw',
                         maxHeight: '95vh',
                         overflowY: 'auto',
                     }}

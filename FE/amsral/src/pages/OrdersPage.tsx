@@ -18,7 +18,7 @@ import orderRecordsService, { type OrderRecordsDetails } from '../services/order
 import type { OrderRecordReceiptData } from '../services/printerService';
 import { useAuth } from '../hooks/useAuth';
 import { hasPermission } from '../utils/roleUtils';
-import { getStatusColor, getStatusLabel, normalizeStatus, isCompletedStatus } from '../utils/statusUtils';
+import { getStatusColor, getStatusLabel, normalizeStatus } from '../utils/statusUtils';
 import toast from 'react-hot-toast';
 
 // We'll define columns inside the component to access the handler functions
@@ -45,6 +45,7 @@ type OrderRow = {
   deliveryDate: string;
   status: string;
   complete: boolean;
+  overdue: boolean;
   createdAt: string;
   updatedAt: string;
   actions: number;
@@ -152,6 +153,7 @@ export default function OrdersPage() {
           deliveryDate: order.deliveryDate,
           status: order.status,
           complete: order.complete,
+          overdue: order.overdue || false,
           createdAt: order.createdAt,
           updatedAt: order.updatedAt,
           actions: order.id,
@@ -180,14 +182,14 @@ export default function OrdersPage() {
       try {
         setOptionsLoading(true);
 
-        // Fetch customers with full names
+        // Fetch customers with first name and customer code
         const customersResponse = await CustomerService.getAllCustomers({
           limit: 100, // Get all customers for dropdown
           isActive: true
         });
         const customerOpts = customersResponse.customers.map(customer => ({
           value: customer.id!.toString(),
-          label: `${customer.firstName} ${customer.lastName}`.trim()
+          label: `${customer.firstName} - ${customer.customerCode || 'N/A'}`.trim()
         }));
         setCustomerOptions(customerOpts);
 
@@ -575,31 +577,37 @@ export default function OrdersPage() {
         );
       }
     },
-    {
-      field: 'recordsCount',
-      headerName: 'Records',
-      flex: 0.4,
-      minWidth: 70,
-      type: 'number',
-      renderCell: (params) => (
-        <span
-          className="px-2 py-1 rounded-lg text-xs lg:text-sm font-medium"
-          style={{
-            backgroundColor: params.value > 0 ? '#dcfce7' : colors.secondary[100],
-            color: params.value > 0 ? '#166534' : colors.text.muted,
-          }}
-        >
-          {params.value}
-        </span>
-      )
-    },
+    // {
+    //   field: 'recordsCount',
+    //   headerName: 'Records',
+    //   flex: 0.4,
+    //   minWidth: 70,
+    //   type: 'number',
+    //   renderCell: (params) => (
+    //     <span
+    //       className="px-2 py-1 rounded-lg text-xs lg:text-sm font-medium"
+    //       style={{
+    //         backgroundColor: params.value > 0 ? '#dcfce7' : colors.secondary[100],
+    //         color: params.value > 0 ? '#166534' : colors.text.muted,
+    //       }}
+    //     >
+    //       {params.value}
+    //     </span>
+    //   )
+    // },
     {
       field: 'deliveryDate',
       headerName: 'Delivery',
       flex: 0.7,
       minWidth: 100,
       renderCell: (params) => (
-        <span className="text-sm lg:text-base" style={{ color: colors.text.secondary }}>
+        <span
+          className="text-sm lg:text-base"
+          style={{
+            color: params.row.overdue ? '#ef4444' : colors.text.secondary,
+            fontWeight: params.row.overdue ? 'bold' : 'normal'
+          }}
+        >
           {new Date(params.value).toLocaleDateString()}
         </span>
       )
@@ -806,6 +814,7 @@ export default function OrdersPage() {
             deliveryDate: response.data.deliveryDate,
             status: response.data.status,
             complete: response.data.complete,
+            overdue: response.data.overdue || false,
             createdAt: response.data.createdAt,
             updatedAt: response.data.updatedAt,
             actions: response.data.id,

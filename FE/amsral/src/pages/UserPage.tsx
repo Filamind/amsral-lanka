@@ -569,6 +569,7 @@ export default function UserPage() {
                             }
                         }}
                         loading={loading}
+                        height="auto"
                     />
                 )}
             </div>

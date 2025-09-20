@@ -740,7 +740,7 @@ export const generateAmsralInvoice = (invoiceData: InvoiceData): void => {
      
      // Simple signature line with reduced width
      doc.setLineWidth(0.2); // Reduced line width
-     doc.line(margin, signatureY + 15, margin + 80, signatureY + 15);
+     doc.line(margin, signatureY + 15, margin + 30, signatureY + 15);
      
      doc.setFontSize(10);
      doc.setFont('helvetica', 'normal');

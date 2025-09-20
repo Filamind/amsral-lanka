@@ -383,8 +383,8 @@ const BillingPage: React.FC = () => {
                             options={[
                                 { value: '', label: 'All Customers' },
                                 ...customers.map(customer => ({
-                                    value: `${customer.firstName} ${customer.lastName}`,
-                                    label: `${customer.firstName} ${customer.lastName}`
+                                    value: `${customer.firstName} - ${customer.customerCode || 'N/A'}`,
+                                    label: `${customer.firstName} - ${customer.customerCode || 'N/A'}`
                                 }))
                             ]}
                             placeholder="Customer"

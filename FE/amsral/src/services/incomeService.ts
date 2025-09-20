@@ -44,6 +44,21 @@ export interface IncomeTrendsData {
 }
 
 export interface IncomeSummaryData {
+  period: {
+    startDate: string;
+    endDate: string;
+  };
+  summary: {
+    totalRevenue: number;
+    totalIncome: number;
+    pendingIncome: number;
+    totalRecords: number;
+    paidRecords: number;
+    invoicedRecords: number;
+  };
+}
+
+export interface LegacyIncomeSummaryData {
   period: string;
   currentPeriod: {
     startDate: string;
@@ -139,8 +154,19 @@ export class IncomeService {
   // Get top customers by income
   static async getTopCustomers(filters: IncomeFilters = {}): Promise<TopCustomer[]> {
     try {
-      const analytics = await this.getIncomeAnalytics(filters);
-      return analytics.topCustomers;
+      const params = new URLSearchParams();
+      
+      if (filters.startDate) params.append('startDate', filters.startDate);
+      if (filters.endDate) params.append('endDate', filters.endDate);
+      if (filters.limit) params.append('limit', filters.limit.toString());
+
+      const response = await apiClient.get(`/billing/top-customers?${params.toString()}`);
+      
+      if (response.data.success) {
+        return response.data.data;
+      }
+      
+      throw new Error(response.data.message || 'Failed to fetch top customers');
     } catch (error) {
       console.error('Error fetching top customers:', error);
       throw error;
