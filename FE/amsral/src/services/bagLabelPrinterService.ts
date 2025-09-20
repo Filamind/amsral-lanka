@@ -25,6 +25,23 @@ class BagLabelPrinterService {
   }
 
   /**
+   * Print single bag receipt
+   */
+  async printSingleBagReceipt(bagData: BagLabelData): Promise<void> {
+    if (!printerService.isConnected()) {
+      throw new Error('Printer not connected');
+    }
+
+    try {
+      // Use the existing printer service's printBagLabel method
+      await printerService.printBagLabel(bagData);
+    } catch (error) {
+      console.error('Error printing bag receipt:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Print multiple bag labels with delay between prints
    */
   async printMultipleBagLabels(bagDataArray: BagLabelData[], onProgress?: (current: number, total: number) => void): Promise<void> {

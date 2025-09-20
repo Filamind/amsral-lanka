@@ -8,6 +8,7 @@ interface PrimaryTableProps extends Partial<DataGridProps> {
     columns: GridColDef[];
     rows: any[];
     height?: number | string | 'auto';
+    pagination?: boolean;
     paginationModel?: { page: number; pageSize: number };
     onPaginationModelChange?: (model: { page: number; pageSize: number }) => void;
     rowCount?: number;
@@ -22,6 +23,7 @@ export default function PrimaryTable({
     rows,
     height = 400,
     onRowClick,
+    pagination = false,
     paginationModel,
     onPaginationModelChange,
     rowCount,
@@ -36,10 +38,10 @@ export default function PrimaryTable({
         if (height === 'auto') {
             const headerHeight = 56; // Header height
             const rowHeight = 52; // Row height
-            const paginationHeight = 52; // Pagination height
+            const paginationHeight = pagination ? 52 : 0; // Pagination height only if pagination is enabled
             const padding = 16; // Paper padding
             const minHeight = 200; // Minimum height
-            const maxHeight = 600; // Maximum height
+            const maxHeight = 800; // Increased maximum height
 
             const calculatedHeight = headerHeight + (rows.length * rowHeight) + paginationHeight + padding;
             return Math.max(minHeight, Math.min(maxHeight, calculatedHeight));
@@ -61,7 +63,11 @@ export default function PrimaryTable({
             <DataGrid
                 rows={rows}
                 columns={columns}
-                pagination={false}
+                pagination={pagination}
+                paginationModel={paginationModel}
+                onPaginationModelChange={onPaginationModelChange}
+                rowCount={rowCount}
+                pageSizeOptions={pageSizeOptions}
                 checkboxSelection={checkboxSelection}
                 onRowSelectionModelChange={onRowSelectionModelChange}
                 rowSelectionModel={rowSelectionModel}

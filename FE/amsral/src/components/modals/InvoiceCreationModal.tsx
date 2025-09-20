@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -17,22 +17,18 @@ import {
   Paper,
   IconButton,
   Divider,
-  Alert,
   CircularProgress,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
+  Checkbox,
+  FormControlLabel,
 } from '@mui/material';
 import {
   Close as CloseIcon,
   Print as PrintIcon,
-  Save as SaveIcon,
 } from '@mui/icons-material';
 import { orderService } from '../../services/orderService';
 import { BillingService } from '../../services/billingService';
 import PrimaryButton from '../common/PrimaryButton';
-import { generateInvoice } from '../../utils/invoiceUtils';
+import { generateAmsralInvoice } from '../../utils/invoiceUtils';
 import toast from 'react-hot-toast';
 
 interface InvoiceRecord {
@@ -44,6 +40,7 @@ interface InvoiceRecord {
   totalPrice: number;
   washType: string;
   processTypes: string[];
+  styleNo?: string; // Optional style number
 }
 
 interface InvoiceData {
@@ -53,10 +50,13 @@ interface InvoiceData {
   customerPhone: string;
   invoiceDate: string;
   dueDate: string;
+  poNumber?: string; // Purchase Order Number
+  includeStyleNo: boolean; // Whether to include Style No column
   orders: {
     id: number;
     referenceNo: string;
     orderDate: string;
+    gpNumber?: string; // Gate Pass Number
     records: InvoiceRecord[];
   }[];
   subtotal: number;
@@ -69,16 +69,19 @@ interface InvoiceOrder {
   id: number;
   referenceNo: string;
   customerName: string;
+  customerId: number; // Customer ID for invoice number generation
   date: string;
+  orderDate: string;
   quantity: number;
   status: string;
+  gpNo?: string; // Gate Pass Number from backend
+  records: InvoiceRecord[];
 }
 
 interface InvoiceCreationModalProps {
   open: boolean;
   onClose: () => void;
   selectedOrderIds: number[];
-  orders: InvoiceOrder[];
   onInvoiceCreated: () => void;
 }
 
@@ -86,23 +89,18 @@ const InvoiceCreationModal: React.FC<InvoiceCreationModalProps> = ({
   open,
   onClose,
   selectedOrderIds,
-  orders,
   onInvoiceCreated,
 }) => {
   const [loading, setLoading] = useState(false);
-  const [orderDetails, setOrderDetails] = useState<any[]>([]);
+  const [orderDetails, setOrderDetails] = useState<InvoiceOrder[]>([]);
   const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null);
   const [unitPrices, setUnitPrices] = useState<{ [key: string]: number }>({});
-  const [paymentTerms, setPaymentTerms] = useState(30); // 30 days default
+  const [includeStyleNo, setIncludeStyleNo] = useState(false);
+  const [styleNumbers, setStyleNumbers] = useState<{ [key: string]: string }>({});
+  const [poNumber, setPoNumber] = useState('');
+  const [invoiceNumber, setInvoiceNumber] = useState('');
 
-  // Fetch detailed order information
-  useEffect(() => {
-    if (open && selectedOrderIds.length > 0) {
-      fetchOrderDetails();
-    }
-  }, [open, selectedOrderIds]);
-
-  const fetchOrderDetails = async () => {
+  const fetchOrderDetails = useCallback(async () => {
     try {
       setLoading(true);
       const orderPromises = selectedOrderIds.map(orderId =>
@@ -114,13 +112,14 @@ const InvoiceCreationModal: React.FC<InvoiceCreationModalProps> = ({
         .filter(response => response.success)
         .map(response => response.data);
 
-      setOrderDetails(validOrders);
+      setOrderDetails(validOrders as unknown as InvoiceOrder[]);
 
       // Initialize unit prices
       const initialPrices: { [key: string]: number } = {};
       validOrders.forEach(order => {
-        order.records.forEach((record: any) => {
-          const key = `${order.id}-${record.id}`;
+        order.records.forEach((record: unknown) => {
+          const recordData = record as { id: number };
+          const key = `${order.id}-${recordData.id}`;
           initialPrices[key] = 0; // Default to 0, user must enter
         });
       });
@@ -129,27 +128,63 @@ const InvoiceCreationModal: React.FC<InvoiceCreationModalProps> = ({
       // Create initial invoice data
       if (validOrders.length > 0) {
         const firstOrder = validOrders[0];
+
+        // Check if all orders have the same customer
+        const uniqueCustomers = new Set(validOrders.map(order => order.customerId || order.customerName));
+        if (uniqueCustomers.size > 1) {
+          toast.error('Cannot create invoice for multiple customers. Please select orders from the same customer.');
+          setLoading(false);
+          return;
+        }
+
+        // Check if customerId is available
+        if (!firstOrder.customerId) {
+          console.warn('Customer ID not available in order summary. Using fallback invoice number.');
+          // Continue with fallback invoice number instead of stopping
+        }
+
+        // Fetch invoice number for the customer
+        let nextInvoiceNo = `INV-${Date.now()}`; // Fallback
+        if (firstOrder.customerId) {
+          try {
+            const invoicePreview = await orderService.getInvoicePreview(firstOrder.customerId);
+            if (invoicePreview.success) {
+              nextInvoiceNo = invoicePreview.data.nextInvoiceNo;
+              setInvoiceNumber(nextInvoiceNo);
+            }
+          } catch (error) {
+            console.warn('Failed to fetch invoice number, using fallback:', error);
+          }
+        }
+
         const invoiceData: InvoiceData = {
-          invoiceNumber: `INV-${Date.now()}`,
+          invoiceNumber: nextInvoiceNo,
           customerName: firstOrder.customerName,
           customerAddress: '', // Will be fetched from customer data
           customerPhone: '', // Will be fetched from customer data
           invoiceDate: new Date().toISOString().split('T')[0],
-          dueDate: new Date(Date.now() + paymentTerms * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days default
+          poNumber: poNumber,
+          includeStyleNo: includeStyleNo,
           orders: validOrders.map(order => ({
             id: order.id,
             referenceNo: order.referenceNo,
             orderDate: order.orderDate,
-            records: order.records.map((record: any) => ({
-              id: record.id,
-              orderId: order.id,
-              itemName: record.itemName,
-              quantity: record.quantity,
-              unitPrice: 0,
-              totalPrice: 0,
-              washType: record.washType,
-              processTypes: record.processTypes,
-            })),
+            gpNumber: (order as { gpNo?: string }).gpNo || '', // Use gpNo from fetched data
+            records: order.records.map((record: unknown) => {
+              const recordData = record as { id: number; itemName: string; quantity: number; washType: string; processTypes: string[] };
+              return {
+                id: recordData.id,
+                orderId: order.id,
+                itemName: recordData.itemName,
+                quantity: recordData.quantity,
+                unitPrice: 0,
+                totalPrice: 0,
+                washType: recordData.washType,
+                processTypes: recordData.processTypes,
+                styleNo: '', // Will be filled if includeStyleNo is true
+              };
+            }),
           })),
           subtotal: 0,
           taxRate: 0,
@@ -164,7 +199,21 @@ const InvoiceCreationModal: React.FC<InvoiceCreationModalProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedOrderIds, poNumber, includeStyleNo]);
+
+  // Fetch detailed order information
+  useEffect(() => {
+    if (open && selectedOrderIds.length > 0) {
+      fetchOrderDetails();
+    }
+  }, [open, selectedOrderIds, fetchOrderDetails]);
+
+  // Update invoice data when invoice number changes
+  useEffect(() => {
+    if (invoiceNumber) {
+      setInvoiceData(prev => prev ? { ...prev, invoiceNumber } : null);
+    }
+  }, [invoiceNumber]);
 
   // Update unit price
   const handleUnitPriceChange = (orderId: number, recordId: number, price: number) => {
@@ -253,7 +302,7 @@ const InvoiceCreationModal: React.FC<InvoiceCreationModalProps> = ({
           totalPrice: order.records.reduce((sum, record) => sum + record.totalPrice, 0),
         })),
         taxRate: 0,
-        paymentTerms: paymentTerms,
+        paymentTerms: 30,
       });
 
       if (response.success) {
@@ -287,10 +336,49 @@ const InvoiceCreationModal: React.FC<InvoiceCreationModalProps> = ({
     }
   };
 
-  // Print invoice
+  // Print invoice preview (does NOT mark billing status as Invoiced)
   const handlePrintInvoice = () => {
     if (!invoiceData) return;
-    generateInvoice(invoiceData);
+
+    // Update invoice data with current form values
+    const updatedInvoiceData = {
+      ...invoiceData,
+      poNumber: poNumber,
+      includeStyleNo: includeStyleNo,
+      orders: invoiceData.orders.map(order => ({
+        ...order,
+        records: order.records.map(record => ({
+          ...record,
+          styleNo: includeStyleNo ? styleNumbers[`${order.id}-${record.id}`] || '' : undefined,
+        })),
+      })),
+    };
+
+    // Always use AMSRAL format - this is just a preview, no status update
+    generateAmsralInvoice(updatedInvoiceData);
+  };
+
+  // Create and print invoice (marks billing status as Invoiced)
+  const handleCreateAndPrintInvoice = async () => {
+    if (!invoiceData) return;
+
+    try {
+      setLoading(true);
+
+      // First create the invoice (this marks billing status as Invoiced)
+      await handleCreateInvoice();
+
+      // Then print it
+      handlePrintInvoice();
+
+      // Close modal after successful creation and printing
+      handleClose();
+    } catch (error) {
+      console.error('Error creating and printing invoice:', error);
+      toast.error('Failed to create and print invoice');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleClose = () => {
@@ -307,75 +395,139 @@ const InvoiceCreationModal: React.FC<InvoiceCreationModalProps> = ({
       maxWidth="lg"
       fullWidth
       PaperProps={{
-        sx: { minHeight: '80vh' }
+        sx: {
+          minHeight: '80vh',
+          borderRadius: 2,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+        }
       }}
     >
-      <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        Create Invoice
-        <IconButton onClick={handleClose}>
+      <DialogTitle sx={{
+        bgcolor: 'primary.main',
+        color: 'white',
+        py: 2,
+        px: 3,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <Typography variant="h5" sx={{ fontWeight: 600 }}>
+          Create Invoice
+        </Typography>
+        <IconButton
+          onClick={handleClose}
+          sx={{
+            color: 'white',
+            '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
+          }}
+        >
           <CloseIcon />
         </IconButton>
       </DialogTitle>
 
-      <DialogContent>
+      <DialogContent sx={{ p: 3 }}>
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
             <CircularProgress />
           </Box>
         ) : (
-          <Box>
+          <Box sx={{ '& > *': { mb: 3 } }}>
             {/* Invoice Header */}
             {invoiceData && (
-              <Box sx={{ mb: 3 }}>
+              <Box sx={{
+                p: 3,
+                bgcolor: 'grey.50',
+                borderRadius: 2,
+                border: '1px solid',
+                borderColor: 'grey.200'
+              }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                   <Box>
-                    <Typography variant="h6">Invoice #{invoiceData.invoiceNumber}</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 600, color: 'primary.main' }}>
+                      Invoice No : {invoiceData.invoiceNumber}
+                    </Typography>
                     <Typography variant="body2" color="text.secondary">
                       Date: {invoiceData.invoiceDate ? new Date(invoiceData.invoiceDate).toLocaleDateString() : 'N/A'}
                     </Typography>
                   </Box>
                   <Box sx={{ textAlign: 'right' }}>
-                    <Typography variant="h6">{invoiceData.customerName}</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                      {invoiceData.customerName}
+                    </Typography>
                     <Typography variant="body2" color="text.secondary">
                       Due: {invoiceData.dueDate ? new Date(invoiceData.dueDate).toLocaleDateString() : 'N/A'}
                     </Typography>
                   </Box>
                 </Box>
 
-                <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
                   <TextField
-                    label="Payment Terms (days)"
-                    type="number"
-                    value={paymentTerms}
-                    onChange={(e) => setPaymentTerms(parseInt(e.target.value))}
+                    label="P/O Number"
+                    value={poNumber}
+                    onChange={(e) => setPoNumber(e.target.value)}
                     size="small"
-                    sx={{ width: 150 }}
+                    sx={{ width: 200 }}
+                    variant="outlined"
                   />
+                </Box>
+
+                {/* Style Number Options */}
+                <Box sx={{
+                  p: 2,
+                  border: '1px solid',
+                  borderColor: 'grey.300',
+                  borderRadius: 2,
+                  bgcolor: 'white'
+                }}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={includeStyleNo}
+                        onChange={(e) => setIncludeStyleNo(e.target.checked)}
+                        color="primary"
+                      />
+                    }
+                    label="Include Style Number (St No) in invoice"
+                    sx={{ fontWeight: 500 }}
+                  />
+                  {includeStyleNo && (
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                      Style numbers will be added to each record in the invoice table
+                    </Typography>
+                  )}
                 </Box>
               </Box>
             )}
 
             {/* Orders and Records */}
-            {orderDetails.map((order, orderIndex) => (
+            {orderDetails.map((order) => (
               <Box key={order.id} sx={{ mb: 3 }}>
                 <Typography variant="h6" sx={{ mb: 1 }}>
-                  Order #{order.referenceNo} - {order.orderDate ? new Date(order.orderDate).toLocaleDateString() : 'N/A'}
+                  Ref No :- {order.id} - ({order.orderDate ? new Date(order.orderDate).toLocaleDateString() : 'N/A'})
                 </Typography>
 
-                <TableContainer component={Paper} sx={{ mb: 2 }}>
+                <TableContainer
+                  component={Paper}
+                  sx={{
+                    mb: 2,
+                    borderRadius: 2,
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                  }}
+                >
                   <Table size="small">
-                    <TableHead>
+                    <TableHead sx={{ bgcolor: 'primary.main' }}>
                       <TableRow>
-                        <TableCell>Item</TableCell>
-                        <TableCell>Wash Type</TableCell>
-                        <TableCell>Process Types</TableCell>
-                        <TableCell align="right">Quantity</TableCell>
-                        <TableCell align="right">Unit Price</TableCell>
-                        <TableCell align="right">Total</TableCell>
+                        <TableCell sx={{ color: 'white', fontWeight: 600 }}>Item</TableCell>
+                        <TableCell sx={{ color: 'white', fontWeight: 600 }}>Wash Type</TableCell>
+                        <TableCell sx={{ color: 'white', fontWeight: 600 }}>Process Types</TableCell>
+                        <TableCell align="right" sx={{ color: 'white', fontWeight: 600 }}>Quantity</TableCell>
+                        <TableCell align="right" sx={{ color: 'white', fontWeight: 600 }}>Unit Price (Rs)</TableCell>
+                        <TableCell align="right" sx={{ color: 'white', fontWeight: 600 }}>Total (Rs)</TableCell>
+                        {includeStyleNo && <TableCell sx={{ color: 'white', fontWeight: 600 }}>Style No</TableCell>}
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {order.records.map((record: any) => {
+                      {order.records.map((record: InvoiceRecord) => {
                         const key = `${order.id}-${record.id}`;
                         const unitPrice = unitPrices[key] || 0;
                         const total = record.quantity * unitPrice;
@@ -397,8 +549,22 @@ const InvoiceCreationModal: React.FC<InvoiceCreationModalProps> = ({
                               />
                             </TableCell>
                             <TableCell align="right">
-                              ${total.toFixed(2)}
+                              Rs. {total.toFixed(2)}
                             </TableCell>
+                            {includeStyleNo && (
+                              <TableCell>
+                                <TextField
+                                  value={styleNumbers[key] || ''}
+                                  onChange={(e) => setStyleNumbers(prev => ({
+                                    ...prev,
+                                    [key]: e.target.value
+                                  }))}
+                                  size="small"
+                                  sx={{ width: 120 }}
+                                  placeholder="Style No"
+                                />
+                              </TableCell>
+                            )}
                           </TableRow>
                         );
                       })}
@@ -410,15 +576,29 @@ const InvoiceCreationModal: React.FC<InvoiceCreationModalProps> = ({
 
             {/* Invoice Summary */}
             {invoiceData && (
-              <Box sx={{ mt: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+              <Box sx={{
+                mt: 3,
+                p: 3,
+                bgcolor: 'primary.50',
+                borderRadius: 2,
+                border: '1px solid',
+                borderColor: 'primary.200'
+              }}>
+                <Typography variant="h6" sx={{ mb: 2, color: 'primary.main', fontWeight: 600 }}>
+                  Invoice Summary
+                </Typography>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography>Subtotal:</Typography>
-                  <Typography>${invoiceData.subtotal.toFixed(2)}</Typography>
+                  <Typography sx={{ fontWeight: 500 }}>Subtotal:</Typography>
+                  <Typography sx={{ fontWeight: 500 }}>Rs. {invoiceData.subtotal.toFixed(2)}</Typography>
                 </Box>
-                <Divider sx={{ my: 1 }} />
+                <Divider sx={{ my: 2 }} />
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography variant="h6">Total:</Typography>
-                  <Typography variant="h6">${invoiceData.total.toFixed(2)}</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                    Total:
+                  </Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                    Rs. {invoiceData.total.toFixed(2)}
+                  </Typography>
                 </Box>
               </Box>
             )}
@@ -426,8 +606,13 @@ const InvoiceCreationModal: React.FC<InvoiceCreationModalProps> = ({
         )}
       </DialogContent>
 
-      <DialogActions sx={{ p: 3 }}>
-        <Button onClick={handleClose} disabled={loading}>
+      <DialogActions sx={{ p: 3, gap: 2 }}>
+        <Button
+          onClick={handleClose}
+          disabled={loading}
+          variant="outlined"
+          sx={{ minWidth: 100 }}
+        >
           Cancel
         </Button>
         <Button
@@ -435,17 +620,17 @@ const InvoiceCreationModal: React.FC<InvoiceCreationModalProps> = ({
           startIcon={<PrintIcon />}
           onClick={handlePrintInvoice}
           disabled={loading || !invoiceData}
+          sx={{ minWidth: 140 }}
         >
           Print Preview
         </Button>
         <PrimaryButton
-          variant="contained"
-          startIcon={<SaveIcon />}
-          onClick={handleCreateInvoice}
+          startIcon={<PrintIcon />}
+          onClick={handleCreateAndPrintInvoice}
           loading={loading}
           disabled={!invoiceData || invoiceData.total === 0}
         >
-          Create Invoice
+          Create & Print Invoice
         </PrimaryButton>
       </DialogActions>
     </Dialog>

@@ -10,6 +10,7 @@ export interface InvoiceRecord {
   totalPrice: number;
   washType: string;
   processTypes: string[];
+  styleNo?: string; // Optional style number
 }
 
 export interface InvoiceData {
@@ -19,10 +20,13 @@ export interface InvoiceData {
   customerPhone: string;
   invoiceDate: string;
   dueDate: string;
+  poNumber?: string; // Purchase Order Number
+  includeStyleNo: boolean; // Whether to include Style No column
   orders: {
     id: number;
     referenceNo: string;
     orderDate: string;
+    gpNumber?: string; // Gate Pass Number
     records: InvoiceRecord[];
   }[];
   subtotal: number;
@@ -109,7 +113,6 @@ export const generateInvoice = (invoiceData: InvoiceData): void => {
       // Table header
       doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
-      const tableStartY = yPosition;
       
       // Table headers
       doc.text('Item', 20, yPosition);
@@ -322,7 +325,6 @@ export const generateA4Invoice = (invoiceData: InvoiceData): void => {
   try {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
     let yPosition = 20;
 
     // Header with logo area
@@ -373,7 +375,6 @@ export const generateA4Invoice = (invoiceData: InvoiceData): void => {
 
     // Detailed table
     const tableTop = yPosition;
-    const colWidths = [60, 30, 40, 20, 25, 25];
     const colPositions = [20, 80, 110, 150, 170, 195];
 
     // Table header
@@ -467,5 +468,297 @@ export const generateA4Invoice = (invoiceData: InvoiceData): void => {
   } catch (error) {
     console.error('Error generating A4 invoice:', error);
     throw new Error('Failed to generate A4 invoice');
+  }
+};
+
+/**
+ * Generate new AMSRAL Lanka Enterprises invoice format
+ * Updated format with perfectly styled table and professional layout
+ */
+export const generateAmsralInvoice = (invoiceData: InvoiceData): void => {
+  try {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 15;
+    let yPosition = 20;
+
+    // Set font
+    doc.setFont('helvetica');
+
+    // Centered Header Section
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.text('AMSRAL LANKA ENTERPRISES', pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 8;
+
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'normal');
+    doc.text('(Specialist in Industrial Garment Washing)', pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 6;
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Washing Plant & Finishing Plant', pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 6;
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.text('109/1, Bellanwila Rajamaha Viharaya', pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 5;
+
+    doc.text('(Opposite Bellanwila Rajamaha Viharaya)', pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 5;
+
+    doc.text('Tel: 0777 3107343 | 0714837714 | 011 2731705', pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 5;
+
+    doc.text('Email: amsrallanka1@gmail.com', pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 15;
+
+     // Horizontal separator line
+     doc.setLineWidth(0.2); // Reduced divider line width
+     doc.line(margin, yPosition, pageWidth - margin, yPosition);
+    yPosition += 10;
+
+    // INVOICE Title - smaller
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text('INVOICE', pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 15;
+
+    // Simple Customer and Invoice Info Section - no boxes, no titles
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    
+    // Left side - Customer info
+    doc.text(`Customer: ${invoiceData.customerName}`, margin, yPosition);
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, margin, yPosition + 8);
+
+    // Right side - Invoice info
+    const rightInfoX = pageWidth - 100;
+    doc.text(`Invoice No: ${invoiceData.invoiceNumber}`, rightInfoX, yPosition);
+    if (invoiceData.poNumber) {
+      doc.text(`P/O No: ${invoiceData.poNumber}`, rightInfoX, yPosition + 8);
+    } else {
+      doc.text(`P/O No: `, rightInfoX, yPosition + 8);
+    }
+
+    yPosition += 25;
+
+     // Simple Table like the PDF sample
+     const tableStartY = yPosition;
+     const rowHeight = 12;
+    
+     // Column definitions matching the PDF sample
+     const columns = invoiceData.includeStyleNo 
+       ? [
+           { header: 'Ref NO.', width: 25, x: 0 },
+           { header: 'GP No.', width: 20, x: 0 },
+           { header: 'St No.', width: 20, x: 0 },
+           { header: 'Item', width: 25, x: 0 },
+           { header: 'Description', width: 35, x: 0 },
+           { header: 'Qty', width: 15, x: 0 },
+           { header: 'Unit Price', width: 20, x: 0 },
+           { header: 'Amount', width: 20, x: 0 }
+         ]
+       : [
+           { header: 'Ref NO.', width: 30, x: 0 },
+           { header: 'GP No.', width: 25, x: 0 },
+           { header: 'Item', width: 30, x: 0 },
+           { header: 'Description', width: 45, x: 0 },
+           { header: 'Qty', width: 15, x: 0 },
+           { header: 'Unit Price', width: 20, x: 0 },
+           { header: 'Amount', width: 25, x: 0 }
+         ];
+
+    // Calculate column positions
+    let currentX = margin;
+    columns.forEach(col => {
+      col.x = currentX;
+      currentX += col.width;
+    });
+
+    // Ensure table width doesn't exceed page width
+    const totalTableWidth = currentX - margin;
+    const availableWidth = pageWidth - 2 * margin;
+    
+    if (totalTableWidth > availableWidth) {
+      // Scale down all columns proportionally
+      const scaleFactor = availableWidth / totalTableWidth;
+      columns.forEach(col => {
+        col.width = Math.floor(col.width * scaleFactor);
+      });
+      
+      // Recalculate positions
+      currentX = margin;
+      columns.forEach(col => {
+        col.x = currentX;
+        currentX += col.width;
+      });
+    }
+
+    // Calculate final table width
+    const tableWidth = currentX - margin;
+
+    // Draw table outline - reduced border width
+    doc.setLineWidth(0.3);
+    doc.setDrawColor(0, 0, 0);
+    doc.rect(margin, tableStartY, tableWidth, rowHeight); // Header row outline
+
+    // Draw header background (light gray like PDF)
+    doc.setFillColor(230, 230, 230);
+    doc.rect(margin, tableStartY, tableWidth, rowHeight, 'F');
+    doc.rect(margin, tableStartY, tableWidth, rowHeight); // Border on top
+
+    // Header text
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    
+    columns.forEach(col => {
+      doc.text(col.header, col.x + 2, tableStartY + 8);
+    });
+
+    // Draw vertical lines for header
+    currentX = margin;
+    columns.forEach((col, index) => {
+      currentX += col.width;
+      if (index < columns.length - 1) {
+        doc.line(currentX, tableStartY, currentX, tableStartY + rowHeight);
+      }
+    });
+
+    yPosition = tableStartY + rowHeight;
+
+    // Table rows - simple style
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    let totalAmount = 0;
+
+    invoiceData.orders.forEach((order) => {
+      order.records.forEach((record) => {
+        // Check if we need a new page
+        if (yPosition > pageHeight - 60) {
+          doc.addPage();
+          yPosition = 20;
+        }
+
+         // Row data
+         const rowData = invoiceData.includeStyleNo 
+           ? [
+               order.id.toString(), // Show Order ID instead of reference number
+               order.gpNumber || '-', // GP No always shown
+               record.styleNo || '-', // St No only when included
+               record.itemName,
+               record.washType,
+               record.quantity.toString(),
+               record.unitPrice.toFixed(2),
+               record.totalPrice.toFixed(2)
+             ]
+           : [
+               order.id.toString(), // Show Order ID instead of reference number
+               order.gpNumber || '-', // GP No always shown
+               record.itemName,
+               record.washType,
+               record.quantity.toString(),
+               record.unitPrice.toFixed(2),
+               record.totalPrice.toFixed(2)
+             ];
+
+        // Draw row border - reduced border width
+        doc.setLineWidth(0.3);
+        doc.rect(margin, yPosition, tableWidth, rowHeight);
+
+         // Draw cell content with multi-line support for description
+         columns.forEach((col, index) => {
+           const cellText = rowData[index];
+           
+           // Handle multi-line text for description column
+           if (col.header === 'Description' && cellText.length > 20) {
+             const words = cellText.split(' ');
+             let line1 = '';
+             let line2 = '';
+             
+             for (const word of words) {
+               if ((line1 + word).length <= 20) {
+                 line1 += (line1 ? ' ' : '') + word;
+               } else {
+                 line2 += (line2 ? ' ' : '') + word;
+               }
+             }
+             
+             doc.text(line1, col.x + 2, yPosition + 6);
+             if (line2) {
+               doc.text(line2, col.x + 2, yPosition + 10);
+             }
+           } else {
+             doc.text(cellText, col.x + 2, yPosition + 8);
+           }
+         });
+
+        // Draw vertical lines
+        currentX = margin;
+        columns.forEach((col, index) => {
+          currentX += col.width;
+          if (index < columns.length - 1) {
+            doc.line(currentX, yPosition, currentX, yPosition + rowHeight);
+          }
+        });
+
+        totalAmount += record.totalPrice;
+        yPosition += rowHeight;
+      });
+    });
+
+     // Total row - simple style like PDF with reduced border
+     doc.setFont('helvetica', 'bold');
+     doc.setLineWidth(0.2); // Reduced divider line width
+     doc.rect(margin, yPosition, tableWidth, rowHeight);
+     
+     // Calculate Amount column position for alignment
+     const amountColumnX = columns[columns.length - 1].x; // Last column (Amount)
+     
+     doc.text('Total Amount (Rs)', margin + 5, yPosition + 8);
+     doc.text(totalAmount.toFixed(2), amountColumnX + 2, yPosition + 8); // Aligned with Amount column
+
+     yPosition += rowHeight + 15;
+
+     // Simple Terms and Conditions
+     doc.setTextColor(0, 0, 0);
+     doc.setFontSize(10);
+     doc.setFont('helvetica', 'normal');
+     doc.text('Please inform us within 7 days from the billed date if you have any questions or concerns regarding this invoice.', margin, yPosition);
+     yPosition += 20;
+
+     // Move signature section to bottom
+     const signatureY = pageHeight - 40; // Position near bottom of page
+     
+     // Simple Signature Section - just like PDF
+     doc.setFontSize(12);
+     doc.setFont('helvetica', 'bold');
+     doc.text('AMSRAL LANKA ENTERPRISES', margin, signatureY);
+     
+     // Simple signature line with reduced width
+     doc.setLineWidth(0.2); // Reduced line width
+     doc.line(margin, signatureY + 15, margin + 80, signatureY + 15);
+     
+     doc.setFontSize(10);
+     doc.setFont('helvetica', 'normal');
+     doc.text('Authorized Signature', margin, signatureY + 23);
+
+    // Save the PDF
+    doc.save(`AMSRAL_Invoice_${invoiceData.invoiceNumber}.pdf`);
+
+    // Also open in new window for printing
+    const pdfOutput = doc.output('blob');
+    const pdfUrl = URL.createObjectURL(pdfOutput);
+    window.open(pdfUrl, '_blank');
+
+    // Clean up
+    setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
+
+  } catch (error) {
+    console.error('Error generating AMSRAL invoice:', error);
+    throw new Error('Failed to generate AMSRAL invoice');
   }
 };

@@ -49,6 +49,8 @@ export interface BagLabelData {
   orderId: number;
   customerName: string;
   bagNumber: number;
+  numberOfBags?: string;
+  quantity?: string;
 }
 
 export const generateOrderReceipt = (orderData: OrderReceiptData): void => {
@@ -261,70 +263,77 @@ export const generateOrderReceiptA4 = (orderData: OrderReceiptData): void => {
 };
 
 export const generateAssignmentReceipt = (assignmentData: AssignmentReceiptData): void => {
-  // Create a new PDF document
-  // A4 size: 210 x 297 mm, 1/4 size: 105 x 148.5 mm
+  // Create a new PDF document - Use smaller format for larger text
   const doc = new jsPDF({
-    orientation: 'portrait',
+    orientation: 'landscape',
     unit: 'mm',
-    format: [105, 148.5] // 1/4 A4 size
+    format: [100, 150] // Custom smaller size for larger text
   });
 
   // Set font
   doc.setFont('helvetica');
 
-  // Colors
-  const primaryColor = '#1e293b'; 
-  const textColor = '#64748b';
-  const lightGray = '#94a3b8'; 
+  // Colors - pure black for maximum contrast
+  const primaryColor = '#000000';
+  const textColor = '#000000';
+  const lightGray = '#666666';
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
 
-  // Header (no logo for internal use)
-  doc.setFontSize(16);
+  // Header with LARGE text
+  doc.setFontSize(24);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(primaryColor);
-  doc.text('MACHINE ASSIGNMENT', 52.5, 20, { align: 'center' });
+  doc.text('MACHINE ASSIGNMENT', pageWidth / 2, 20, { align: 'center' });
 
   // Line separator
   doc.setDrawColor(lightGray);
-  doc.line(10, 25, 95, 25);
+  doc.setLineWidth(1);
+  doc.line(10, 25, pageWidth - 10, 25);
 
-  // Order details with better spacing
-  let yPosition = 35;
+  // Assignment details with LARGE text and better spacing
+  let yPosition = 40;
 
-  // Helper function to add a detail row with proper spacing
+  // Helper function to add a detail row with LARGE fonts
   const addDetailRow = (label: string, value: string | number | undefined | null, isBold = false) => {
     // Ensure value is a valid string
     const safeValue = value !== null && value !== undefined ? String(value) : 'N/A';
     
-    doc.setFontSize(11);
+    // Label with readable font
+    doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(textColor);
     doc.text(`${label}:`, 10, yPosition);
     
-    doc.setFont('helvetica', isBold ? 'bold' : 'normal');
-    doc.text(safeValue, 45, yPosition); // Increased spacing from 40 to 45
-    yPosition += 7; // Reduced spacing between rows to fit better
+    // Value with LARGE font
+    doc.setFont('helvetica', isBold ? 'bold' : 'bold');
+    doc.setFontSize(20);
+    doc.setTextColor(primaryColor);
+    // Center the value text
+    doc.text(safeValue, pageWidth / 2, yPosition + 8, { align: 'center' });
+    yPosition += 25; // Increased spacing
   };
 
   // Assignment details with safe data handling
-  addDetailRow('Tracking ID', assignmentData.trackingNumber);
-  addDetailRow('Item Name', assignmentData.itemName);
-  addDetailRow('Wash Type', assignmentData.washType);
+  addDetailRow('Tracking ID', assignmentData.trackingNumber, true);
+  addDetailRow('Item Name', assignmentData.itemName, true);
+  addDetailRow('Wash Type', assignmentData.washType, true);
   
   // Process Types (handle array safely)
   const processTypesText = Array.isArray(assignmentData.processTypes) 
     ? assignmentData.processTypes.join(', ') 
     : 'N/A';
-  addDetailRow('Process Types', processTypesText);
+  addDetailRow('Process Types', processTypesText, true);
   
-  addDetailRow('Assigned To', assignmentData.assignedTo);
-  addDetailRow('Quantity', assignmentData.quantity);
+  addDetailRow('Assigned To', assignmentData.assignedTo, true);
+  addDetailRow('Quantity', assignmentData.quantity, true);
 
-  // Footer (no thank you message for internal use)
-  const footerY = Math.max(120, yPosition + 15); // Dynamic footer position
+  // Footer at bottom
+  const footerY = pageHeight - 20;
   doc.setDrawColor(lightGray);
-  doc.line(10, footerY, 95, footerY);
+  doc.line(10, footerY - 5, pageWidth - 10, footerY - 5);
   
-  // Print date and time
+  // Print date and time with larger font
   const now = new Date();
   const printTime = now.toLocaleString('en-US', {
     year: 'numeric',
@@ -335,13 +344,26 @@ export const generateAssignmentReceipt = (assignmentData: AssignmentReceiptData)
   });
   doc.setFontSize(10);
   doc.setTextColor(lightGray);
-  doc.text(`Printed: ${printTime}`, 52.5, footerY + 8, { align: 'center' });
+  doc.text(`Printed: ${printTime}`, pageWidth / 2, footerY, { align: 'center' });
 
-  // Generate filename
-  const filename = `Assignment_${assignmentData.assignmentId}_Receipt.pdf`;
+  // Generate filename with timestamp to avoid caching
+  const timestamp = new Date().getTime();
+  const filename = `Assignment_${assignmentData.trackingNumber}_${timestamp}.pdf`;
 
-  // Save the PDF
+  // Save and open the PDF
   doc.save(filename);
+  // Also open in new window for immediate viewing/printing
+  const pdfOutput = doc.output('blob');
+  const pdfUrl = URL.createObjectURL(pdfOutput);
+  const printWindow = window.open(pdfUrl, '_blank');
+  // Optional: Auto-print when opened
+  if (printWindow) {
+    printWindow.onload = () => {
+      printWindow.print();
+    };
+  }
+  // Clean up
+  setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
 };
 
 export const generateGatepass = (gatepassData: GatepassData): void => {
@@ -515,72 +537,152 @@ export const generateGatepass = (gatepassData: GatepassData): void => {
 };
 
 export const generateBagLabel = (bagData: BagLabelData): void => {
-  // Create a new PDF document - A4 size like other receipts
+  // Create a new PDF document - Use even smaller format to force larger text
   const doc = new jsPDF({
-    orientation: 'portrait',
+    orientation: 'portrait', // Changed to portrait for better text scaling
     unit: 'mm',
-    format: 'a4'
+    format: [80, 120] // Even smaller thermal receipt size
   });
 
   // Set font
   doc.setFont('helvetica');
 
-  // Colors
-  const primaryColor = '#1e293b'; 
-  const textColor = '#64748b';
-  const lightGray = '#94a3b8';
+  // Colors - pure black for maximum contrast
+  const primaryColor = '#000000';
+  const textColor = '#000000';
+  const lightGray = '#333333';
 
-  // Header
-  doc.setFontSize(20);
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  // Header with MASSIVE text
+  doc.setFontSize(18); // Much larger relative to page size
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(primaryColor);
-  doc.text('BAG LABEL', 105, 30, { align: 'center' });
+  doc.text('BAG RECEIPT', pageWidth / 2, 15, { align: 'center' });
 
   // Line separator
   doc.setDrawColor(lightGray);
-  doc.line(20, 40, 190, 40);
+  doc.setLineWidth(0.8);
+  doc.line(5, 20, pageWidth - 5, 20);
 
-  // Bag details with better spacing
-  let yPosition = 60;
+  // Bag details with MASSIVE text
+  let yPosition = 30;
 
-  // Helper function to add a detail row with proper spacing
-  const addDetailRow = (label: string, value: string, isBold = false) => {
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
+  // Helper function with EXTREME font size differences
+  const addDetailRow = (label: string, value: string) => {
+    // Label - very small
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
     doc.setTextColor(textColor);
-    doc.text(`${label}:`, 30, yPosition);
+    doc.text(`${label}:`, pageWidth / 2, yPosition, { align: 'center' });
     
-    doc.setFont('helvetica', isBold ? 'bold' : 'normal');
-    doc.text(value, 80, yPosition);
-    yPosition += 12;
+    // Value - MASSIVE
+    doc.setFontSize(16); // Much larger relative to page
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(primaryColor);
+    doc.text(value, pageWidth / 2, yPosition + 6, { align: 'center' });
+    yPosition += 18; // Tighter spacing for smaller page
   };
 
-  // Bag details
-  addDetailRow('Reference No', bagData.orderId.toString(), true);
-  addDetailRow('Customer Name', bagData.customerName, true);
-  addDetailRow('Bag Number', bagData.bagNumber.toString(), true);
+  // Bag details - always show Reference No and Customer Name
+  addDetailRow('Reference No', bagData.orderId.toString());
+  addDetailRow('Customer Name', bagData.customerName);
+  
+  // Always show Number of Bags and Quantity (even if empty)
+  addDetailRow('Number of Bags', bagData.numberOfBags || '');
+  addDetailRow('Quantity', bagData.quantity || '');
 
   // Footer
-  const footerY = 250;
+  const footerY = pageHeight - 15;
   doc.setDrawColor(lightGray);
-  doc.line(20, footerY, 190, footerY);
+  doc.line(5, footerY - 8, pageWidth - 5, footerY - 8);
   
   // Print date and time
   const now = new Date();
   const printTime = now.toLocaleString('en-US', {
-    year: 'numeric',
-    month: 'long',
+    month: 'short',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit'
   });
-  doc.setFontSize(10);
+  doc.setFontSize(6);
   doc.setTextColor(lightGray);
-  doc.text(`Printed: ${printTime}`, 105, footerY + 10, { align: 'center' });
+  doc.text(`Printed: ${printTime}`, pageWidth / 2, footerY, { align: 'center' });
 
-  // Generate filename
-  const filename = `Bag_Label_${bagData.orderId}_${bagData.bagNumber}.pdf`;
+  // Generate filename with timestamp
+  const timestamp = new Date().getTime();
+  const filename = `Bag_Receipt_${bagData.orderId}_${timestamp}.pdf`;
 
-  // Save the PDF
+  // Save and open the PDF
+  doc.save(filename);
+  
+  // Also open in new window for immediate viewing/printing
+  const pdfOutput = doc.output('blob');
+  const pdfUrl = URL.createObjectURL(pdfOutput);
+  const printWindow = window.open(pdfUrl, '_blank');
+  
+  // Auto-print when opened
+  if (printWindow) {
+    printWindow.onload = () => {
+      printWindow.print();
+    };
+  }
+  
+  // Clean up
+  setTimeout(() => URL.revokeObjectURL(pdfUrl), 1000);
+};
+
+// Alternative version with even larger text for thermal printers
+export const generateBagLabelThermal = (bagData: BagLabelData): void => {
+  // Create thermal printer format (80mm width)
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: [80, 120] // Thermal printer size
+  });
+
+  doc.setFont('helvetica');
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  // Header
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text('BAG RECEIPT', pageWidth / 2, 15, { align: 'center' });
+
+  // Line
+  doc.setLineWidth(0.5);
+  doc.line(5, 20, pageWidth - 5, 20);
+
+  let yPosition = 30;
+
+  // Very large text for thermal printing
+  const addThermalRow = (label: string, value: string) => {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(label, pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 8;
+    
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text(value, pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 15;
+  };
+
+  addThermalRow('Reference No:', bagData.orderId.toString());
+  addThermalRow('Customer:', bagData.customerName);
+  addThermalRow('Number of Bags:', bagData.numberOfBags || '');
+  addThermalRow('Quantity:', bagData.quantity || '');
+
+  // Footer
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  const now = new Date();
+  const printTime = now.toLocaleString();
+  doc.text(printTime, pageWidth / 2, yPosition + 10, { align: 'center' });
+
+  // Save
+  const timestamp = new Date().getTime();
+  const filename = `Thermal_Bag_${bagData.orderId}_${timestamp}.pdf`;
   doc.save(filename);
 };

@@ -14,6 +14,7 @@ export interface CreateOrderRequest {
   date: string;
   customerId: string;
   quantity: number;
+  gpNo?: string;
   notes?: string;
   deliveryDate: string;
   records: CreateOrderRecordRequest[]; // Empty array initially, records are added separately
@@ -35,6 +36,15 @@ export interface UpdateOrderRecordRequest {
   washType: WashType;
   processTypes: ProcessType[];
   trackingNumber?: string; // Optional, for updating tracking number if needed
+}
+
+export interface UpdateOrderRequest {
+  date?: string;
+  customerId?: string;
+  quantity?: number;
+  notes?: string;
+  deliveryDate?: string;
+  status?: OrderStatus;
 }
 
 // Response Interfaces
@@ -61,6 +71,7 @@ export interface ManagementOrder {
   notes: string;
   deliveryDate: string;
   status: OrderStatus;
+  billingStatus?: 'pending' | 'invoiced' | 'paid';
   recordsCount: number;
   complete: boolean;
   createdAt: string;
@@ -71,6 +82,7 @@ export interface OrderDetailsRecord {
   id: number;
   orderId: number;
   itemId: string;
+  itemName?: string; // Add itemName to the interface
   quantity: number;
   washType: string;
   processTypes: string[];
@@ -209,6 +221,16 @@ export interface ErrorResponse {
   errors?: { [key: string]: string };
 }
 
+// Invoice Preview Data
+export interface InvoicePreviewData {
+  customerId: number;
+  customerCode: string;
+  customerName: string;
+  currentIncrement: number;
+  nextIncrement: number;
+  nextInvoiceNo: string;
+}
+
 // Order Summary for Gatepass
 export interface OrderSummaryRecord {
   id: number;
@@ -225,6 +247,7 @@ export interface OrderSummaryRecord {
 
 export interface OrderSummaryData {
   id: number;
+  customerId: number; // Customer ID for invoice number generation
   customerName: string;
   orderDate: string;
   totalQuantity: number;
@@ -327,6 +350,7 @@ class OrderService {
     customerName?: string;
     orderId?: string;
     billingStatus?: string;
+    excludeDelivered?: boolean; // New parameter to exclude delivered orders
   }): Promise<OrdersResponse> {
     try {
       const queryParams = new URLSearchParams();
@@ -337,6 +361,7 @@ class OrderService {
       if (params?.customerName) queryParams.append('customerName', params.customerName);
       if (params?.orderId) queryParams.append('orderId', params.orderId);
       if (params?.billingStatus) queryParams.append('billingStatus', params.billingStatus);
+      if (params?.excludeDelivered) queryParams.append('excludeDelivered', 'true');
       
       const response = await apiClient.get(`/orders?${queryParams.toString()}`);
       return response.data;
@@ -350,7 +375,7 @@ class OrderService {
    * 7. Update Order
    * PUT /orders/{orderId}
    */
-  async updateOrder(orderId: number, orderData: Partial<CreateOrderRequest>): Promise<OrderResponse> {
+  async updateOrder(orderId: number, orderData: UpdateOrderRequest): Promise<OrderResponse> {
     try {
       const response = await apiClient.put(`/orders/${orderId}`, orderData);
       return response.data;
@@ -462,6 +487,20 @@ class OrderService {
     } catch (error: unknown) {
       const apiError = error as { response?: { data?: ErrorResponse } };
       throw apiError.response?.data || { success: false, message: 'Failed to fetch order summary' };
+    }
+  }
+
+  /**
+   * Get invoice preview data for a customer
+   * GET /api/orders/invoice-preview/:customerId
+   */
+  async getInvoicePreview(customerId: number): Promise<{ success: boolean; data: InvoicePreviewData }> {
+    try {
+      const response = await apiClient.get(`/orders/invoice-preview/${customerId}`);
+      return response.data;
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: ErrorResponse } };
+      throw apiError.response?.data || { success: false, message: 'Failed to fetch invoice preview' };
     }
   }
 }

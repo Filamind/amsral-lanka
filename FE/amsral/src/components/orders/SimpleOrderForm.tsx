@@ -1,15 +1,16 @@
 import React from 'react';
 import { Box, Typography, Collapse, IconButton } from '@mui/material';
 import { ExpandMore, ExpandLess } from '@mui/icons-material';
-import PrimaryDropdown from '../common/PrimaryDropdown';
 import PrimaryNumberInput from '../common/PrimaryNumberInput';
 import PrimaryDatePicker from '../common/PrimaryDatePicker';
+import PrimaryDropdown from '../common/PrimaryDropdown';
 import colors from '../../styles/colors';
 
 interface SimpleOrderFormProps {
     form: {
         customerId: string;
         quantity: number;
+        gpNo: string;
         date: string;
         deliveryDate: string;
         notes: string;
@@ -44,40 +45,57 @@ const SimpleOrderForm: React.FC<SimpleOrderFormProps> = ({
                 {isEditing ? 'Edit Order' : 'Create New Order'}
             </Typography>
 
-            <div className="space-y-4">
-                {/* Customer Selection and Quantity - Single Line */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-                    {/* Customer Selection - No Label */}
-                    <div>
-                        <PrimaryDropdown
-                            name="customerId"
-                            value={form.customerId}
-                            onChange={onChange}
-                            options={customerOptions}
-                            placeholder={optionsLoading ? "Loading customers..." : "Select a customer"}
-                            error={!!errors.customerId}
-                            disabled={optionsLoading}
-                            className="px-4 py-3 text-base"
-                            style={{ borderColor: colors.border.light }}
-                        />
-                        {errors.customerId && <span className="text-xs text-red-500 mt-1 block">{errors.customerId}</span>}
-                    </div>
-
+            <div className="space-y-6">
+                {/* Quantity and GP No - First Row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
                     {/* Quantity - No Label */}
                     <div>
-                        <PrimaryNumberInput
+                        <input
+                            type="number"
                             name="quantity"
                             value={form.quantity}
                             onChange={onChange}
-                            label=""
                             placeholder="Enter total quantity"
                             min={1}
-                            error={!!errors.quantity}
-                            helperText={errors.quantity}
-                            className="text-base"
-                            pattern="[0-9]*"
+                            className="w-full px-4 py-4 text-lg border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            style={{ borderColor: errors.quantity ? '#ef4444' : colors.border.light }}
                         />
+                        {errors.quantity && <span className="text-xs text-red-500 mt-1 block">{errors.quantity}</span>}
                     </div>
+
+                    {/* GP No - No Label */}
+                    <div>
+                        <input
+                            type="text"
+                            name="gpNo"
+                            value={form.gpNo}
+                            onChange={onChange}
+                            placeholder="GP No"
+                            className="w-full px-4 py-4 text-lg border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            style={{ borderColor: errors.gpNo ? '#ef4444' : colors.border.light }}
+                        />
+                        {errors.gpNo && <span className="text-xs text-red-500 mt-1 block">{errors.gpNo}</span>}
+                    </div>
+                </div>
+
+                {/* Customer Selection - Second Row */}
+                <div className="w-full">
+                    <PrimaryDropdown
+                        name="customerId"
+                        value={form.customerId}
+                        onChange={onChange}
+                        options={customerOptions}
+                        placeholder={optionsLoading ? "Loading customers..." : "Select a customer"}
+                        error={!!errors.customerId}
+                        disabled={optionsLoading}
+                        className="w-full py-4 text-lg"
+                        style={{
+                            borderColor: errors.customerId ? '#ef4444' : colors.border.light,
+                            paddingLeft: '0px',
+                            paddingRight: '16px'
+                        }}
+                    />
+                    {errors.customerId && <span className="text-xs text-red-500 mt-1 block">{errors.customerId}</span>}
                 </div>
 
                 {/* Additional Information - Collapsible */}

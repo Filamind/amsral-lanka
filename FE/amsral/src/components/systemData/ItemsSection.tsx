@@ -17,8 +17,9 @@ interface ApiError {
 
 const getColumns = (onEdit: (item: Item) => void, onDelete: (item: Item) => void): GridColDef[] => [
     { field: 'id', headerName: 'ID', flex: 0.6, minWidth: 80 },
-    { field: 'name', headerName: 'Item Name', flex: 2, minWidth: 200 },
-    { field: 'description', headerName: 'Description', flex: 2.5, minWidth: 250 },
+    { field: 'name', headerName: 'Item Name', flex: 1.5, minWidth: 150 },
+    { field: 'code', headerName: 'Code', flex: 0.8, minWidth: 100 },
+    { field: 'description', headerName: 'Description', flex: 2, minWidth: 200 },
     { field: 'createdAt', headerName: 'Created At', flex: 1.2, minWidth: 140 },
     {
         field: 'actions',
@@ -56,6 +57,7 @@ export default function ItemsSection() {
     const [selectedItem, setSelectedItem] = useState<Item | null>(null);
     const [form, setForm] = useState({
         name: '',
+        code: '',
         description: '',
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -111,10 +113,20 @@ export default function ItemsSection() {
     const validate = () => {
         const newErrors: { [key: string]: string } = {};
         if (!form.name.trim()) newErrors.name = 'Item name is required';
+        if (!form.code.trim()) newErrors.code = 'Code is required';
         if (form.name.length > 100) newErrors.name = 'Item name must be 100 characters or less';
+        if (form.code.length > 20) newErrors.code = 'Code must be 20 characters or less';
         if (form.description && form.description.length > 500) {
             newErrors.description = 'Description must be 500 characters or less';
         }
+
+        // Check for unique code
+        const isCodeUnique = !rows.some(row =>
+            row.code.toLowerCase() === form.code.toLowerCase() &&
+            (!editMode || row.id !== selectedItem?.id)
+        );
+        if (!isCodeUnique) newErrors.code = 'Code must be unique';
+
         return newErrors;
     };
 
@@ -123,6 +135,7 @@ export default function ItemsSection() {
         setEditMode(true);
         setForm({
             name: item.name || '',
+            code: item.code || '',
             description: item.description || '',
         });
         setErrors({});
@@ -154,6 +167,7 @@ export default function ItemsSection() {
         setSelectedItem(null);
         setForm({
             name: '',
+            code: '',
             description: '',
         });
         setErrors({});
@@ -290,19 +304,36 @@ export default function ItemsSection() {
                         {editMode ? 'Edit Item' : 'Add Item'}
                     </Typography>
                     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-                        <div className="flex flex-col">
-                            <label className="block text-sm font-medium mb-2">
-                                Item Name <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                name="name"
-                                value={form.name}
-                                onChange={handleChange}
-                                placeholder="Enter item name"
-                                className={`w-full px-4 py-3 border rounded-xl focus:outline-none text-base ${errors.name ? 'border-red-500' : ''}`}
-                                style={{ borderColor: errors.name ? '#ef4444' : colors.border.light }}
-                            />
-                            {errors.name && <span className="text-xs text-red-500 mt-1">{errors.name}</span>}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="flex flex-col">
+                                <label className="block text-sm font-medium mb-2">
+                                    Item Name <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    name="name"
+                                    value={form.name}
+                                    onChange={handleChange}
+                                    placeholder="Enter item name"
+                                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none text-base ${errors.name ? 'border-red-500' : ''}`}
+                                    style={{ borderColor: errors.name ? '#ef4444' : colors.border.light }}
+                                />
+                                {errors.name && <span className="text-xs text-red-500 mt-1">{errors.name}</span>}
+                            </div>
+
+                            <div className="flex flex-col">
+                                <label className="block text-sm font-medium mb-2">
+                                    Code <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    name="code"
+                                    value={form.code}
+                                    onChange={handleChange}
+                                    placeholder="Enter code (e.g., ITM001)"
+                                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none text-base ${errors.code ? 'border-red-500' : ''}`}
+                                    style={{ borderColor: errors.code ? '#ef4444' : colors.border.light }}
+                                />
+                                {errors.code && <span className="text-xs text-red-500 mt-1">{errors.code}</span>}
+                            </div>
                         </div>
 
                         <div className="flex flex-col">
@@ -356,7 +387,7 @@ export default function ItemsSection() {
                     </Typography>
                     <Typography variant="body1" mb={3} color={colors.text.secondary}>
                         Are you sure you want to delete item{' '}
-                        <strong>{itemToDelete?.name}</strong>?
+                        <strong>{itemToDelete?.name} ({itemToDelete?.code})</strong>?
                         This action cannot be undone.
                     </Typography>
                     <div className="flex gap-3 justify-end">

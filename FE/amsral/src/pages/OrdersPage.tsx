@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Modal, Box, Menu, MenuItem, IconButton } from '@mui/material';
-import { MoreVert, Print, Inventory } from '@mui/icons-material';
+import { Modal, Box, Menu, MenuItem, IconButton, Fab, Tooltip } from '@mui/material';
+import { MoreVert, Print, Inventory, PrintOutlined, PrintDisabled } from '@mui/icons-material';
 import type { GridColDef, GridRowParams } from '@mui/x-data-grid';
 import PrimaryButton from '../components/common/PrimaryButton';
 import PrimaryTable from '../components/common/PrimaryTable';
@@ -10,14 +10,15 @@ import ConfirmationDialog from '../components/common/ConfirmationDialog';
 import colors from '../styles/colors';
 import { orderService, type CreateOrderRequest, type ErrorResponse } from '../services/orderService';
 import CustomerService from '../services/customerService';
-import { generateOrderReceipt, generateBagLabel, type OrderReceiptData, type BagLabelData } from '../utils/pdfUtils';
+import { type BagLabelData } from '../utils/pdfUtils';
 import { usePrinter } from '../context/PrinterContext';
 import bagLabelPrinterService from '../services/bagLabelPrinterService';
 import orderRecordPrinterService from '../services/orderRecordPrinterService';
-import orderRecordsService, { type OrderRecordsDetails, type OrderRecord } from '../services/orderRecordsService';
+import orderRecordsService, { type OrderRecordsDetails } from '../services/orderRecordsService';
 import type { OrderRecordReceiptData } from '../services/printerService';
 import { useAuth } from '../hooks/useAuth';
 import { hasPermission } from '../utils/roleUtils';
+import { getStatusColor, getStatusLabel, normalizeStatus, isCompletedStatus } from '../utils/statusUtils';
 import toast from 'react-hot-toast';
 
 // We'll define columns inside the component to access the handler functions
@@ -30,16 +31,6 @@ type ProcessRecord = {
   processTypes: string[];
 };
 
-type OrderRecordReceiptData = {
-  orderId: number;
-  customerName: string;
-  itemName: string;
-  quantity: number;
-  washType: string;
-  processTypes: string[];
-  trackingNumber?: string;
-  isRemaining?: boolean;
-};
 
 type OrderRow = {
   id: number;
@@ -47,6 +38,7 @@ type OrderRow = {
   customerId: string;
   customerName: string;
   quantity: number;
+  gpNo?: string;
   notes: string;
   records: ProcessRecord[];
   recordsCount: number;
@@ -56,14 +48,14 @@ type OrderRow = {
   createdAt: string;
   updatedAt: string;
   actions: number;
-  [key: string]: string | number | boolean | ProcessRecord[];
+  [key: string]: string | number | boolean | ProcessRecord[] | undefined;
 };
 
 
 export default function OrdersPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { isConnected, isConnecting, printStatus, connect } = usePrinter();
+  const { isConnected, isConnecting, connect } = usePrinter();
   const [search, setSearch] = useState('');
   const [rows, setRows] = useState<OrderRow[]>([]);
   const [open, setOpen] = useState(false);
@@ -87,6 +79,7 @@ export default function OrdersPage() {
     open: false,
     order: null as OrderRow | null,
     numberOfBags: '',
+    quantity: '',
   });
 
   // Bag printing progress state
@@ -111,6 +104,7 @@ export default function OrdersPage() {
     date: new Date().toISOString().split('T')[0], // Today's date as default
     customerId: '',
     quantity: 1,
+    gpNo: '',
     notes: '',
     deliveryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 2 weeks from now
   });
@@ -122,11 +116,11 @@ export default function OrdersPage() {
     currentPage: 1,
     totalPages: 1,
     totalItems: 0,
-    itemsPerPage: 10,
+    itemsPerPage: 20, // Match default pageSize
     hasNextPage: false,
     hasPrevPage: false
   });
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(20); // Default to 20 rows per page
   const [currentPage, setCurrentPage] = useState(1);
 
   // Fetch orders from API
@@ -135,7 +129,8 @@ export default function OrdersPage() {
       const response = await orderService.getOrders({
         page: currentPage,
         limit: pageSize,
-        search: search || undefined
+        search: search || undefined,
+        excludeDelivered: true // Exclude delivered orders from the orders table
       });
 
       if (response.success) {
@@ -250,6 +245,7 @@ export default function OrdersPage() {
         date: order.date,
         customerId: order.customerId,
         quantity: order.quantity,
+        gpNo: order.gpNo || '',
         notes: order.notes,
         deliveryDate: order.deliveryDate,
       });
@@ -260,6 +256,7 @@ export default function OrdersPage() {
         date: new Date().toISOString().split('T')[0],
         customerId: '',
         quantity: 1,
+        gpNo: '',
         notes: '',
         deliveryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 2 weeks from now
       });
@@ -436,6 +433,7 @@ export default function OrdersPage() {
       open: true,
       order: orderRow,
       numberOfBags: '',
+      quantity: '',
     });
   };
 
@@ -444,6 +442,7 @@ export default function OrdersPage() {
       open: false,
       order: null,
       numberOfBags: '',
+      quantity: '',
     });
   };
 
@@ -458,18 +457,18 @@ export default function OrdersPage() {
     }
   };
 
+  const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Only allow numbers
+    if (value === '' || /^\d+$/.test(value)) {
+      setBagModal(prev => ({
+        ...prev,
+        quantity: value,
+      }));
+    }
+  };
+
   const handlePrintBags = async () => {
-    if (!bagModal.order || !bagModal.numberOfBags) {
-      toast.error('Please enter the number of bags');
-      return;
-    }
-
-    const numberOfBags = parseInt(bagModal.numberOfBags);
-    if (numberOfBags <= 0) {
-      toast.error('Number of bags must be greater than 0');
-      return;
-    }
-
     // Check if printer is connected
     if (!isConnected) {
       toast.error('Printer not connected. Please connect your printer first.');
@@ -481,30 +480,20 @@ export default function OrdersPage() {
       setBagPrintingProgress({
         isPrinting: true,
         current: 0,
-        total: numberOfBags,
+        total: 1,
       });
 
-      // Prepare bag data array
-      const bagDataArray: BagLabelData[] = [];
-      for (let i = 1; i <= numberOfBags; i++) {
-        bagDataArray.push({
-          orderId: bagModal.order.id,
-          customerName: bagModal.order.customerName,
-          bagNumber: i,
-        });
-      }
+      // Prepare single bag receipt data
+      const bagData: BagLabelData = {
+        orderId: bagModal.order!.id,
+        customerName: bagModal.order!.customerName,
+        bagNumber: 1, // Single receipt
+        numberOfBags: bagModal.numberOfBags || '',
+        quantity: bagModal.quantity || '',
+      };
 
-      // Print all bag labels using the separate service with progress callback
-      await bagLabelPrinterService.printMultipleBagLabels(
-        bagDataArray,
-        (current, total) => {
-          setBagPrintingProgress({
-            isPrinting: true,
-            current,
-            total,
-          });
-        }
-      );
+      // Print single bag receipt
+      await bagLabelPrinterService.printSingleBagReceipt(bagData);
 
       // Reset printing state
       setBagPrintingProgress({
@@ -513,11 +502,11 @@ export default function OrdersPage() {
         total: 0,
       });
 
-      toast.success(`${numberOfBags} bag label(s) printed successfully!`);
+      toast.success('Bag receipt printed successfully!');
       handleBagModalClose();
     } catch (error) {
-      console.error('Error printing bag labels:', error);
-      toast.error('Failed to print bag labels. Please check printer connection.');
+      console.error('Error printing bag receipt:', error);
+      toast.error('Failed to print bag receipt. Please check printer connection.');
 
       // Reset printing state on error
       setBagPrintingProgress({
@@ -528,22 +517,55 @@ export default function OrdersPage() {
     }
   };
 
+
   // Define columns inside component to access handler functions
   const columns: GridColDef[] = [
-    { field: 'date', headerName: 'Date', flex: 0.8, minWidth: 110 },
-    { field: 'id', headerName: 'Reference No', flex: 0.8, minWidth: 100, type: 'number' },
-    { field: 'customerName', headerName: 'Customer', flex: 1.5, minWidth: 180 },
+    {
+      field: 'date',
+      headerName: 'Date',
+      flex: 0.6,
+      minWidth: 90,
+      renderCell: (params) => (
+        <span className="text-sm lg:text-base" style={{ color: colors.text.secondary }}>
+          {new Date(params.value).toLocaleDateString()}
+        </span>
+      )
+    },
+    {
+      field: 'id',
+      headerName: 'Ref No',
+      flex: 0.5,
+      minWidth: 80,
+      type: 'number',
+      renderCell: (params) => (
+        <span className="font-semibold text-sm lg:text-base" style={{ color: colors.text.primary }}>
+          {params.value}
+        </span>
+      )
+    },
+    {
+      field: 'customerName',
+      headerName: 'Customer',
+      flex: 1.2,
+      minWidth: 150,
+      renderCell: (params) => (
+        <span className="text-sm lg:text-base" style={{ color: colors.text.primary }}>
+          {params.value}
+        </span>
+      )
+    },
     {
       field: 'quantity',
       headerName: 'Total Qty',
-      flex: 0.8,
-      minWidth: 100,
+      flex: 0.6,
+      minWidth: 90,
       type: 'number',
       renderCell: (params) => {
-        const isComplete = (params.row.status || '').toLowerCase() === 'complete';
+        // Use the complete boolean field from API response for Total Qty coloring
+        const isComplete = params.row.complete;
         return (
           <span
-            className={`px-3 py-1 rounded-xl text-sm font-semibold ${isComplete
+            className={`px-2 py-1 lg:px-3 lg:py-1 rounded-xl text-xs lg:text-sm font-semibold ${isComplete
               ? 'bg-green-100 text-green-800'
               : 'bg-red-100 text-red-800'
               }`}
@@ -553,41 +575,51 @@ export default function OrdersPage() {
         );
       }
     },
-    { field: 'recordsCount', headerName: 'Records', flex: 0.6, minWidth: 80, type: 'number' },
-    { field: 'deliveryDate', headerName: 'Delivery Date', flex: 1, minWidth: 120 },
+    {
+      field: 'recordsCount',
+      headerName: 'Records',
+      flex: 0.4,
+      minWidth: 70,
+      type: 'number',
+      renderCell: (params) => (
+        <span
+          className="px-2 py-1 rounded-lg text-xs lg:text-sm font-medium"
+          style={{
+            backgroundColor: params.value > 0 ? '#dcfce7' : colors.secondary[100],
+            color: params.value > 0 ? '#166534' : colors.text.muted,
+          }}
+        >
+          {params.value}
+        </span>
+      )
+    },
+    {
+      field: 'deliveryDate',
+      headerName: 'Delivery',
+      flex: 0.7,
+      minWidth: 100,
+      renderCell: (params) => (
+        <span className="text-sm lg:text-base" style={{ color: colors.text.secondary }}>
+          {new Date(params.value).toLocaleDateString()}
+        </span>
+      )
+    },
     {
       field: 'status',
       headerName: 'Status',
-      flex: 1,
-      minWidth: 120,
+      flex: 0.8,
+      minWidth: 100,
       renderCell: (params) => {
         const status = params.row.status || 'Pending';
-        const getStatusStyle = (status: string) => {
-          switch (status.toLowerCase()) {
-            case 'complete':
-              return 'bg-green-100 text-green-800';
-            case 'completed':
-              return 'bg-green-100 text-green-800';
-            case 'in progress':
-              return 'bg-yellow-100 text-yellow-800';
-            case 'pending':
-              return 'bg-blue-100 text-blue-800';
-            case 'confirmed':
-              return 'bg-purple-100 text-purple-800';
-            case 'processing':
-              return 'bg-orange-100 text-orange-800';
-            case 'delivered':
-              return 'bg-gray-100 text-gray-800';
-            default:
-              return 'bg-gray-100 text-gray-800';
-          }
-        };
+        const normalizedStatus = normalizeStatus(status, 'order');
+        const statusColor = getStatusColor(normalizedStatus, 'order');
+        const statusLabel = getStatusLabel(normalizedStatus, 'order');
 
         return (
           <span
-            className={`px-3 py-1 rounded-xl text-sm font-semibold ${getStatusStyle(status)}`}
+            className={`px-2 py-1 lg:px-3 lg:py-1 rounded-xl text-xs lg:text-sm font-semibold ${statusColor}`}
           >
-            {status}
+            {statusLabel}
           </span>
         );
       }
@@ -595,8 +627,8 @@ export default function OrdersPage() {
     {
       field: 'print',
       headerName: 'Print',
-      flex: 0.3,
-      minWidth: 60,
+      flex: 0.25,
+      minWidth: 50,
       sortable: false,
       renderCell: (params) => {
         const canPrint = isConnected && !orderRecordPrintingProgress.isPrinting;
@@ -613,7 +645,8 @@ export default function OrdersPage() {
             size="small"
             sx={{
               color: canPrint ? colors.button.primary : colors.text.muted,
-              opacity: canPrint ? 1 : 0.3
+              opacity: canPrint ? 1 : 0.3,
+              padding: '4px'
             }}
             title={
               !isConnected
@@ -624,7 +657,7 @@ export default function OrdersPage() {
             }
             disabled={!canPrint}
           >
-            <Print />
+            <Print fontSize="small" />
           </IconButton>
         );
       }
@@ -632,8 +665,8 @@ export default function OrdersPage() {
     {
       field: 'bagPrint',
       headerName: 'Bag',
-      flex: 0.3,
-      minWidth: 60,
+      flex: 0.25,
+      minWidth: 50,
       sortable: false,
       renderCell: (params) => {
         const isComplete = (params.row.status || '').toLowerCase() === 'complete';
@@ -651,7 +684,8 @@ export default function OrdersPage() {
             size="small"
             sx={{
               color: canPrint ? colors.button.primary : colors.text.muted,
-              opacity: canPrint ? 1 : 0.3
+              opacity: canPrint ? 1 : 0.3,
+              padding: '4px'
             }}
             title={
               !isComplete
@@ -662,7 +696,7 @@ export default function OrdersPage() {
             }
             disabled={!canPrint}
           >
-            <Inventory />
+            <Inventory fontSize="small" />
           </IconButton>
         );
       }
@@ -670,8 +704,8 @@ export default function OrdersPage() {
     {
       field: 'actions',
       headerName: 'Actions',
-      flex: 0.5,
-      minWidth: 80,
+      flex: 0.3,
+      minWidth: 60,
       sortable: false,
       renderCell: (params) => {
         // Only show actions menu if user has edit or delete permissions
@@ -686,9 +720,12 @@ export default function OrdersPage() {
               handleMenuOpen(e, params.row);
             }}
             size="small"
-            sx={{ color: colors.text.secondary }}
+            sx={{
+              color: colors.text.secondary,
+              padding: '4px'
+            }}
           >
-            <MoreVert />
+            <MoreVert fontSize="small" />
           </IconButton>
         );
       }
@@ -742,6 +779,7 @@ export default function OrdersPage() {
           date: form.date,
           customerId: form.customerId,
           quantity: form.quantity,
+          gpNo: form.gpNo || undefined,
           notes: form.notes || undefined,
           deliveryDate: form.deliveryDate,
           records: [] // Start with empty records
@@ -784,6 +822,7 @@ export default function OrdersPage() {
         date: new Date().toISOString().split('T')[0],
         customerId: '',
         quantity: 1,
+        gpNo: '',
         notes: '',
         deliveryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       });
@@ -806,41 +845,31 @@ export default function OrdersPage() {
 
 
   return (
-    <div className="w-full mx-auto px-1 sm:px-3 md:px-4 py-3">
-      <div className="flex flex-col gap-2 sm:gap-3 mb-4">
-        <h2 className="text-xl md:text-2xl font-bold" style={{ color: colors.text.primary }}>Orders</h2>
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 w-full">
-          <div className="flex flex-1 items-center w-full sm:w-auto">
+    <div className="w-full mx-auto px-1 sm:px-3 md:px-4 lg:px-6 py-3">
+      <div className="flex flex-col gap-2 sm:gap-3 lg:gap-4 mb-4">
+        <h2 className="text-xl md:text-2xl lg:text-3xl font-bold" style={{ color: colors.text.primary }}>Orders</h2>
+        <div className="flex flex-col sm:flex-row lg:flex-row items-center justify-between gap-2 lg:gap-4 w-full">
+          <div className="flex flex-1 items-center w-full sm:w-auto lg:w-auto">
             <input
               type="text"
               placeholder="Search by reference or customer..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="flex-1 px-3 py-2 border rounded-xl focus:outline-none text-sm sm:text-base"
-              style={{ borderColor: colors.border.light, maxWidth: 300 }}
+              className="flex-1 px-3 py-2 lg:py-3 border rounded-xl focus:outline-none text-sm sm:text-base lg:text-lg"
+              style={{ borderColor: colors.border.light, maxWidth: 400 }}
             />
           </div>
           <div className="flex items-center gap-4">
-            {/* Printer Status */}
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
-              <div className="flex items-center gap-2">
-                <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                <span className="text-sm font-medium text-gray-700">
-                  {isConnected ? 'Printer Connected' : 'Printer Disconnected'}
-                </span>
-              </div>
-              {!isConnected && (
-                <PrimaryButton
-                  onClick={connect}
-                  disabled={isConnecting}
-                  style={{ minWidth: 120, fontSize: '12px', padding: '6px 12px' }}
-                >
-                  {isConnecting ? 'Connecting...' : 'Connect'}
-                </PrimaryButton>
-              )}
-            </div>
-            <div className="w-full sm:w-auto mt-1 sm:mt-0">
-              <PrimaryButton style={{ minWidth: 140, width: '100%' }} onClick={() => handleOpen()}>
+            <div className="w-full sm:w-auto lg:w-auto mt-1 sm:mt-0 lg:mt-0">
+              <PrimaryButton
+                style={{
+                  minWidth: 160,
+                  width: '100%',
+                  fontSize: '14px',
+                  padding: '10px 20px'
+                }}
+                onClick={() => handleOpen()}
+              >
                 + Add Order
               </PrimaryButton>
             </div>
@@ -850,10 +879,10 @@ export default function OrdersPage() {
 
       {/* Order Record Printing Progress */}
       {orderRecordPrintingProgress.isPrinting && (
-        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="mb-4 p-3 md:p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="flex items-center gap-3">
             <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
-            <span className="text-sm font-medium text-blue-700">
+            <span className="text-sm md:text-base font-medium text-blue-700">
               Printing order record {orderRecordPrintingProgress.current} of {orderRecordPrintingProgress.total}...
             </span>
           </div>
@@ -863,7 +892,7 @@ export default function OrdersPage() {
               style={{ width: `${(orderRecordPrintingProgress.current / orderRecordPrintingProgress.total) * 100}%` }}
             ></div>
           </div>
-          <p className="text-xs text-blue-600 mt-1">
+          <p className="text-xs md:text-sm text-blue-600 mt-1">
             Each receipt prints with a 5-second delay for easy removal
           </p>
         </div>
@@ -873,7 +902,7 @@ export default function OrdersPage() {
         <PrimaryTable
           columns={columns}
           rows={rows}
-          pageSizeOptions={[5, 10, 20, 50]}
+          pageSizeOptions={[10, 20, 50, 100]}
           pagination
           paginationMode="server"
           paginationModel={{
@@ -943,8 +972,14 @@ export default function OrdersPage() {
             bgcolor: 'background.paper',
             boxShadow: 24,
             borderRadius: 2,
-            p: { xs: 3, sm: 4, md: 5 },
-            width: { xs: '95vw', sm: '90vw', md: '85vw', lg: '900px', xl: '1000px' },
+            p: { xs: 4, sm: 5, md: 6, lg: 6 },
+            width: {
+              xs: '95vw',
+              sm: '90vw',
+              md: '85vw',
+              lg: '1200px',
+              xl: '1400px'
+            },
             maxWidth: '95vw',
             maxHeight: '95vh',
             overflowY: 'auto',
@@ -1017,8 +1052,8 @@ export default function OrdersPage() {
             bgcolor: 'background.paper',
             boxShadow: 24,
             borderRadius: 2,
-            p: 4,
-            width: { xs: '90vw', sm: '400px' },
+            p: { xs: 4, sm: 4, md: 5 },
+            width: { xs: '90vw', sm: '400px', md: '450px' },
             maxWidth: '95vw',
           }}
         >
@@ -1030,29 +1065,50 @@ export default function OrdersPage() {
             {bagModal.order && (
               <div className="bg-gray-50 p-3 rounded-lg">
                 <p className="text-sm text-gray-600">
-                  <strong>Order:</strong> {bagModal.order.id}
+                  <strong>Reference No:</strong> {bagModal.order.id}
                 </p>
                 <p className="text-sm text-gray-600">
                   <strong>Customer:</strong> {bagModal.order.customerName}
                 </p>
+                <p className="text-sm text-gray-600">
+                  <strong>Quantity:</strong> {bagModal.order.quantity}
+                </p>
               </div>
             )}
 
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium" style={{ color: colors.text.primary }}>
-                Number of Bags:
-              </label>
-              <input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                value={bagModal.numberOfBags}
-                onChange={handleNumberOfBagsChange}
-                placeholder="Enter number of bags"
-                className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                style={{ borderColor: colors.border.light }}
-                autoFocus
-              />
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium" style={{ color: colors.text.primary }}>
+                  Number of Bags (Optional):
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={bagModal.numberOfBags}
+                  onChange={handleNumberOfBagsChange}
+                  placeholder="Enter number of bags"
+                  className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  style={{ borderColor: colors.border.light }}
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium" style={{ color: colors.text.primary }}>
+                  Quantity (Optional):
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={bagModal.quantity}
+                  onChange={handleQuantityChange}
+                  placeholder="Enter quantity"
+                  className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  style={{ borderColor: colors.border.light }}
+                />
+              </div>
             </div>
 
             {/* Printer Status in Modal */}
@@ -1069,10 +1125,10 @@ export default function OrdersPage() {
 
             {/* Printing Progress */}
             {bagPrintingProgress.isPrinting && (
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="p-3 md:p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                  <span className="text-sm text-blue-700">
+                  <span className="text-sm md:text-base text-blue-700">
                     Printing bag {bagPrintingProgress.current} of {bagPrintingProgress.total}...
                   </span>
                 </div>
@@ -1082,7 +1138,7 @@ export default function OrdersPage() {
                     style={{ width: `${(bagPrintingProgress.current / bagPrintingProgress.total) * 100}%` }}
                   ></div>
                 </div>
-                <p className="text-xs text-blue-600 mt-1">
+                <p className="text-xs md:text-sm text-blue-600 mt-1">
                   Each bag prints with a 2-second delay for easy removal
                 </p>
               </div>
@@ -1102,7 +1158,7 @@ export default function OrdersPage() {
               </PrimaryButton>
               <PrimaryButton
                 onClick={handlePrintBags}
-                disabled={!bagModal.numberOfBags || parseInt(bagModal.numberOfBags) <= 0 || !isConnected || bagPrintingProgress.isPrinting}
+                disabled={!isConnected || bagPrintingProgress.isPrinting}
                 style={{
                   backgroundColor: bagPrintingProgress.isPrinting ? colors.secondary[500] : colors.primary[500],
                   color: colors.text.white,
@@ -1111,16 +1167,40 @@ export default function OrdersPage() {
                 }}
               >
                 {bagPrintingProgress.isPrinting
-                  ? `Printing... (${bagPrintingProgress.current}/${bagPrintingProgress.total})`
+                  ? 'Printing...'
                   : !isConnected
                     ? 'Connect Printer First'
-                    : 'Print Bags'
+                    : 'Print Receipt'
                 }
               </PrimaryButton>
             </div>
           </div>
         </Box>
       </Modal>
+
+      {/* Floating Printer Status Button */}
+      <Tooltip title={isConnected ? 'Printer Connected' : 'Printer Disconnected'} arrow>
+        <Fab
+          color={isConnected ? 'success' : 'error'}
+          aria-label="printer status"
+          onClick={!isConnected ? connect : undefined}
+          disabled={isConnecting}
+          sx={{
+            position: 'fixed',
+            bottom: { xs: 24, sm: 24, md: 32, lg: 24 },
+            right: { xs: 24, sm: 24, md: 32, lg: 24 },
+            zIndex: 1000,
+            width: { xs: 56, sm: 56, md: 64, lg: 56 },
+            height: { xs: 56, sm: 56, md: 64, lg: 56 },
+            '&:hover': {
+              transform: 'scale(1.1)',
+              transition: 'transform 0.2s ease-in-out',
+            },
+          }}
+        >
+          {isConnected ? <PrintOutlined /> : <PrintDisabled />}
+        </Fab>
+      </Tooltip>
     </div>
   );
 }
