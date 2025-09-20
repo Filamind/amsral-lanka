@@ -266,6 +266,7 @@ export default function MachinesSection() {
                     paginationModel={paginationModel}
                     onPaginationModelChange={handlePaginationModelChange}
                     pageSizeOptions={[5, 10, 20, 50]}
+                    height="auto"
                 />
             </div>
 

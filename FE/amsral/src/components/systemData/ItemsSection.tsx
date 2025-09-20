@@ -278,6 +278,7 @@ export default function ItemsSection() {
                             }
                         }}
                         loading={loading}
+                        height="auto"
                     />
                 )}
             </div>

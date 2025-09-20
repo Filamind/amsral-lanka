@@ -171,12 +171,7 @@ class PrinterService {
    * Clear connection state from localStorage
    */
   private clearConnectionState(): void {
-    try {
-      localStorage.removeItem(this.STORAGE_KEY);
-      console.log('🗑️ Printer connection state cleared from localStorage');
-    } catch (error) {
-      console.warn('Failed to clear printer connection state:', error);
-    }
+    this.clearLocalStorage();
   }
 
   /**
@@ -199,15 +194,23 @@ class PrinterService {
     
     // Check if the state is recent (within last 24 hours)
     const isRecent = state.timestamp ? (Date.now() - state.timestamp) < 24 * 60 * 60 * 1000 : false;
-    const hasConnection = state.connected && isRecent;
+    const hasStoredConnection = state.connected && isRecent;
+    
+    // Check if we're actually connected right now
+    const isActuallyConnected = this.isConnected();
+    
     console.log('📊 Connection check:', { 
-      connected: state.connected, 
+      stored: state.connected, 
       isRecent, 
-      hasConnection,
+      hasStoredConnection,
+      isActuallyConnected,
       timestamp: state.timestamp,
       age: state.timestamp ? Date.now() - state.timestamp : 'unknown'
     });
-    return hasConnection;
+    
+    // For auto-reconnect, we only need a recent stored connection
+    // The actual connection check will be done during the reconnect attempt
+    return hasStoredConnection;
   }
 
   /**
@@ -237,7 +240,7 @@ class PrinterService {
 
       // Check if already connected
       if (this.isConnected()) {
-        console.log('Printer already connected');
+        console.log('✅ Printer already connected');
         return {
           connected: true,
           port: this.port!
@@ -246,26 +249,29 @@ class PrinterService {
 
       // Clean up any existing bad state
       if (this.port) {
-        console.log('Cleaning up existing port...');
+        console.log('🧹 Cleaning up existing port...');
         try {
           await this.disconnect();
         } catch (e) {
-          console.log('Error during cleanup:', e);
+          console.log('⚠️ Error during cleanup:', e);
         }
         this.port = null;
         this.writer = null;
       }
 
       // Try to use existing ports only
-      console.log('Quick reconnect: Checking for existing ports...');
+      console.log('🔍 Quick reconnect: Checking for existing ports...');
       const existingPorts = await this.getAvailablePorts();
       
       if (existingPorts.length === 0) {
+        console.log('❌ No existing ports found');
         return {
           connected: false,
           error: 'No existing ports found. Please use "Connect Printer" to select a printer.'
         };
       }
+
+      console.log(`📡 Found ${existingPorts.length} existing ports`);
 
       // Get the previously used port index
       const savedPortIndex = this.loadPortIndex();
@@ -277,15 +283,22 @@ class PrinterService {
         try {
           this.port = existingPorts[savedPortIndex];
           
-          await this.port.open({ 
-            baudRate: 9600,
-            dataBits: 8,
-            stopBits: 1,
-            parity: 'none',
-            flowControl: 'none'
-          });
-          
-          this.writer = this.port.writable?.getWriter() || null;
+          // Check if port is already open
+          if (this.port.readable !== null && this.port.writable !== null) {
+            console.log(`Quick reconnect: Saved port ${savedPortIndex} is already open, using existing connection`);
+            this.writer = this.port.writable?.getWriter() || null;
+          } else {
+            console.log(`Quick reconnect: Opening saved port ${savedPortIndex}...`);
+            await this.port.open({ 
+              baudRate: 9600,
+              dataBits: 8,
+              stopBits: 1,
+              parity: 'none',
+              flowControl: 'none'
+            });
+            
+            this.writer = this.port.writable?.getWriter() || null;
+          }
           
           if (this.writer) {
             console.log(`Quick reconnect: Successfully connected to saved port ${savedPortIndex}!`);
@@ -323,15 +336,22 @@ class PrinterService {
           console.log(`Quick reconnect: Trying port ${i}...`);
           this.port = existingPorts[i];
           
-          await this.port.open({ 
-            baudRate: 9600,
-            dataBits: 8,
-            stopBits: 1,
-            parity: 'none',
-            flowControl: 'none'
-          });
-          
-          this.writer = this.port.writable?.getWriter() || null;
+          // Check if port is already open
+          if (this.port.readable !== null && this.port.writable !== null) {
+            console.log(`Quick reconnect: Port ${i} is already open, using existing connection`);
+            this.writer = this.port.writable?.getWriter() || null;
+          } else {
+            console.log(`Quick reconnect: Opening port ${i}...`);
+            await this.port.open({ 
+              baudRate: 9600,
+              dataBits: 8,
+              stopBits: 1,
+              parity: 'none',
+              flowControl: 'none'
+            });
+            
+            this.writer = this.port.writable?.getWriter() || null;
+          }
           
           if (this.writer) {
             console.log(`Quick reconnect: Successfully connected to port ${i}!`);
@@ -993,10 +1013,78 @@ class PrinterService {
   }
 
   /**
+   * Clear all local storage related to printer connection
+   */
+  clearLocalStorage(): void {
+    try {
+      localStorage.removeItem(this.STORAGE_KEY);
+      localStorage.removeItem(this.PORT_INDEX_KEY);
+      console.log('✅ Printer local storage cleared');
+    } catch (error) {
+      console.warn('Failed to clear printer local storage:', error);
+    }
+  }
+
+  /**
+   * Test connection health by sending a simple command
+   */
+  async testConnectionHealth(): Promise<boolean> {
+    if (!this.isConnected()) {
+      return false;
+    }
+
+    try {
+      // Send a simple initialization command to test the connection
+      await this.sendCommand(new Uint8Array([0x1B, 0x40])); // ESC @
+      console.log('✅ Connection health test passed');
+      return true;
+    } catch (error) {
+      console.log('❌ Connection health test failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Test printing functionality with a simple test print
+   */
+  async testPrint(): Promise<boolean> {
+    if (!this.isConnected()) {
+      console.log('❌ Cannot test print - printer not connected');
+      return false;
+    }
+
+    try {
+      console.log('🖨️ Testing printer functionality...');
+      
+      // Initialize printer
+      await this.sendCommand(new Uint8Array([0x1B, 0x40])); // ESC @
+      
+      // Print a simple test line
+      await this.printText('PRINTER TEST', { align: 'center', bold: true });
+      await this.printText(''); // Empty line
+      await this.printText('If you can see this, printing works!');
+      await this.printText(''); // Empty line
+      await this.printText(''); // Empty line
+      
+      // Cut paper
+      await this.sendCommand(new Uint8Array([0x1D, 0x56, 0x00])); // GS V 0 (Full cut)
+      
+      console.log('✅ Printer test successful');
+      return true;
+    } catch (error) {
+      console.log('❌ Printer test failed:', error);
+      return false;
+    }
+  }
+
+  /**
    * Clear browser's port cache and force fresh connection
    */
   async clearCacheAndConnect(): Promise<PrinterStatus> {
     console.log('Clearing browser port cache and forcing fresh connection...');
+    
+    // Clear local storage first
+    this.clearLocalStorage();
     
     // Force reset first
     await this.forceReset();
@@ -1120,10 +1208,56 @@ class PrinterService {
    * Check if printer is connected
    */
   isConnected(): boolean {
-    return this.port !== null && 
-           this.writer !== null && 
-           this.port.readable !== null && 
-           this.port.writable !== null;
+    // Basic checks
+    if (!this.port || !this.writer) {
+      console.log('❌ No port or writer available');
+      return false;
+    }
+    
+    // Check if port is actually open and functional
+    const isPortOpen = this.port.readable !== null && this.port.writable !== null;
+    
+    if (!isPortOpen) {
+      console.log('❌ Port is not open (readable/writable)');
+      return false;
+    }
+    
+    // Additional check: verify the connection is actually working
+    // by checking if we can write to the port
+    try {
+      // Check if the writer is still valid and not closed
+      if (this.writer && typeof this.writer.closed === 'boolean' && this.writer.closed) {
+        console.log('❌ Writer is closed, marking as disconnected');
+        return false;
+      }
+      
+      console.log('✅ Basic connection checks passed');
+      return true;
+    } catch (error) {
+      console.log('❌ Connection check failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Verify connection is actually working by testing communication
+   */
+  async verifyConnection(): Promise<boolean> {
+    if (!this.isConnected()) {
+      console.log('❌ Basic connection check failed');
+      return false;
+    }
+
+    try {
+      console.log('🔍 Testing printer communication...');
+      // Send a simple initialization command to test the connection
+      await this.sendCommand(new Uint8Array([0x1B, 0x40])); // ESC @
+      console.log('✅ Printer communication test successful');
+      return true;
+    } catch (error) {
+      console.log('❌ Printer communication test failed:', error);
+      return false;
+    }
   }
 
   /**
@@ -1175,9 +1309,21 @@ class PrinterService {
       throw new Error('Printer not connected');
     }
 
-    console.log('Sending command to printer:', command);
-    await this.writer!.write(command);
-    console.log('Command sent successfully');
+    if (!this.writer) {
+      throw new Error('Writer not available');
+    }
+
+    try {
+      console.log('Sending command to printer:', command);
+      await this.writer.write(command);
+      console.log('Command sent successfully');
+    } catch (error) {
+      console.error('Error sending command to printer:', error);
+      // If sending fails, mark as disconnected
+      this.port = null;
+      this.writer = null;
+      throw new Error(`Failed to send command to printer: ${error}`);
+    }
   }
 
   /**

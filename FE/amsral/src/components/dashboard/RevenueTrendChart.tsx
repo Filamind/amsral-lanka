@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Typography, Card, CardContent } from '@mui/material';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import colors from '../../styles/colors';
 
 // Local type definitions to avoid import issues
@@ -10,25 +10,12 @@ interface DailyOrderData {
     revenue: number;
 }
 
-interface OrderStatusDistribution {
-    status: string;
-    count: number;
-    percentage: number;
-}
-
-interface OrdersTrendChartProps {
+interface RevenueTrendChartProps {
     data: DailyOrderData[];
     loading?: boolean;
 }
 
-interface OrderStatusPieChartProps {
-    data: OrderStatusDistribution[];
-    loading?: boolean;
-}
-
-const COLORS = ['#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#8b5cf6'];
-
-export function OrdersTrendChart({ data, loading = false }: OrdersTrendChartProps) {
+export function RevenueTrendChart({ data, loading = false }: RevenueTrendChartProps) {
     if (loading) {
         return (
             <Card sx={{ height: 400, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -38,7 +25,7 @@ export function OrdersTrendChart({ data, loading = false }: OrdersTrendChartProp
     }
 
     // Debug: Log the data to see what we're getting
-    console.log('OrdersTrendChart data:', data);
+    console.log('RevenueTrendChart data:', data);
 
     // Handle empty data
     if (!data || data.length === 0) {
@@ -46,10 +33,10 @@ export function OrdersTrendChart({ data, loading = false }: OrdersTrendChartProp
             <Card sx={{ height: 400, p: 0 }}>
                 <CardContent sx={{ height: '100%', p: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                     <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: colors.text.primary }}>
-                        Orders Trend
+                        Revenue Trend
                     </Typography>
                     <Typography color="text.secondary" sx={{ textAlign: 'center' }}>
-                        No order data available for the selected period.
+                        No revenue data available for the selected period.
                     </Typography>
                 </CardContent>
             </Card>
@@ -60,7 +47,7 @@ export function OrdersTrendChart({ data, loading = false }: OrdersTrendChartProp
         <Card sx={{ height: 400, p: 0 }}>
             <CardContent sx={{ height: '100%', p: 3 }}>
                 <Typography variant="h6" sx={{ mb: 3, fontWeight: 600, color: colors.text.primary }}>
-                    Orders Trend
+                    Revenue Trend
                 </Typography>
                 <Box sx={{ height: 'calc(100% - 60px)' }}>
                     <ResponsiveContainer width="100%" height="100%">
@@ -85,6 +72,7 @@ export function OrdersTrendChart({ data, loading = false }: OrdersTrendChartProp
                             <YAxis
                                 stroke={colors.text.secondary}
                                 fontSize={12}
+                                tickFormatter={(value) => `Rs. ${value.toLocaleString()}`}
                             />
                             <Tooltip
                                 contentStyle={{
@@ -94,16 +82,16 @@ export function OrdersTrendChart({ data, loading = false }: OrdersTrendChartProp
                                     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                                 }}
                                 labelFormatter={(value) => new Date(value).toLocaleDateString()}
-                                formatter={(value: any) => [`${value} orders`, 'Orders']}
+                                formatter={(value: any) => [`Rs. ${value.toLocaleString()}`, 'Revenue']}
                             />
                             <Line
                                 type="monotone"
-                                dataKey="orders"
-                                stroke={colors.primary[500]}
+                                dataKey="revenue"
+                                stroke={colors.success[500]}
                                 strokeWidth={3}
-                                dot={{ fill: colors.primary[500], strokeWidth: 2, r: 4 }}
-                                activeDot={{ r: 6, stroke: colors.primary[500], strokeWidth: 2 }}
-                                name="Orders"
+                                dot={{ fill: colors.success[500], strokeWidth: 2, r: 4 }}
+                                activeDot={{ r: 6, stroke: colors.success[500], strokeWidth: 2 }}
+                                name="Revenue"
                             />
                         </LineChart>
                     </ResponsiveContainer>
@@ -113,51 +101,4 @@ export function OrdersTrendChart({ data, loading = false }: OrdersTrendChartProp
     );
 }
 
-export function OrderStatusPieChart({ data, loading = false }: OrderStatusPieChartProps) {
-    if (loading) {
-        return (
-            <Card sx={{ height: 400, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Typography color="text.secondary">Loading chart data...</Typography>
-            </Card>
-        );
-    }
-
-    return (
-        <Card sx={{ height: 400, p: 0 }}>
-            <CardContent sx={{ height: '100%', p: 3 }}>
-                <Typography variant="h6" sx={{ mb: 3, fontWeight: 600, color: colors.text.primary }}>
-                    Order Status Distribution
-                </Typography>
-                <Box sx={{ height: 'calc(100% - 60px)' }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                            <Pie
-                                data={data}
-                                cx="50%"
-                                cy="50%"
-                                labelLine={false}
-                                label={({ name, percentage }) => `${name} (${percentage}%)`}
-                                outerRadius={80}
-                                fill="#8884d8"
-                                dataKey="count"
-                            >
-                                {data.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                ))}
-                            </Pie>
-                            <Tooltip
-                                formatter={(value: any, name: string) => [`${value} orders`, 'Count']}
-                                contentStyle={{
-                                    backgroundColor: 'white',
-                                    border: `1px solid ${colors.border.light}`,
-                                    borderRadius: 8,
-                                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                                }}
-                            />
-                        </PieChart>
-                    </ResponsiveContainer>
-                </Box>
-            </CardContent>
-        </Card>
-    );
-}
+export default RevenueTrendChart;

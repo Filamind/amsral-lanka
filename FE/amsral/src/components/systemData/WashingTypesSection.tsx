@@ -284,6 +284,7 @@ export default function WashingTypesSection() {
                             }
                         }}
                         loading={loading}
+                        height="auto"
                     />
                 )}
             </div>

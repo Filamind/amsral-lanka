@@ -176,6 +176,7 @@ export interface Order {
   billingStatus?: 'pending' | 'invoiced' | 'paid';
   recordsCount: number;
   complete: boolean;
+  overdue: boolean;
   createdAt: string;
   updatedAt: string;
   records: OrderRecord[];
