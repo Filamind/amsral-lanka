@@ -17,6 +17,7 @@ import { usePrinter } from '../context/PrinterContext';
 import printerService from '../services/printerService';
 import { useAuth } from '../hooks/useAuth';
 import { hasPermission } from '../utils/roleUtils';
+import { getStatusColor, getStatusLabel, normalizeStatus } from '../utils/statusUtils';
 import toast from 'react-hot-toast';
 
 // Types are now imported from services
@@ -94,20 +95,20 @@ export default function RecordAssignmentsPage() {
             headerName: 'Status',
             flex: 1,
             minWidth: 120,
-            renderCell: (params) => (
-                <span
-                    className={`px-3 py-1 rounded-xl text-sm font-semibold ${params.value === 'Completed'
-                        ? 'bg-green-100 text-green-800'
-                        : params.value === 'In Progress'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : params.value === 'Pending'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-gray-100 text-gray-800'
-                        }`}
-                >
-                    {params.value || 'Pending'}
-                </span>
-            )
+            renderCell: (params) => {
+                const status = params.value || 'Pending';
+                const normalizedStatus = normalizeStatus(status, 'assignment');
+                const statusColor = getStatusColor(normalizedStatus, 'assignment');
+                const statusLabel = getStatusLabel(normalizedStatus, 'assignment');
+
+                return (
+                    <span
+                        className={`px-3 py-1 rounded-xl text-sm font-semibold ${statusColor}`}
+                    >
+                        {statusLabel}
+                    </span>
+                );
+            }
         },
         {
             field: 'toggleStatus',
@@ -558,11 +559,8 @@ export default function RecordAssignmentsPage() {
                         </div>
                         <div>
                             <span className="font-semibold">Status:</span>
-                            <span className={`ml-1 px-2 py-1 rounded text-xs font-semibold ${record.status === 'completed'
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-blue-100 text-blue-800'
-                                }`}>
-                                {record.status}
+                            <span className={`ml-1 px-2 py-1 rounded text-xs font-semibold ${getStatusColor(normalizeStatus(record.status, 'order'), 'order')}`}>
+                                {getStatusLabel(normalizeStatus(record.status, 'order'), 'order')}
                             </span>
                         </div>
                     </div>

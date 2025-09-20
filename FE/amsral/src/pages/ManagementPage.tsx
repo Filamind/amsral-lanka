@@ -1,25 +1,30 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Typography, IconButton, TextField, InputAdornment } from '@mui/material';
-import { Search, FilterList, Print } from '@mui/icons-material';
-import type { GridColDef } from '@mui/x-data-grid';
+import { IconButton } from '@mui/material';
+import { CheckCircle, RadioButtonUnchecked } from '@mui/icons-material';
+import type { GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
 import PrimaryTable from '../components/common/PrimaryTable';
-import PrimaryDropdown from '../components/common/PrimaryDropdown';
 import PrimaryButton from '../components/common/PrimaryButton';
 import colors from '../styles/colors';
-import { orderService, type ManagementOrder, type OrderStatus, type OrderSummaryData } from '../services/orderService';
-import { generateGatepass, type GatepassData } from '../utils/pdfUtils';
+import { orderService, type ManagementOrder, type UpdateOrderRequest, type ErrorResponse } from '../services/orderService';
+import { getStatusColor, getStatusLabel, normalizeStatus } from '../utils/statusUtils';
+import { useAuth } from '../hooks/useAuth';
+import { hasPermission } from '../utils/roleUtils';
 import toast from 'react-hot-toast';
 
 
 export default function ManagementPage() {
     const navigate = useNavigate();
+    const { user } = useAuth();
     const [orders, setOrders] = useState<ManagementOrder[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [orderIdFilter, setOrderIdFilter] = useState('');
     const [customerNameFilter, setCustomerNameFilter] = useState('');
+
+    // Permission checks
+    const canMarkDelivered = hasPermission(user, 'canMarkDelivered');
 
     // Pagination state
     const [pagination, setPagination] = useState({
@@ -49,65 +54,86 @@ export default function ManagementPage() {
         // },
         {
             field: 'id',
-            headerName: 'Reference No',
-            flex: 1,
-            minWidth: 120,
+            headerName: 'Ref No',
+            flex: 0.8,
+            minWidth: 80,
             renderCell: (params) => (
-                <span className="font-mono font-semibold" style={{ color: colors.button.primary }}>
+                <span className="font-mono font-semibold text-xs sm:text-sm" style={{ color: colors.button.primary }}>
                     {params.value}
                 </span>
             )
         },
-        { field: 'customerName', headerName: 'Customer', flex: 1.2, minWidth: 150 },
-        { field: 'quantity', headerName: 'Quantity', flex: 0.8, minWidth: 100, type: 'number' },
-        { field: 'date', headerName: 'Order Date', flex: 1, minWidth: 120 },
-        { field: 'deliveryDate', headerName: 'Delivery Date', flex: 1, minWidth: 120 },
+        { field: 'customerName', headerName: 'Customer', flex: 1.2, minWidth: 120 },
+        { field: 'quantity', headerName: 'Qty', flex: 0.6, minWidth: 60, type: 'number' },
+        { field: 'date', headerName: 'Order Date', flex: 1, minWidth: 100 },
+        { field: 'deliveryDate', headerName: 'Delivery Date', flex: 1, minWidth: 100 },
         {
             field: 'status',
             headerName: 'Status',
             flex: 1,
-            minWidth: 120,
-            renderCell: (params) => (
-                <span
-                    className={`px-3 py-1 rounded-xl text-sm font-semibold ${params.value === 'Completed'
-                        ? 'bg-green-100 text-green-800'
-                        : params.value === 'In Progress'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : params.value === 'Pending'
-                                ? 'bg-blue-100 text-blue-800'
-                                : params.value === 'Confirmed'
-                                    ? 'bg-purple-100 text-purple-800'
-                                    : params.value === 'Processing'
-                                        ? 'bg-orange-100 text-orange-800'
-                                        : params.value === 'Delivered'
-                                            ? 'bg-gray-100 text-gray-800'
-                                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                >
-                    {params.value}
-                </span>
-            )
+            minWidth: 100,
+            renderCell: (params) => {
+                const status = params.value || 'Pending';
+                const normalizedStatus = normalizeStatus(status, 'order');
+                const statusColor = getStatusColor(normalizedStatus, 'order');
+                const statusLabel = getStatusLabel(normalizedStatus, 'order');
+
+                return (
+                    <span
+                        className={`px-2 py-1 rounded-xl text-xs sm:text-sm font-semibold ${statusColor}`}
+                    >
+                        {statusLabel}
+                    </span>
+                );
+            }
         },
-        { field: 'recordsCount', headerName: 'Records', flex: 0.6, minWidth: 80, type: 'number' },
         {
-            field: 'print',
-            headerName: 'Print',
-            flex: 0.5,
-            minWidth: 80,
-            sortable: false,
-            renderCell: (params) => (
-                <IconButton
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        handlePrintOrder(params.row);
-                    }}
-                    size="small"
-                    sx={{ color: colors.button.primary }}
-                >
-                    <Print />
-                </IconButton>
-            )
+            field: 'billingStatus',
+            headerName: 'Billing',
+            flex: 1,
+            minWidth: 100,
+            renderCell: (params) => {
+                const status = params.row.billingStatus || 'pending';
+                const normalizedStatus = normalizeStatus(status, 'billing');
+                const statusColor = getStatusColor(normalizedStatus, 'billing');
+                const statusLabel = getStatusLabel(normalizedStatus, 'billing');
+
+                return (
+                    <span
+                        className={`px-2 py-1 rounded-xl text-xs sm:text-sm font-semibold ${statusColor}`}
+                    >
+                        {statusLabel}
+                    </span>
+                );
+            }
         },
+        { field: 'recordsCount', headerName: 'Records', flex: 0.6, minWidth: 60, type: 'number' },
+        ...(canMarkDelivered ? [{
+            field: 'delivered',
+            headerName: 'Delivered',
+            flex: 0.5,
+            minWidth: 60,
+            sortable: false,
+            renderCell: (params: GridRenderCellParams) => {
+                const isDelivered = (params.row.status || '').toLowerCase() === 'delivered';
+                return (
+                    <IconButton
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleDelivery(params.row);
+                        }}
+                        size="small"
+                        sx={{
+                            color: isDelivered ? colors.button.primary : colors.text.secondary
+                        }}
+                        title={isDelivered ? 'Mark as Completed' : 'Mark as Delivered'}
+                        disabled={loading}
+                    >
+                        {isDelivered ? <CheckCircle /> : <RadioButtonUnchecked />}
+                    </IconButton>
+                );
+            }
+        }] : []),
     ];
 
     // Fetch orders with filters
@@ -181,36 +207,37 @@ export default function ManagementPage() {
         navigate(`/management/orders/${params.id}`);
     };
 
-    // Handle print gatepass
-    const handlePrintOrder = async (order: ManagementOrder) => {
+    // Handle delivery toggle
+    const handleToggleDelivery = async (order: ManagementOrder) => {
+        const isDelivered = (order.status || '').toLowerCase() === 'delivered';
+
         try {
-            // Fetch order summary data
-            const response = await orderService.getOrderSummary(order.id);
+            setLoading(true);
+
+            // Update order status via API
+            const updateData: UpdateOrderRequest = {
+                status: isDelivered ? 'Completed' : 'Delivered'
+            };
+
+            const response = await orderService.updateOrder(order.id, updateData);
 
             if (response.success) {
-                const gatepassData: GatepassData = {
-                    id: response.data.id,
-                    customerName: response.data.customerName,
-                    orderDate: response.data.orderDate,
-                    totalQuantity: response.data.totalQuantity,
-                    createdDate: response.data.createdDate,
-                    referenceNo: response.data.referenceNo,
-                    deliveryDate: response.data.deliveryDate,
-                    status: response.data.status,
-                    notes: response.data.notes,
-                    records: response.data.records
-                };
+                // Update order in local state
+                setOrders(prev => prev.map(row =>
+                    row.id === order.id ? { ...row, status: response.data.status } : row
+                ));
 
-                generateGatepass(gatepassData);
-                toast.success('Gatepass downloaded successfully!');
-            } else {
-                toast.error('Failed to fetch order details');
+                toast.success(`Order ${isDelivered ? 'marked as Completed' : 'marked as Delivered'} successfully`);
             }
         } catch (error) {
-            console.error('Error generating gatepass:', error);
-            toast.error('Failed to generate gatepass');
+            console.error('Error updating order status:', error);
+            const apiError = error as ErrorResponse;
+            toast.error(apiError.message || 'Failed to update order status');
+        } finally {
+            setLoading(false);
         }
     };
+
 
 
     // Clear all filters
@@ -222,51 +249,31 @@ export default function ManagementPage() {
     };
 
     return (
-        <div className="p-6">
-            <div className="mb-6">
-                <Typography variant="h4" className="font-bold text-gray-800 mb-2">
-                    Order Management
-                </Typography>
-                <Typography variant="body1" className="text-gray-600">
-                    Manage and track all orders with detailed information and status updates.
-                </Typography>
-            </div>
-
-            {/* Filters */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-                <div className="flex items-center gap-4 mb-4">
-                    <FilterList className="text-gray-500" />
-                    <Typography variant="h6" className="font-semibold text-gray-700">
-                        Filters
-                    </Typography>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {/* Search */}
-                    <div className="flex flex-col">
-                        <label className="block text-sm font-medium mb-2">Search</label>
-                        <TextField
+        <div className="w-full mx-auto px-2 sm:px-3 md:px-4 py-3">
+            <div className="flex flex-col gap-2 sm:gap-3 mb-4">
+                <h2 className="text-lg sm:text-xl md:text-2xl font-bold" style={{ color: colors.text.primary }}>Order Management</h2>
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-2 w-full">
+                    <div className="flex flex-1 items-center w-full sm:w-auto">
+                        <input
+                            type="text"
+                            placeholder="Search by Reference No or customer name..."
                             value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder="Order ID or Customer Name"
-                            size="small"
-                            InputProps={{
-                                startAdornment: (
-                                    <InputAdornment position="start">
-                                        <Search />
-                                    </InputAdornment>
-                                ),
-                            }}
-                            className="w-full"
+                            onChange={e => setSearchTerm(e.target.value)}
+                            className="flex-1 px-3 py-2 border rounded-xl focus:outline-none text-sm sm:text-base"
+                            style={{ borderColor: colors.border.light, maxWidth: 400 }}
                         />
                     </div>
-
-                    {/* Clear Filters Button */}
-                    <div className="flex items-end">
+                    <div className="flex items-center gap-2">
                         <PrimaryButton
                             onClick={handleClearFilters}
-                            variant="outlined"
-                            className="w-full"
+                            style={{
+                                backgroundColor: colors.secondary[500],
+                                color: colors.text.white,
+                                border: 'none',
+                                borderRadius: '8px',
+                                padding: '8px 16px',
+                                fontSize: '14px'
+                            }}
                         >
                             Clear Filters
                         </PrimaryButton>
@@ -289,7 +296,7 @@ export default function ManagementPage() {
                         pageSize: pageSize
                     }}
                     rowCount={pagination.totalItems}
-                    height={600}
+                    height={window.innerWidth < 768 ? 400 : 600} // Responsive height
                     onPaginationModelChange={(model) => {
                         // Handle page size change
                         if (model.pageSize !== pageSize) {

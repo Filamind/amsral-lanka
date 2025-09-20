@@ -37,6 +37,15 @@ export interface UpdateOrderRecordRequest {
   trackingNumber?: string; // Optional, for updating tracking number if needed
 }
 
+export interface UpdateOrderRequest {
+  date?: string;
+  customerId?: string;
+  quantity?: number;
+  notes?: string;
+  deliveryDate?: string;
+  status?: OrderStatus;
+}
+
 // Response Interfaces
 export interface OrderRecord {
   id: number;
@@ -61,6 +70,7 @@ export interface ManagementOrder {
   notes: string;
   deliveryDate: string;
   status: OrderStatus;
+  billingStatus?: 'pending' | 'invoiced' | 'paid';
   recordsCount: number;
   complete: boolean;
   createdAt: string;
@@ -71,6 +81,7 @@ export interface OrderDetailsRecord {
   id: number;
   orderId: number;
   itemId: string;
+  itemName?: string; // Add itemName to the interface
   quantity: number;
   washType: string;
   processTypes: string[];
@@ -327,6 +338,7 @@ class OrderService {
     customerName?: string;
     orderId?: string;
     billingStatus?: string;
+    excludeDelivered?: boolean; // New parameter to exclude delivered orders
   }): Promise<OrdersResponse> {
     try {
       const queryParams = new URLSearchParams();
@@ -337,6 +349,7 @@ class OrderService {
       if (params?.customerName) queryParams.append('customerName', params.customerName);
       if (params?.orderId) queryParams.append('orderId', params.orderId);
       if (params?.billingStatus) queryParams.append('billingStatus', params.billingStatus);
+      if (params?.excludeDelivered) queryParams.append('excludeDelivered', 'true');
       
       const response = await apiClient.get(`/orders?${queryParams.toString()}`);
       return response.data;
@@ -350,7 +363,7 @@ class OrderService {
    * 7. Update Order
    * PUT /orders/{orderId}
    */
-  async updateOrder(orderId: number, orderData: Partial<CreateOrderRequest>): Promise<OrderResponse> {
+  async updateOrder(orderId: number, orderData: UpdateOrderRequest): Promise<OrderResponse> {
     try {
       const response = await apiClient.put(`/orders/${orderId}`, orderData);
       return response.data;

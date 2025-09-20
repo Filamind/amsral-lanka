@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Box, Typography, IconButton, Card, CardContent, Grid, Chip, LinearProgress, Divider } from '@mui/material';
-import { ArrowBack, Print, Assignment, CalendarToday, Person, Inventory, LocalShipping, Description, CheckCircle, Schedule } from '@mui/icons-material';
+import { Typography, IconButton, Card, CardContent, Chip, LinearProgress, Divider } from '@mui/material';
+import { ArrowBack, Assignment, CalendarToday, Person, Inventory, LocalShipping, Description, CheckCircle, Schedule } from '@mui/icons-material';
 import type { GridColDef } from '@mui/x-data-grid';
 import PrimaryTable from '../components/common/PrimaryTable';
 import AssignmentDetailsModal from '../components/modals/AssignmentDetailsModal';
 import colors from '../styles/colors';
 import { orderService, type OrderDetailsResponse, type OrderDetailsRecord } from '../services/orderService';
-import { generateOrderReceipt, type OrderReceiptData } from '../utils/pdfUtils';
+import { getStatusColor, getStatusLabel, isCompletedStatus } from '../utils/statusUtils';
 import toast from 'react-hot-toast';
 
 export default function OrderDetailsPage() {
@@ -41,25 +41,6 @@ export default function OrderDetailsPage() {
         fetchOrderDetails();
     }, [orderId]);
 
-    // Handle print order
-    const handlePrintOrder = () => {
-        if (!orderDetails) return;
-
-        try {
-            const receiptData: OrderReceiptData = {
-                orderId: orderDetails.order.id,
-                customerName: orderDetails.order.customerName,
-                totalQuantity: orderDetails.order.quantity,
-                orderDate: orderDetails.order.date,
-                notes: orderDetails.order.notes
-            };
-            generateOrderReceipt(receiptData);
-            toast.success('Order receipt downloaded successfully!');
-        } catch (error) {
-            console.error('Error generating receipt:', error);
-            toast.error('Failed to generate receipt');
-        }
-    };
 
     // Handle open assignment modal
     const handleOpenAssignmentModal = (record: OrderDetailsRecord) => {
@@ -87,12 +68,14 @@ export default function OrderDetailsPage() {
             )
         },
         {
-            field: 'itemId',
-            headerName: 'Item ID',
+            field: 'itemName',
+            headerName: 'Item Name',
             flex: 1,
             minWidth: 100,
             renderCell: (params) => (
-                <span className="text-sm sm:text-base truncate">{params.value}</span>
+                <span className="text-sm sm:text-base truncate">
+                    {params.value || params.row.itemId || 'N/A'}
+                </span>
             )
         },
         {
@@ -143,19 +126,18 @@ export default function OrderDetailsPage() {
             headerName: 'Status',
             flex: 1,
             minWidth: 100,
-            renderCell: (params) => (
-                <Chip
-                    icon={params.value === 'Completed' ? <CheckCircle /> : <Schedule />}
-                    label={params.value}
-                    color={
-                        params.value === 'Completed' ? 'success' :
-                            params.value === 'In Progress' ? 'warning' :
-                                params.value === 'Pending' ? 'info' : 'default'
-                    }
-                    size="small"
-                    className="font-medium text-xs sm:text-sm"
-                />
-            )
+            renderCell: (params) => {
+                const statusColor = getStatusColor(params.value, 'assignment');
+                const statusLabel = getStatusLabel(params.value, 'assignment');
+                const isCompleted = isCompletedStatus(params.value);
+
+                return (
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColor}`}>
+                        {isCompleted ? <CheckCircle className="w-3 h-3 mr-1" /> : <Schedule className="w-3 h-3 mr-1" />}
+                        {statusLabel}
+                    </span>
+                );
+            }
         },
         {
             field: 'stats',
@@ -222,89 +204,74 @@ export default function OrderDetailsPage() {
     const { order, records, overallStats } = orderDetails;
 
     return (
-        <div className="p-6">
+        <div className="p-3 sm:p-4 md:p-6">
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-4">
-                    <IconButton
-                        onClick={() => navigate('/management')}
-                        sx={{ color: colors.text.secondary }}
-                    >
-                        <ArrowBack />
-                    </IconButton>
-                    <div>
-                        <Typography variant="h4" className="font-bold text-gray-800">
-                            Order Details - {order.id}
-                        </Typography>
-                        <Typography variant="body1" className="text-gray-600">
-                            Reference Number: {order.id} | Customer: {order.customerName}
-                        </Typography>
-                    </div>
-                </div>
+            <div className="flex items-center gap-2 sm:gap-4 mb-4 sm:mb-6">
                 <IconButton
-                    onClick={handlePrintOrder}
-                    sx={{ color: colors.button.primary }}
+                    onClick={() => navigate('/management')}
+                    sx={{ color: colors.text.secondary }}
+                    size="small"
                 >
-                    <Print />
+                    <ArrowBack />
                 </IconButton>
+                <div className="min-w-0 flex-1">
+                    <Typography variant="h4" className="font-bold text-gray-800 text-lg sm:text-xl md:text-2xl">
+                        Order Details - {order.id}
+                    </Typography>
+                    <Typography variant="body1" className="text-gray-600 text-sm sm:text-base truncate">
+                        Ref: {order.id} | {order.customerName}
+                    </Typography>
+                </div>
             </div>
 
             {/* Summary Cards */}
-            <Grid container spacing={2} className="mb-6">
-                <Grid item xs={12} sm={6} md={3}>
-                    <Card className="bg-gradient-to-r from-blue-50 to-blue-100">
-                        <CardContent className="text-center">
-                            <Typography variant="h4" className="font-bold text-blue-600 mb-1">
-                                {overallStats.workCompletion.workCompletionPercentage}%
-                            </Typography>
-                            <Typography variant="body2" className="text-blue-700">
-                                Work Complete
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                    <Card className="bg-gradient-to-r from-green-50 to-green-100">
-                        <CardContent className="text-center">
-                            <Typography variant="h4" className="font-bold text-green-600 mb-1">
-                                {overallStats.assignmentCompleteness.assignmentCompletionPercentage}%
-                            </Typography>
-                            <Typography variant="body2" className="text-green-700">
-                                Assignments Complete
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                    <Card className="bg-gradient-to-r from-purple-50 to-purple-100">
-                        <CardContent className="text-center">
-                            <Typography variant="h4" className="font-bold text-purple-600 mb-1">
-                                {overallStats.recordsCount}
-                            </Typography>
-                            <Typography variant="body2" className="text-purple-700">
-                                Total Records
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                    <Card className="bg-gradient-to-r from-orange-50 to-orange-100">
-                        <CardContent className="text-center">
-                            <Typography variant="h4" className="font-bold text-orange-600 mb-1">
-                                {overallStats.totalAssignments}
-                            </Typography>
-                            <Typography variant="body2" className="text-orange-700">
-                                Total Assignments
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                </Grid>
-            </Grid>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
+                <Card className="bg-gradient-to-r from-blue-50 to-blue-100">
+                    <CardContent className="text-center">
+                        <Typography variant="h4" className="font-bold text-blue-600 mb-1">
+                            {overallStats.workCompletion.workCompletionPercentage}%
+                        </Typography>
+                        <Typography variant="body2" className="text-blue-700">
+                            Work Complete
+                        </Typography>
+                    </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-r from-green-50 to-green-100">
+                    <CardContent className="text-center">
+                        <Typography variant="h4" className="font-bold text-green-600 mb-1">
+                            {overallStats.assignmentCompleteness.assignmentCompletionPercentage}%
+                        </Typography>
+                        <Typography variant="body2" className="text-green-700">
+                            Assignments Complete
+                        </Typography>
+                    </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-r from-purple-50 to-purple-100">
+                    <CardContent className="text-center">
+                        <Typography variant="h4" className="font-bold text-purple-600 mb-1">
+                            {overallStats.recordsCount}
+                        </Typography>
+                        <Typography variant="body2" className="text-purple-700">
+                            Total Records
+                        </Typography>
+                    </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-r from-orange-50 to-orange-100">
+                    <CardContent className="text-center">
+                        <Typography variant="h4" className="font-bold text-orange-600 mb-1">
+                            {overallStats.totalAssignments}
+                        </Typography>
+                        <Typography variant="body2" className="text-orange-700">
+                            Total Assignments
+                        </Typography>
+                    </CardContent>
+                </Card>
+            </div>
 
             {/* Order Information Cards */}
-            <Grid container spacing={3} className="mb-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
                 {/* Order Details */}
-                <Grid item xs={12} lg={6}>
+                <div>
                     <Card className="shadow-lg">
                         <CardContent className="p-4 sm:p-6">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 gap-3">
@@ -312,17 +279,10 @@ export default function OrderDetailsPage() {
                                     <Inventory className="mr-2" style={{ color: colors.button.primary }} />
                                     Order Information
                                 </Typography>
-                                <Chip
-                                    icon={order.complete ? <CheckCircle /> : <Schedule />}
-                                    label={order.status}
-                                    color={
-                                        order.status === 'Completed' ? 'success' :
-                                            order.status === 'In Progress' ? 'warning' :
-                                                order.status === 'Pending' ? 'info' : 'default'
-                                    }
-                                    size="medium"
-                                    className="font-semibold w-fit"
-                                />
+                                <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold ${getStatusColor(order.status, 'order')}`}>
+                                    {isCompletedStatus(order.status) ? <CheckCircle className="w-4 h-4 mr-2" /> : <Schedule className="w-4 h-4 mr-2" />}
+                                    {getStatusLabel(order.status, 'order')}
+                                </span>
                             </div>
 
                             <div className="space-y-4">
@@ -420,10 +380,10 @@ export default function OrderDetailsPage() {
                             </div>
                         </CardContent>
                     </Card>
-                </Grid>
+                </div>
 
                 {/* Progress Overview */}
-                <Grid item xs={12} lg={6}>
+                <div>
                     <Card className="shadow-lg">
                         <CardContent className="p-4 sm:p-6">
                             <Typography variant="h5" className="font-bold text-gray-800 mb-4 sm:mb-6 flex items-center text-lg sm:text-xl">
@@ -484,8 +444,8 @@ export default function OrderDetailsPage() {
                             </div>
                         </CardContent>
                     </Card>
-                </Grid>
-            </Grid>
+                </div>
+            </div>
 
 
             {/* Records Table */}

@@ -23,6 +23,7 @@ export interface RolePermissions {
   canViewIntegrations: boolean;
   canEdit: boolean;
   canDelete: boolean;
+  canMarkDelivered: boolean;
 }
 
 /**
@@ -83,6 +84,7 @@ export const getRolePermissions = (user: User | null): RolePermissions => {
         canViewIntegrations: true,
         canEdit: true,
         canDelete: true,
+        canMarkDelivered: true,
       };
     
     case 'manager':
@@ -100,6 +102,7 @@ export const getRolePermissions = (user: User | null): RolePermissions => {
         canViewIntegrations: false,
         canEdit: false,
         canDelete: false,
+        canMarkDelivered: true,
       };
     
     case 'user':
@@ -118,6 +121,7 @@ export const getRolePermissions = (user: User | null): RolePermissions => {
         canViewIntegrations: false,
         canEdit: false,
         canDelete: false,
+        canMarkDelivered: false,
       };
   }
 };

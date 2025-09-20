@@ -18,6 +18,7 @@ import PrimaryDropdown from '../components/common/PrimaryDropdown';
 import { orderService } from '../services/orderService';
 import { CustomerService, type Customer } from '../services/customerService';
 import { BillingService } from '../services/billingService';
+import { getStatusColor, getStatusLabel, normalizeStatus } from '../utils/statusUtils';
 import toast from 'react-hot-toast';
 import InvoiceCreationModal from '../components/modals/InvoiceCreationModal';
 import colors from '../styles/colors';
@@ -294,24 +295,15 @@ const BillingPage: React.FC = () => {
             minWidth: 130,
             renderCell: (params) => {
                 const status = params.row.billingStatus || 'pending';
-                const getStatusStyle = (status: string) => {
-                    switch (status.toLowerCase()) {
-                        case 'pending':
-                            return 'bg-orange-100 text-orange-800';
-                        case 'invoiced':
-                            return 'bg-blue-100 text-blue-800';
-                        case 'paid':
-                            return 'bg-green-100 text-green-800';
-                        default:
-                            return 'bg-gray-100 text-gray-800';
-                    }
-                };
+                const normalizedStatus = normalizeStatus(status, 'billing');
+                const statusColor = getStatusColor(normalizedStatus, 'billing');
+                const statusLabel = getStatusLabel(normalizedStatus, 'billing');
 
                 return (
                     <span
-                        className={`px-3 py-1 rounded-xl text-sm font-semibold ${getStatusStyle(status)}`}
+                        className={`px-3 py-1 rounded-xl text-sm font-semibold ${statusColor}`}
                     >
-                        {status.toUpperCase()}
+                        {statusLabel}
                     </span>
                 );
             }

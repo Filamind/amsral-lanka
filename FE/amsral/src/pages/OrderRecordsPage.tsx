@@ -18,6 +18,7 @@ import { processTypeService } from '../services/processTypeService';
 import { generateOrderReceipt } from '../utils/pdfUtils';
 import { useAuth } from '../hooks/useAuth';
 import { hasPermission } from '../utils/roleUtils';
+import { getStatusColor, getStatusLabel, normalizeStatus } from '../utils/statusUtils';
 import toast from 'react-hot-toast';
 
 interface ProcessRecord {
@@ -467,18 +468,16 @@ export default function OrderRecordsPage() {
                 const isCompleted = params.row.isCompleted || false;
                 const status = params.row.status || 'pending';
 
+                // Use standardized status handling
+                const displayStatus = isCompleted ? 'Completed' : normalizeStatus(status, 'order');
+                const statusColor = getStatusColor(displayStatus, 'order');
+                const statusLabel = getStatusLabel(displayStatus, 'order');
+
                 return (
                     <span
-                        className={`px-3 py-1 rounded-xl text-sm font-semibold ${isCompleted
-                            ? 'bg-green-100 text-green-800'
-                            : status === 'in_progress'
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : status === 'pending'
-                                    ? 'bg-blue-100 text-blue-800'
-                                    : 'bg-gray-100 text-gray-800'
-                            }`}
+                        className={`px-3 py-1 rounded-xl text-sm font-semibold ${statusColor}`}
                     >
-                        {isCompleted ? 'Complete' : status || 'Pending'}
+                        {statusLabel}
                     </span>
                 );
             }

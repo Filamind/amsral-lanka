@@ -10,14 +10,15 @@ import ConfirmationDialog from '../components/common/ConfirmationDialog';
 import colors from '../styles/colors';
 import { orderService, type CreateOrderRequest, type ErrorResponse } from '../services/orderService';
 import CustomerService from '../services/customerService';
-import { generateOrderReceipt, generateBagLabel, type OrderReceiptData, type BagLabelData } from '../utils/pdfUtils';
+import { type BagLabelData } from '../utils/pdfUtils';
 import { usePrinter } from '../context/PrinterContext';
 import bagLabelPrinterService from '../services/bagLabelPrinterService';
 import orderRecordPrinterService from '../services/orderRecordPrinterService';
-import orderRecordsService, { type OrderRecordsDetails, type OrderRecord } from '../services/orderRecordsService';
+import orderRecordsService, { type OrderRecordsDetails } from '../services/orderRecordsService';
 import type { OrderRecordReceiptData } from '../services/printerService';
 import { useAuth } from '../hooks/useAuth';
 import { hasPermission } from '../utils/roleUtils';
+import { getStatusColor, getStatusLabel, normalizeStatus, isCompletedStatus } from '../utils/statusUtils';
 import toast from 'react-hot-toast';
 
 // We'll define columns inside the component to access the handler functions
@@ -30,16 +31,6 @@ type ProcessRecord = {
   processTypes: string[];
 };
 
-type OrderRecordReceiptData = {
-  orderId: number;
-  customerName: string;
-  itemName: string;
-  quantity: number;
-  washType: string;
-  processTypes: string[];
-  trackingNumber?: string;
-  isRemaining?: boolean;
-};
 
 type OrderRow = {
   id: number;
@@ -63,7 +54,7 @@ type OrderRow = {
 export default function OrdersPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { isConnected, isConnecting, printStatus, connect } = usePrinter();
+  const { isConnected, isConnecting, connect } = usePrinter();
   const [search, setSearch] = useState('');
   const [rows, setRows] = useState<OrderRow[]>([]);
   const [open, setOpen] = useState(false);
@@ -135,7 +126,8 @@ export default function OrdersPage() {
       const response = await orderService.getOrders({
         page: currentPage,
         limit: pageSize,
-        search: search || undefined
+        search: search || undefined,
+        excludeDelivered: true // Exclude delivered orders from the orders table
       });
 
       if (response.success) {
@@ -528,6 +520,7 @@ export default function OrdersPage() {
     }
   };
 
+
   // Define columns inside component to access handler functions
   const columns: GridColDef[] = [
     { field: 'date', headerName: 'Date', flex: 0.8, minWidth: 110 },
@@ -540,7 +533,7 @@ export default function OrdersPage() {
       minWidth: 100,
       type: 'number',
       renderCell: (params) => {
-        const isComplete = (params.row.status || '').toLowerCase() === 'complete';
+        const isComplete = isCompletedStatus(params.row.status || '');
         return (
           <span
             className={`px-3 py-1 rounded-xl text-sm font-semibold ${isComplete
@@ -562,32 +555,15 @@ export default function OrdersPage() {
       minWidth: 120,
       renderCell: (params) => {
         const status = params.row.status || 'Pending';
-        const getStatusStyle = (status: string) => {
-          switch (status.toLowerCase()) {
-            case 'complete':
-              return 'bg-green-100 text-green-800';
-            case 'completed':
-              return 'bg-green-100 text-green-800';
-            case 'in progress':
-              return 'bg-yellow-100 text-yellow-800';
-            case 'pending':
-              return 'bg-blue-100 text-blue-800';
-            case 'confirmed':
-              return 'bg-purple-100 text-purple-800';
-            case 'processing':
-              return 'bg-orange-100 text-orange-800';
-            case 'delivered':
-              return 'bg-gray-100 text-gray-800';
-            default:
-              return 'bg-gray-100 text-gray-800';
-          }
-        };
+        const normalizedStatus = normalizeStatus(status, 'order');
+        const statusColor = getStatusColor(normalizedStatus, 'order');
+        const statusLabel = getStatusLabel(normalizedStatus, 'order');
 
         return (
           <span
-            className={`px-3 py-1 rounded-xl text-sm font-semibold ${getStatusStyle(status)}`}
+            className={`px-3 py-1 rounded-xl text-sm font-semibold ${statusColor}`}
           >
-            {status}
+            {statusLabel}
           </span>
         );
       }

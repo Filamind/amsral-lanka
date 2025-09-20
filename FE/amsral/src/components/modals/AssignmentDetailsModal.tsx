@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import {
     Modal,
     Box,
@@ -6,7 +6,6 @@ import {
     IconButton,
     Card,
     CardContent,
-    Grid,
     Chip,
     LinearProgress,
     Divider,
@@ -18,10 +17,9 @@ import {
     TableRow,
     Paper
 } from '@mui/material';
-import { Close, Person, Inventory, LocalShipping, Schedule, CheckCircle } from '@mui/icons-material';
+import { Close, Person, Inventory, Schedule, CheckCircle } from '@mui/icons-material';
 import colors from '../../styles/colors';
-import { orderService, type OrderDetailsRecord } from '../../services/orderService';
-import toast from 'react-hot-toast';
+import { type OrderDetailsRecord } from '../../services/orderService';
 
 interface AssignmentDetailsModalProps {
     open: boolean;
@@ -30,7 +28,20 @@ interface AssignmentDetailsModalProps {
 }
 
 export default function AssignmentDetailsModal({ open, onClose, record }: AssignmentDetailsModalProps) {
-    const [loading, setLoading] = useState(false);
+
+    // Handle escape key press
+    useEffect(() => {
+        const handleEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape' && open) {
+                onClose();
+            }
+        };
+
+        if (open) {
+            document.addEventListener('keydown', handleEscape);
+            return () => document.removeEventListener('keydown', handleEscape);
+        }
+    }, [open, onClose]);
 
     if (!record) return null;
 
@@ -41,6 +52,7 @@ export default function AssignmentDetailsModal({ open, onClose, record }: Assign
             open={open}
             onClose={onClose}
             aria-labelledby="assignment-details-modal"
+            disableEscapeKeyDown={false}
             sx={{
                 display: 'flex',
                 alignItems: 'center',
@@ -64,35 +76,56 @@ export default function AssignmentDetailsModal({ open, onClose, record }: Assign
                 {/* Header */}
                 <Box
                     sx={{
-                        p: { xs: 2, sm: 3 },
+                        p: { xs: 1.5, sm: 2 },
                         borderBottom: 1,
                         borderColor: 'divider',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         bgcolor: colors.gradients.primaryBlue,
-                        color: 'white'
+                        color: 'white',
+                        minHeight: '60px'
                     }}
                 >
-                    <Typography variant="h5" className="font-bold flex items-center text-lg sm:text-xl">
+                    <Typography variant="h6" className="font-bold flex items-center text-base sm:text-lg">
                         <Inventory className="mr-2" />
                         Assignment Details - {record.trackingNumber}
                     </Typography>
                     <IconButton
                         onClick={onClose}
-                        sx={{ color: 'white' }}
+                        sx={{
+                            color: '#1f2937', // Dark gray color for better contrast
+                            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                            '&:hover': {
+                                backgroundColor: 'rgba(255, 255, 255, 1)',
+                                transform: 'scale(1.1)',
+                                color: '#111827' // Even darker on hover
+                            },
+                            transition: 'all 0.2s ease-in-out',
+                            border: '2px solid rgba(255, 255, 255, 0.8)',
+                            width: '40px',
+                            height: '40px',
+                            minWidth: '40px',
+                            minHeight: '40px',
+                            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)'
+                        }}
                         size="large"
+                        title="Close modal"
                     >
-                        <Close />
+                        <Close sx={{
+                            fontSize: '24px',
+                            fontWeight: 'bold',
+                            color: '#1f2937'
+                        }} />
                     </IconButton>
                 </Box>
 
                 {/* Content */}
-                <Box sx={{ p: { xs: 2, sm: 3 }, overflow: 'auto', flex: 1 }}>
+                <Box sx={{ p: { xs: 1.5, sm: 2 }, overflow: 'auto', flex: 1 }}>
                     {/* Record Information */}
-                    <Card className="mb-4 shadow-sm">
-                        <CardContent className="p-4 sm:p-6">
-                            <Typography variant="h6" className="font-semibold mb-4 flex items-center text-lg sm:text-xl">
+                    <Card className="mb-3 shadow-sm">
+                        <CardContent className="p-3 sm:p-4">
+                            <Typography variant="h6" className="font-semibold mb-3 flex items-center text-base sm:text-lg">
                                 <Inventory className="mr-2" style={{ color: colors.button.primary }} />
                                 Record Information
                             </Typography>
@@ -202,9 +235,9 @@ export default function AssignmentDetailsModal({ open, onClose, record }: Assign
                             </div>
 
                             {/* Progress Section */}
-                            <Divider className="my-4" />
-                            <div className="space-y-4">
-                                <Typography variant="h6" className="font-semibold text-lg sm:text-xl">
+                            <Divider className="my-3" />
+                            <div className="space-y-3">
+                                <Typography variant="h6" className="font-semibold text-base sm:text-lg">
                                     Progress Overview
                                 </Typography>
 
@@ -245,8 +278,8 @@ export default function AssignmentDetailsModal({ open, onClose, record }: Assign
 
                     {/* Assignments Table */}
                     <Card className="shadow-sm">
-                        <CardContent className="p-4 sm:p-6">
-                            <Typography variant="h6" className="font-semibold mb-4 flex items-center text-lg sm:text-xl">
+                        <CardContent className="p-3 sm:p-4">
+                            <Typography variant="h6" className="font-semibold mb-3 flex items-center text-base sm:text-lg">
                                 <Person className="mr-2" style={{ color: colors.button.primary }} />
                                 Assignments ({assignments.length})
                             </Typography>

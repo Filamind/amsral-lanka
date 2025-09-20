@@ -7,6 +7,7 @@ import { orderService } from '../services/orderService';
 import { itemService } from '../services/itemService';
 import { washingTypeService } from '../services/washingTypeService';
 import { processTypeService } from '../services/processTypeService';
+import { getStatusColor, getStatusLabel, normalizeStatus } from '../utils/statusUtils';
 import toast from 'react-hot-toast';
 
 // Types
@@ -63,20 +64,28 @@ const recordsColumns: GridColDef[] = [
         headerName: 'Status',
         flex: 1,
         minWidth: 120,
-        renderCell: (params) => (
-            <span
-                className={`px-3 py-1 rounded-xl text-sm font-semibold ${params.row.complete
-                    ? 'bg-green-100 text-green-800'
-                    : params.row.remainingQuantity === 0
-                        ? 'bg-blue-100 text-blue-800'
-                        : params.row.status === 'in_progress'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-gray-100 text-gray-800'
-                    }`}
-            >
-                {params.row.complete ? 'Complete' : params.row.remainingQuantity === 0 ? 'Assigned' : params.row.status || 'Pending'}
-            </span>
-        )
+        renderCell: (params) => {
+            // Determine display status based on completion and assignment
+            let displayStatus: string;
+            if (params.row.complete) {
+                displayStatus = 'Completed';
+            } else if (params.row.remainingQuantity === 0) {
+                displayStatus = 'Assigned';
+            } else {
+                displayStatus = normalizeStatus(params.row.status || 'Pending', 'order');
+            }
+
+            const statusColor = getStatusColor(displayStatus, 'order');
+            const statusLabel = getStatusLabel(displayStatus, 'order');
+
+            return (
+                <span
+                    className={`px-3 py-1 rounded-xl text-sm font-semibold ${statusColor}`}
+                >
+                    {statusLabel}
+                </span>
+            );
+        }
     },
 ];
 
