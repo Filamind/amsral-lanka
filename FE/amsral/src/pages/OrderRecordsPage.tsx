@@ -78,11 +78,11 @@ export default function OrderRecordsPage() {
         currentPage: 1,
         totalPages: 1,
         totalItems: 0,
-        itemsPerPage: 10,
+        itemsPerPage: 20, // Match default pageSize
         hasNextPage: false,
         hasPrevPage: false
     });
-    const [pageSize, setPageSize] = useState(10);
+    const [pageSize, setPageSize] = useState(20); // Default to 20 rows per page
 
     // Errors
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -749,7 +749,7 @@ export default function OrderRecordsPage() {
                     <PrimaryTable
                         columns={columns}
                         rows={tableRows}
-                        pageSizeOptions={[5, 10, 20, 50]}
+                        pageSizeOptions={[10, 20, 50, 100]}
                         pagination
                         paginationModel={{
                             page: pagination.currentPage - 1, // DataGrid uses 0-based indexing

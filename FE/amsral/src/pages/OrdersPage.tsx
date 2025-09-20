@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Modal, Box, Menu, MenuItem, IconButton } from '@mui/material';
-import { MoreVert, Print, Inventory } from '@mui/icons-material';
+import { Modal, Box, Menu, MenuItem, IconButton, Fab, Tooltip } from '@mui/material';
+import { MoreVert, Print, Inventory, PrintOutlined, PrintDisabled } from '@mui/icons-material';
 import type { GridColDef, GridRowParams } from '@mui/x-data-grid';
 import PrimaryButton from '../components/common/PrimaryButton';
 import PrimaryTable from '../components/common/PrimaryTable';
@@ -113,11 +113,11 @@ export default function OrdersPage() {
     currentPage: 1,
     totalPages: 1,
     totalItems: 0,
-    itemsPerPage: 10,
+    itemsPerPage: 20, // Match default pageSize
     hasNextPage: false,
     hasPrevPage: false
   });
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(20); // Default to 20 rows per page
   const [currentPage, setCurrentPage] = useState(1);
 
   // Fetch orders from API
@@ -797,24 +797,6 @@ export default function OrdersPage() {
             />
           </div>
           <div className="flex items-center gap-4">
-            {/* Printer Status */}
-            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
-              <div className="flex items-center gap-2">
-                <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                <span className="text-sm font-medium text-gray-700">
-                  {isConnected ? 'Printer Connected' : 'Printer Disconnected'}
-                </span>
-              </div>
-              {!isConnected && (
-                <PrimaryButton
-                  onClick={connect}
-                  disabled={isConnecting}
-                  style={{ minWidth: 120, fontSize: '12px', padding: '6px 12px' }}
-                >
-                  {isConnecting ? 'Connecting...' : 'Connect'}
-                </PrimaryButton>
-              )}
-            </div>
             <div className="w-full sm:w-auto mt-1 sm:mt-0">
               <PrimaryButton style={{ minWidth: 140, width: '100%' }} onClick={() => handleOpen()}>
                 + Add Order
@@ -849,7 +831,7 @@ export default function OrdersPage() {
         <PrimaryTable
           columns={columns}
           rows={rows}
-          pageSizeOptions={[5, 10, 20, 50]}
+          pageSizeOptions={[10, 20, 50, 100]}
           pagination
           paginationMode="server"
           paginationModel={{
@@ -1097,6 +1079,30 @@ export default function OrdersPage() {
           </div>
         </Box>
       </Modal>
+
+      {/* Floating Printer Status Button */}
+      <Tooltip title={isConnected ? 'Printer Connected' : 'Printer Disconnected'} arrow>
+        <Fab
+          color={isConnected ? 'success' : 'error'}
+          aria-label="printer status"
+          onClick={!isConnected ? connect : undefined}
+          disabled={isConnecting}
+          sx={{
+            position: 'fixed',
+            bottom: 24,
+            right: 24,
+            zIndex: 1000,
+            width: 56,
+            height: 56,
+            '&:hover': {
+              transform: 'scale(1.1)',
+              transition: 'transform 0.2s ease-in-out',
+            },
+          }}
+        >
+          {isConnected ? <PrintOutlined /> : <PrintDisabled />}
+        </Fab>
+      </Tooltip>
     </div>
   );
 }

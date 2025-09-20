@@ -459,7 +459,7 @@ export default function OrderDetailsPage() {
                             columns={recordsColumns}
                             rows={records}
                             loading={loading}
-                            pageSizeOptions={[5, 10, 20]}
+                            pageSizeOptions={[10, 20, 50, 100]}
                             pagination
                             getRowClassName={(params) =>
                                 params.row.complete ? 'opacity-75' : ''

@@ -220,6 +220,16 @@ export interface ErrorResponse {
   errors?: { [key: string]: string };
 }
 
+// Invoice Preview Data
+export interface InvoicePreviewData {
+  customerId: number;
+  customerCode: string;
+  customerName: string;
+  currentIncrement: number;
+  nextIncrement: number;
+  nextInvoiceNo: string;
+}
+
 // Order Summary for Gatepass
 export interface OrderSummaryRecord {
   id: number;
@@ -236,6 +246,7 @@ export interface OrderSummaryRecord {
 
 export interface OrderSummaryData {
   id: number;
+  customerId: number; // Customer ID for invoice number generation
   customerName: string;
   orderDate: string;
   totalQuantity: number;
@@ -475,6 +486,20 @@ class OrderService {
     } catch (error: unknown) {
       const apiError = error as { response?: { data?: ErrorResponse } };
       throw apiError.response?.data || { success: false, message: 'Failed to fetch order summary' };
+    }
+  }
+
+  /**
+   * Get invoice preview data for a customer
+   * GET /api/orders/invoice-preview/:customerId
+   */
+  async getInvoicePreview(customerId: number): Promise<{ success: boolean; data: InvoicePreviewData }> {
+    try {
+      const response = await apiClient.get(`/orders/invoice-preview/${customerId}`);
+      return response.data;
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: ErrorResponse } };
+      throw apiError.response?.data || { success: false, message: 'Failed to fetch invoice preview' };
     }
   }
 }

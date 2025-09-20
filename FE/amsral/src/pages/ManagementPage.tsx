@@ -31,11 +31,11 @@ export default function ManagementPage() {
         currentPage: 1,
         totalPages: 1,
         totalItems: 0,
-        itemsPerPage: 10,
+        itemsPerPage: 20, // Match default pageSize
         hasNextPage: false,
         hasPrevPage: false
     });
-    const [pageSize, setPageSize] = useState(10);
+    const [pageSize, setPageSize] = useState(20); // Default to 20 rows per page
     const [currentPage, setCurrentPage] = useState(1);
 
     // Table columns
@@ -288,7 +288,7 @@ export default function ManagementPage() {
                     rows={orders}
                     loading={loading}
                     onRowClick={handleRowClick}
-                    pageSizeOptions={[5, 10, 20, 50]}
+                    pageSizeOptions={[10, 20, 50, 100]}
                     pagination
                     paginationMode="server"
                     paginationModel={{
@@ -296,7 +296,7 @@ export default function ManagementPage() {
                         pageSize: pageSize
                     }}
                     rowCount={pagination.totalItems}
-                    height={window.innerWidth < 768 ? 400 : 600} // Responsive height
+                    height="auto" // Dynamic height based on rows
                     onPaginationModelChange={(model) => {
                         // Handle page size change
                         if (model.pageSize !== pageSize) {
