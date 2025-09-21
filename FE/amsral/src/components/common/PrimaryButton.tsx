@@ -9,12 +9,14 @@ interface PrimaryButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonE
     startIcon?: React.ReactNode;
     endIcon?: React.ReactNode;
     fullWidth?: boolean;
+    sx?: React.CSSProperties;
 }
 
 const PrimaryButton: React.FC<PrimaryButtonProps> = ({
     children,
     className = "",
     style,
+    sx,
     loading = false,
     disabled,
     startIcon,
@@ -30,6 +32,7 @@ const PrimaryButton: React.FC<PrimaryButtonProps> = ({
                 color: colors.button.text,
                 opacity: loading ? 0.7 : 1,
                 ...style,
+                ...sx,
             }}
             onMouseEnter={e => !loading && (e.currentTarget.style.backgroundColor = colors.button.primaryHover)}
             onMouseLeave={e => !loading && (e.currentTarget.style.backgroundColor = colors.button.primary)}

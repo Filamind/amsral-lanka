@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Box, Typography, Card, CardContent, TextField, Button, Alert, CircularProgress, InputAdornment, IconButton, Tabs, Tab, Paper, Avatar, Chip } from '@mui/material';
-import { Person, Lock, Edit, Visibility, VisibilityOff, AccountCircle, Security, PersonPin } from '@mui/icons-material';
+import { Box, Typography, Card, CardContent, TextField, Alert, CircularProgress, InputAdornment, IconButton, Tabs, Tab, Paper, Avatar, Chip } from '@mui/material';
+import { Person, Visibility, VisibilityOff, AccountCircle, Security, PersonPin } from '@mui/icons-material';
 import PrimaryButton from '../components/common/PrimaryButton';
 import ConfirmationDialog from '../components/common/ConfirmationDialog';
 import colors from '../styles/colors';
@@ -57,11 +57,11 @@ export default function ProfilePage() {
             setProfileForm({
                 firstName: user.firstName || '',
                 lastName: user.lastName || '',
-                phone: user.phone || '',
-                dateOfBirth: user.dateOfBirth || '',
+                phone: (user as any).phone || '',
+                dateOfBirth: (user as any).dateOfBirth || '',
             });
             setUsernameForm({
-                newUsername: user.username || '',
+                newUsername: (user as any).username || '',
             });
         }
     }, [user]);
@@ -137,7 +137,18 @@ export default function ProfilePage() {
             };
 
             const updatedUser = await UserService.updateProfile(user.id, profileData);
-            updateUser(updatedUser);
+            // Convert userService User to authService User format
+            const authUser = {
+                id: updatedUser.id!,
+                email: updatedUser.email,
+                firstName: updatedUser.firstName,
+                lastName: updatedUser.lastName,
+                role: updatedUser.role.name,
+                phone: updatedUser.phone,
+                dateOfBirth: updatedUser.dateOfBirth,
+                username: updatedUser.username,
+            };
+            updateUser(authUser);
             toast.success('Profile updated successfully!');
         } catch (error: any) {
             console.error('Error updating profile:', error);
@@ -207,7 +218,18 @@ export default function ProfilePage() {
                     };
 
                     const updatedUser = await UserService.changeUsername(user.id, usernameData);
-                    updateUser(updatedUser);
+                    // Convert userService User to authService User format
+                    const authUser = {
+                        id: updatedUser.id!,
+                        email: updatedUser.email,
+                        firstName: updatedUser.firstName,
+                        lastName: updatedUser.lastName,
+                        role: updatedUser.role.name,
+                        phone: updatedUser.phone,
+                        dateOfBirth: updatedUser.dateOfBirth,
+                        username: updatedUser.username,
+                    };
+                    updateUser(authUser);
                     toast.success('Username changed successfully!');
                 } catch (error: any) {
                     console.error('Error changing username:', error);
@@ -298,10 +320,10 @@ export default function ProfilePage() {
                                     mb: 1
                                 }}
                             >
-                                @{user?.username}
+                                @{(user as any)?.username}
                             </Typography>
                             <Chip
-                                label={user?.role?.name || user?.role || 'User'}
+                                label={typeof user?.role === 'object' ? user.role.name : user?.role || 'User'}
                                 sx={{
                                     background: colors.primary[100],
                                     color: colors.primary[700],

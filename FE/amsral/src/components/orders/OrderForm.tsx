@@ -2,8 +2,6 @@ import React from 'react';
 import { Box, Typography } from '@mui/material';
 import PrimaryDropdown from '../common/PrimaryDropdown';
 import PrimaryNumberInput from '../common/PrimaryNumberInput';
-import FormGrid from './FormGrid';
-import FormField from './FormField';
 import colors from '../../styles/colors';
 
 interface OrderFormProps {

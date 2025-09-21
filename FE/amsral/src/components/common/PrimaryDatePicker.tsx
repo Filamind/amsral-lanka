@@ -1,7 +1,7 @@
 import React from 'react';
 import colors from '../../styles/colors';
 
-interface PrimaryDatePickerProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange'> {
+interface PrimaryDatePickerProps extends Omit<Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'size'>, 'value'> {
     value?: string;
     onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
     label?: string;
@@ -26,7 +26,6 @@ const PrimaryDatePicker: React.FC<PrimaryDatePickerProps> = ({
     disabled = false,
     required = false,
     className = '',
-    fullWidth = true,
     size = 'medium',
     name,
     style,

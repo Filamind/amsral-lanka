@@ -10,7 +10,7 @@ import {
     Legend
 } from 'recharts';
 import { Box, Typography, CircularProgress, Paper } from '@mui/material';
-import { TrendingUp, AttachMoney } from '@mui/icons-material';
+import { TrendingUp } from '@mui/icons-material';
 import colors from '../../styles/colors';
 import type { IncomeByPeriod } from '../../services/incomeService';
 
@@ -79,7 +79,7 @@ const IncomeTrendsChart: React.FC<IncomeTrendsChartProps> = ({ data, loading = f
                         />
                         <Tooltip
                             contentStyle={{
-                                backgroundColor: colors.background.paper,
+                                backgroundColor: colors.background.card,
                                 border: `1px solid ${colors.border.light}`,
                                 borderRadius: 8,
                                 boxShadow: '0 4px 12px rgba(0,0,0,0.1)'

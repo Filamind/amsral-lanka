@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 import { useState, useEffect, useCallback } from 'react';
 import { Box, Typography, CircularProgress, Alert } from '@mui/material';
@@ -7,8 +8,7 @@ import {
   Pending,
   AttachMoney,
   AccountBalance,
-  Warning,
-  TrendingUp
+  Warning
 } from '@mui/icons-material';
 import { useAuth } from '../hooks/useAuth';
 import { hasPermission } from '../utils/roleUtils';
@@ -76,7 +76,7 @@ export default function DashboardPage() {
 
   // Income-related state
   const [incomeSummary, setIncomeSummary] = useState<IncomeSummaryData | null>(null);
-  const [incomeTrends, setIncomeTrends] = useState<IncomeByPeriod[]>([]);
+  const [, setIncomeTrends] = useState<IncomeByPeriod[]>([]);
   const [topCustomers, setTopCustomers] = useState<TopCustomer[]>([]);
 
   const [dateRange, setDateRange] = useState<DateRange>({
@@ -109,7 +109,7 @@ export default function DashboardPage() {
         DashboardService.getOrdersTrend(filters),
         DashboardService.getOrderStatusDistribution(filters),
         DashboardService.getRecentOrders(10),
-        IncomeService.getIncomeAnalytics(filters),
+        IncomeService.getIncomeSummaryWithFilters(filters),
         IncomeService.getIncomeTrends({
           startDate: filters.startDate,
           endDate: filters.endDate,
@@ -154,13 +154,7 @@ export default function DashboardPage() {
 
       // Handle income summary
       if (incomeSummaryData.status === 'fulfilled') {
-        // Convert IncomeAnalytics to IncomeSummaryData format
-        const analyticsData = incomeSummaryData.value;
-        const summaryData: IncomeSummaryData = {
-          period: analyticsData.period,
-          summary: analyticsData.summary
-        };
-        setIncomeSummary(summaryData);
+        setIncomeSummary(incomeSummaryData.value);
       } else {
         console.error('Error fetching income summary:', incomeSummaryData.reason);
       }

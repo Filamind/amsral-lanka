@@ -1,6 +1,5 @@
-import React from 'react';
 import { Box, Typography, Card, CardContent } from '@mui/material';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import colors from '../../styles/colors';
 
 // Local type definitions to avoid import issues
@@ -136,17 +135,17 @@ export function OrderStatusPieChart({ data, loading = false }: OrderStatusPieCha
                                 cx="50%"
                                 cy="50%"
                                 labelLine={false}
-                                label={({ name, percentage }) => `${name} (${percentage}%)`}
+                                label={({ name, value }) => `${name} (${value})`}
                                 outerRadius={80}
                                 fill="#8884d8"
                                 dataKey="count"
                             >
-                                {data.map((entry, index) => (
+                                {data.map((_, index) => (
                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                 ))}
                             </Pie>
                             <Tooltip
-                                formatter={(value: any, name: string) => [`${value} orders`, 'Count']}
+                                formatter={(value: any) => [`${value} orders`, 'Count']}
                                 contentStyle={{
                                     backgroundColor: 'white',
                                     border: `1px solid ${colors.border.light}`,

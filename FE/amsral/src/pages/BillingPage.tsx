@@ -474,14 +474,6 @@ const BillingPage: React.FC = () => {
                 open={invoiceModalOpen}
                 onClose={() => setInvoiceModalOpen(false)}
                 selectedOrderIds={selectedOrders}
-                orders={orders.filter(order => selectedOrders.includes(order.id)).map(order => ({
-                    id: order.id,
-                    referenceNo: order.id.toString(), // Use order ID as reference number
-                    customerName: order.customerName,
-                    date: order.date,
-                    quantity: order.quantity,
-                    status: order.status
-                }))}
                 onInvoiceCreated={handleInvoiceCreated}
             />
         </div>

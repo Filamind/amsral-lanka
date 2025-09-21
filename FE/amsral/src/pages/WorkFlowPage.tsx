@@ -135,73 +135,73 @@ export default function WorkFlowPage() {
     const [processTypeOptions, setProcessTypeOptions] = useState<{ value: string; label: string }[]>([]);
 
     // Fetch production records
-    const fetchProductionRecords = useCallback(async () => {
-        try {
-            setLoading(true);
-            const response = await orderService.getAllProductionRecords({
-                page: currentPage,
-                limit: pageSize,
-                search: recordsSearch || undefined
-            });
+    // const fetchProductionRecords = useCallback(async () => {
+    //     try {
+    //         setLoading(true);
+    //         const response = await orderService.getAllProductionRecords({
+    //             page: currentPage,
+    //             limit: pageSize,
+    //             search: recordsSearch || undefined
+    //         });
 
-            if (response.success) {
-                // Transform records into production records
-                const productionRecords: ProcessRecord[] = [];
+    //         if (response.success) {
+    //             // Transform records into production records
+    //             const productionRecords: ProcessRecord[] = [];
 
-                // The /orders/records endpoint returns records directly
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const records = (response.data as any).records || [];
+    //             // The /orders/records endpoint returns records directly
+    //             // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    //             const records = (response.data as any).records || [];
 
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                records.forEach((record: any) => {
-                    // Find item name
-                    const itemName = itemOptions.find(item => item.value === record.itemId)?.label || 'Unknown Item';
+    //             // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    //             records.forEach((record: any) => {
+    //                 // Find item name
+    //                 const itemName = itemOptions.find(item => item.value === record.itemId)?.label || 'Unknown Item';
 
-                    // Find wash type name
-                    const washTypeName = washTypeOptions.find(wash => wash.value === record.washType)?.label || record.washType;
+    //                 // Find wash type name
+    //                 const washTypeName = washTypeOptions.find(wash => wash.value === record.washType)?.label || record.washType;
 
-                    // Find process type names
-                    const processTypeNames = record.processTypes.map((pt: string) =>
-                        processTypeOptions.find(p => p.value === pt)?.label || pt
-                    );
+    //                 // Find process type names
+    //                 const processTypeNames = record.processTypes.map((pt: string) =>
+    //                     processTypeOptions.find(p => p.value === pt)?.label || pt
+    //                 );
 
-                    productionRecords.push({
-                        id: record.id.toString(),
-                        orderId: record.orderId,
-                        orderRef: `${record.orderId}`,
-                        trackingNumber: record.trackingNumber || 'N/A', // Include tracking number from API
-                        customerName: record.customerName || 'Unknown Customer',
-                        item: itemName,
-                        itemId: record.itemId,
-                        quantity: record.quantity,
-                        remainingQuantity: record.remainingQuantity || 0,
-                        washType: washTypeName,
-                        processTypes: processTypeNames,
-                        status: 'pending',
-                        createdAt: record.createdAt ? new Date(record.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-                        complete: record.complete || false
-                    });
-                });
+    //                 productionRecords.push({
+    //                     id: record.id.toString(),
+    //                     orderId: record.orderId,
+    //                     orderRef: `${record.orderId}`,
+    //                     trackingNumber: record.trackingNumber || 'N/A', // Include tracking number from API
+    //                     customerName: record.customerName || 'Unknown Customer',
+    //                     item: itemName,
+    //                     itemId: record.itemId,
+    //                     quantity: record.quantity,
+    //                     remainingQuantity: record.remainingQuantity || 0,
+    //                     washType: washTypeName,
+    //                     processTypes: processTypeNames,
+    //                     status: 'pending',
+    //                     createdAt: record.createdAt ? new Date(record.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+    //                     complete: record.complete || false
+    //                 });
+    //             });
 
-                setRecords(productionRecords);
+    //             setRecords(productionRecords);
 
-                // Update pagination info
-                setPagination({
-                    currentPage: response.data.pagination?.currentPage || 1,
-                    totalPages: response.data.pagination?.totalPages || 1,
-                    totalItems: response.data.pagination?.totalRecords || productionRecords.length,
-                    itemsPerPage: response.data.pagination?.limit || pageSize,
-                    hasNextPage: (response.data.pagination?.currentPage || 1) < (response.data.pagination?.totalPages || 1),
-                    hasPrevPage: (response.data.pagination?.currentPage || 1) > 1
-                });
-            }
-        } catch (error) {
-            console.error('Error fetching production records:', error);
-            toast.error('Failed to fetch production records');
-        } finally {
-            setLoading(false);
-        }
-    }, [itemOptions, washTypeOptions, processTypeOptions, recordsSearch]);
+    //             // Update pagination info
+    //             setPagination({
+    //                 currentPage: response.data.pagination?.currentPage || 1,
+    //                 totalPages: response.data.pagination?.totalPages || 1,
+    //                 totalItems: response.data.pagination?.totalRecords || productionRecords.length,
+    //                 itemsPerPage: response.data.pagination?.limit || pageSize,
+    //                 hasNextPage: (response.data.pagination?.currentPage || 1) < (response.data.pagination?.totalPages || 1),
+    //                 hasPrevPage: (response.data.pagination?.currentPage || 1) > 1
+    //             });
+    //         }
+    //     } catch (error) {
+    //         console.error('Error fetching production records:', error);
+    //         toast.error('Failed to fetch production records');
+    //     } finally {
+    //         setLoading(false);
+    //     }
+    // }, [itemOptions, washTypeOptions, processTypeOptions, recordsSearch]);
 
     // Fetch dropdown options
     const fetchDropdownOptions = useCallback(async () => {

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Box, Typography, Card, CardContent } from '@mui/material';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import colors from '../../styles/colors';

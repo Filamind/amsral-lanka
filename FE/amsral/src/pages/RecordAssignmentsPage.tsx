@@ -28,7 +28,7 @@ export default function RecordAssignmentsPage() {
     const { recordId } = useParams<{ recordId: string }>();
     const navigate = useNavigate();
     const { user } = useAuth();
-    const { isConnected, isConnecting, printStatus, connect } = usePrinter();
+    const { isConnected, isConnecting, connect } = usePrinter();
     const [record, setRecord] = useState<ProcessRecord | null>(null);
     const [assignments, setAssignments] = useState<MachineAssignment[]>([]);
     const [loading, setLoading] = useState(true);
