@@ -472,6 +472,64 @@ const PrinterTestPage: React.FC = () => {
                                 >
                                     Clear Ports
                                 </Button>
+                                <Button
+                                    onClick={async () => {
+                                        try {
+                                            setPrintStatus('Checking printer availability...');
+                                            const availability = await printerService.checkPrinterAvailability(5000);
+                                            if (availability.available) {
+                                                setPrintStatus('✅ Printer is available and responding');
+                                            } else {
+                                                setPrintStatus(`❌ Printer not available: ${availability.error}`);
+                                            }
+                                        } catch (error) {
+                                            setPrintStatus(`❌ Availability check failed: ${error}`);
+                                        }
+                                    }}
+                                    variant="outlined"
+                                    size="small"
+                                    color="success"
+                                >
+                                    Check Availability
+                                </Button>
+                                <Button
+                                    onClick={async () => {
+                                        try {
+                                            setPrintStatus('Getting printer health status...');
+                                            const health = await printerService.getPrinterHealthStatus();
+                                            setPrintStatus(`Health: Connected=${health.connected}, Available=${health.available}, Running=${health.healthCheckRunning}, Error=${health.error || 'None'}`);
+                                        } catch (error) {
+                                            setPrintStatus(`❌ Health check failed: ${error}`);
+                                        }
+                                    }}
+                                    variant="outlined"
+                                    size="small"
+                                    color="info"
+                                >
+                                    Health Status
+                                </Button>
+                                <Button
+                                    onClick={() => {
+                                        printerService.startHealthMonitoring();
+                                        setPrintStatus('🏥 Health monitoring started');
+                                    }}
+                                    variant="outlined"
+                                    size="small"
+                                    color="primary"
+                                >
+                                    Start Monitoring
+                                </Button>
+                                <Button
+                                    onClick={() => {
+                                        printerService.stopHealthMonitoring();
+                                        setPrintStatus('🏥 Health monitoring stopped');
+                                    }}
+                                    variant="outlined"
+                                    size="small"
+                                    color="secondary"
+                                >
+                                    Stop Monitoring
+                                </Button>
                             </Box>
                         </Box>
                     )}

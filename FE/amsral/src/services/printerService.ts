@@ -80,6 +80,9 @@ class PrinterService {
   private writer: WritableStreamDefaultWriter<Uint8Array> | null = null;
   private readonly STORAGE_KEY = 'printer_connection_state';
   private readonly PORT_INDEX_KEY = 'printer_port_index';
+  private healthCheckInterval: number | null = null;
+  private readonly HEALTH_CHECK_INTERVAL = 30000; // 30 seconds
+  private isHealthCheckRunning = false;
 
   /**
    * Save connection state to localStorage
@@ -192,8 +195,8 @@ class PrinterService {
       return false;
     }
     
-    // Check if the state is recent (within last 24 hours)
-    const isRecent = state.timestamp ? (Date.now() - state.timestamp) < 24 * 60 * 60 * 1000 : false;
+    // Check if the state is recent (within last 2 hours for better reliability)
+    const isRecent = state.timestamp ? (Date.now() - state.timestamp) < 2 * 60 * 60 * 1000 : false;
     const hasStoredConnection = state.connected && isRecent;
     
     // Check if we're actually connected right now
@@ -211,6 +214,48 @@ class PrinterService {
     // For auto-reconnect, we only need a recent stored connection
     // The actual connection check will be done during the reconnect attempt
     return hasStoredConnection;
+  }
+
+  /**
+   * Validate localStorage connection state and check if printer is actually available
+   */
+  async validateStoredConnection(): Promise<{ valid: boolean; available: boolean; error?: string }> {
+    const state = this.loadConnectionState();
+    
+    if (!state) {
+      return { valid: false, available: false, error: 'No stored connection state' };
+    }
+
+    // Check if stored state is too old (more than 2 hours)
+    const isRecent = state.timestamp ? (Date.now() - state.timestamp) < 2 * 60 * 60 * 1000 : false;
+    if (!isRecent) {
+      console.log('❌ Stored connection state is too old, clearing...');
+      this.clearConnectionState();
+      return { valid: false, available: false, error: 'Stored connection state is too old' };
+    }
+
+    // Check if we have basic connection
+    if (!this.isConnected()) {
+      console.log('❌ Basic connection check failed');
+      return { valid: false, available: false, error: 'Basic connection check failed' };
+    }
+
+    // Test if printer is actually available and responding
+    try {
+      const availability = await this.checkPrinterAvailability(5000); // 5 second timeout
+      if (!availability.available) {
+        console.log('❌ Printer is not available:', availability.error);
+        this.clearConnectionState();
+        return { valid: false, available: false, error: availability.error };
+      }
+
+      console.log('✅ Stored connection is valid and printer is available');
+      return { valid: true, available: true };
+    } catch (error) {
+      console.log('❌ Printer availability check failed:', error);
+      this.clearConnectionState();
+      return { valid: false, available: false, error: `Availability check failed: ${error}` };
+    }
   }
 
   /**
@@ -609,6 +654,9 @@ class PrinterService {
    */
   async disconnect(): Promise<void> {
     try {
+      // Stop health monitoring
+      this.stopHealthMonitoring();
+      
       if (this.writer) {
         await this.writer.close();
         this.writer = null;
@@ -1204,7 +1252,7 @@ class PrinterService {
   }
 
   /**
-   * Check if printer is connected
+   * Check if printer is connected (basic check only)
    */
   isConnected(): boolean {
     // Basic checks
@@ -1236,6 +1284,174 @@ class PrinterService {
       console.log('❌ Connection check failed:', error);
       return false;
     }
+  }
+
+  /**
+   * Check if printer is actually available and responding (comprehensive check)
+   */
+  async isPrinterAvailable(): Promise<boolean> {
+    // First do basic connection check
+    if (!this.isConnected()) {
+      console.log('❌ Basic connection check failed');
+      return false;
+    }
+
+    try {
+      // Test actual communication with the printer
+      console.log('🔍 Testing printer availability...');
+      
+      // Send a simple initialization command to test if printer responds
+      await this.sendCommand(new Uint8Array([0x1B, 0x40])); // ESC @
+      
+      // Add a small delay to allow for any potential response
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      console.log('✅ Printer is available and responding');
+      return true;
+    } catch (error) {
+      console.log('❌ Printer availability test failed:', error);
+      
+      // If communication fails, mark as disconnected
+      this.port = null;
+      this.writer = null;
+      this.clearConnectionState();
+      
+      return false;
+    }
+  }
+
+  /**
+   * Check printer availability with timeout
+   */
+  async checkPrinterAvailability(timeoutMs: number = 3000): Promise<{ available: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        resolve({ available: false, error: 'Printer availability check timed out' });
+      }, timeoutMs);
+
+      this.isPrinterAvailable()
+        .then((isAvailable) => {
+          clearTimeout(timeout);
+          resolve({ available: isAvailable });
+        })
+        .catch((error) => {
+          clearTimeout(timeout);
+          resolve({ 
+            available: false, 
+            error: `Printer availability check failed: ${error}` 
+          });
+        });
+    });
+  }
+
+  /**
+   * Start printer health monitoring
+   */
+  startHealthMonitoring(): void {
+    if (this.healthCheckInterval) {
+      console.log('Health monitoring already running');
+      return;
+    }
+
+    console.log('🏥 Starting printer health monitoring...');
+    this.healthCheckInterval = setInterval(async () => {
+      await this.performHealthCheck();
+    }, this.HEALTH_CHECK_INTERVAL);
+  }
+
+  /**
+   * Stop printer health monitoring
+   */
+  stopHealthMonitoring(): void {
+    if (this.healthCheckInterval) {
+      console.log('🏥 Stopping printer health monitoring...');
+      clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = null;
+    }
+  }
+
+  /**
+   * Perform health check on the printer
+   */
+  private async performHealthCheck(): Promise<void> {
+    if (this.isHealthCheckRunning) {
+      console.log('Health check already running, skipping...');
+      return;
+    }
+
+    this.isHealthCheckRunning = true;
+
+    try {
+      console.log('🔍 Performing printer health check...');
+      
+      // Only check if we think we're connected
+      if (!this.isConnected()) {
+        console.log('❌ Health check: Not connected, skipping');
+        return;
+      }
+
+      // Test printer availability
+      const availability = await this.checkPrinterAvailability(5000);
+      
+      if (!availability.available) {
+        console.log('❌ Health check failed: Printer not available');
+        console.log('🔄 Attempting automatic reconnection...');
+        
+        // Try to reconnect automatically
+        try {
+          const reconnectResult = await this.quickReconnect();
+          if (reconnectResult.connected) {
+            console.log('✅ Automatic reconnection successful');
+          } else {
+            console.log('❌ Automatic reconnection failed:', reconnectResult.error);
+            // Clear stale connection state
+            this.clearConnectionState();
+          }
+        } catch (error) {
+          console.log('❌ Automatic reconnection error:', error);
+          this.clearConnectionState();
+        }
+      } else {
+        console.log('✅ Health check passed: Printer is available');
+      }
+    } catch (error) {
+      console.log('❌ Health check error:', error);
+    } finally {
+      this.isHealthCheckRunning = false;
+    }
+  }
+
+  /**
+   * Get printer health status
+   */
+  async getPrinterHealthStatus(): Promise<{
+    connected: boolean;
+    available: boolean;
+    lastCheck: number;
+    healthCheckRunning: boolean;
+    error?: string;
+  }> {
+    const connected = this.isConnected();
+    let available = false;
+    let error: string | undefined;
+
+    if (connected) {
+      try {
+        const availability = await this.checkPrinterAvailability(3000);
+        available = availability.available;
+        error = availability.error;
+      } catch (e) {
+        error = `Health check failed: ${e}`;
+      }
+    }
+
+    return {
+      connected,
+      available,
+      lastCheck: Date.now(),
+      healthCheckRunning: this.isHealthCheckRunning,
+      error
+    };
   }
 
   /**

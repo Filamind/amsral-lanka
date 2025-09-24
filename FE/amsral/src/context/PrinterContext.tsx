@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import printerService from '../services/printerService';
 import toast from 'react-hot-toast';
@@ -12,6 +13,10 @@ interface PrinterContextType {
     quickReconnect: () => Promise<void>;
     retryConnection: () => Promise<void>;
     testPrint: () => Promise<void>;
+    checkPrinterAvailability: () => Promise<boolean>;
+    getPrinterHealthStatus: () => Promise<any>;
+    startHealthMonitoring: () => void;
+    stopHealthMonitoring: () => void;
 }
 
 const PrinterContext = createContext<PrinterContextType | undefined>(undefined);
@@ -33,10 +38,26 @@ export const PrinterProvider: React.FC<PrinterProviderProps> = ({ children }) =>
     const [isConnecting, setIsConnecting] = useState(false);
     const [printStatus, setPrintStatus] = useState('Ready to print');
 
-    // Check printer status
-    const checkPrinterStatus = () => {
+    // Check printer status with availability verification
+    const checkPrinterStatus = async () => {
         const connected = printerService.isConnected();
         setIsConnected(connected);
+
+        // If we think we're connected, verify the printer is actually available
+        if (connected) {
+            try {
+                const availability = await printerService.checkPrinterAvailability(3000);
+                if (!availability.available) {
+                    console.log('❌ Printer connection lost, updating status');
+                    setIsConnected(false);
+                    setPrintStatus(`Printer disconnected: ${availability.error || 'Unknown error'}`);
+                }
+            } catch (error) {
+                console.log('❌ Printer availability check failed:', error);
+                setIsConnected(false);
+                setPrintStatus('Printer connection lost');
+            }
+        }
     };
 
     // Enhanced auto-reconnect with retry mechanism
@@ -177,14 +198,22 @@ export const PrinterProvider: React.FC<PrinterProviderProps> = ({ children }) =>
         console.log('⏰ Setting up auto-connect with 500ms delay');
         const timeoutId = setTimeout(autoConnect, 500);
 
-        // Check status every 10 seconds (increased from 5 for better performance)
+        // Start health monitoring if we have a persistent connection
+        if (printerService.hasPersistentConnection()) {
+            console.log('🏥 Starting health monitoring for persistent connection');
+            printerService.startHealthMonitoring();
+        }
+
+        // Check status every 30 seconds (reduced frequency since we have health monitoring)
         const interval = setInterval(() => {
             checkPrinterStatus();
-        }, 10000);
+        }, 30000);
 
         return () => {
             clearTimeout(timeoutId);
             clearInterval(interval);
+            // Stop health monitoring on cleanup
+            printerService.stopHealthMonitoring();
         };
     }, []);
 
@@ -207,6 +236,11 @@ export const PrinterProvider: React.FC<PrinterProviderProps> = ({ children }) =>
                     setIsConnected(true);
                     setPrintStatus('Printer connected successfully!');
                     toast.success('Printer connected!');
+
+                    // Start health monitoring for the connected printer
+                    console.log('🏥 Starting health monitoring for connected printer');
+                    printerService.startHealthMonitoring();
+
                     setTimeout(() => setPrintStatus('Ready to print'), 3000);
                 } else {
                     console.log('❌ Printer connected but not responding');
@@ -315,6 +349,29 @@ export const PrinterProvider: React.FC<PrinterProviderProps> = ({ children }) =>
         }
     };
 
+    // New methods for printer availability checking
+    const checkPrinterAvailability = async (): Promise<boolean> => {
+        try {
+            const availability = await printerService.checkPrinterAvailability(5000);
+            return availability.available;
+        } catch (error) {
+            console.error('Printer availability check failed:', error);
+            return false;
+        }
+    };
+
+    const getPrinterHealthStatus = async () => {
+        return await printerService.getPrinterHealthStatus();
+    };
+
+    const startHealthMonitoring = () => {
+        printerService.startHealthMonitoring();
+    };
+
+    const stopHealthMonitoring = () => {
+        printerService.stopHealthMonitoring();
+    };
+
     const value: PrinterContextType = {
         isConnected,
         isConnecting,
@@ -325,6 +382,10 @@ export const PrinterProvider: React.FC<PrinterProviderProps> = ({ children }) =>
         quickReconnect,
         retryConnection,
         testPrint,
+        checkPrinterAvailability,
+        getPrinterHealthStatus,
+        startHealthMonitoring,
+        stopHealthMonitoring,
     };
 
     return (

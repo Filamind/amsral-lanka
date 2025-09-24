@@ -13,6 +13,7 @@ export type WashType = 'normal' | 'heavy' | 'light' | 'silicon' | 'soft';
 export interface CreateOrderRequest {
   date: string;
   customerId: string;
+  itemId: string;
   quantity: number;
   gpNo?: string;
   notes?: string;
@@ -41,6 +42,7 @@ export interface UpdateOrderRecordRequest {
 export interface UpdateOrderRequest {
   date?: string;
   customerId?: string;
+  itemId?: string;
   quantity?: number;
   notes?: string;
   deliveryDate?: string;
