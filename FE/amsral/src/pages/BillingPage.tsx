@@ -21,6 +21,7 @@ import { BillingService } from '../services/billingService';
 import { getStatusColor, getStatusLabel, normalizeStatus } from '../utils/statusUtils';
 import toast from 'react-hot-toast';
 import InvoiceCreationModal from '../components/modals/InvoiceCreationModal';
+import PaymentStatusModal from '../components/modals/PaymentStatusModal';
 import colors from '../styles/colors';
 
 interface BillingOrder {
@@ -39,6 +40,8 @@ interface BillingOrder {
     createdAt: string;
     updatedAt: string;
     records: unknown[];
+    amount?: number;
+    paymentAmount?: number; // Actual payment amount received (may be less than invoice amount)
 }
 
 const BillingPage: React.FC = () => {
@@ -48,6 +51,10 @@ const BillingPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [selectedOrders, setSelectedOrders] = useState<number[]>([]);
     const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
+    const [paymentModal, setPaymentModal] = useState({
+        open: false,
+        order: null as BillingOrder | null,
+    });
 
     // Filter states
     const [search, setSearch] = useState('');
@@ -219,10 +226,24 @@ const BillingPage: React.FC = () => {
         setInvoiceModalOpen(true);
     };
 
-    // Handle marking order as paid
-    const handleMarkAsPaid = async (orderId: number) => {
+    // Handle opening payment modal
+    const handleOpenPaymentModal = (order: BillingOrder) => {
+        setPaymentModal({
+            open: true,
+            order: order
+        });
+    };
+
+    const handleClosePaymentModal = () => {
+        setPaymentModal({
+            open: false,
+            order: null
+        });
+    };
+
+    const handleUpdatePayment = async (orderId: number, isPaid: boolean, paymentAmount: number) => {
         try {
-            const response = await BillingService.updateOrderBillingStatus(orderId, 'paid' as 'pending' | 'invoiced' | 'paid');
+            const response = await BillingService.updateOrderPaymentStatus(orderId, isPaid, paymentAmount);
             if (response.success) {
                 toast.success('Payment status updated successfully');
                 fetchOrders(); // Refresh the orders list
@@ -232,6 +253,7 @@ const BillingPage: React.FC = () => {
         } catch (error) {
             console.error('Error updating payment status:', error);
             toast.error('Error updating payment status');
+            throw error; // Re-throw to let the modal handle the error
         }
     };
 
@@ -289,6 +311,42 @@ const BillingPage: React.FC = () => {
         },
         { field: 'quantity', headerName: 'Total Qty', flex: 0.8, minWidth: 100, type: 'number' },
         {
+            field: 'amount',
+            headerName: 'Invoice Amount',
+            flex: 1,
+            minWidth: 120,
+            type: 'number',
+            renderCell: (params) => (
+                <span style={{ fontWeight: 500, color: colors.text.primary }}>
+                    ${params.value || 0}
+                </span>
+            )
+        },
+        {
+            field: 'paymentAmount',
+            headerName: 'Payment Amount',
+            flex: 1,
+            minWidth: 120,
+            type: 'number',
+            renderCell: (params) => {
+                const paymentAmount = params.value || 0;
+                const invoiceAmount = params.row.amount || 0;
+                const isPartial = paymentAmount > 0 && paymentAmount < invoiceAmount;
+                const isOverpaid = paymentAmount > invoiceAmount;
+
+                return (
+                    <span style={{
+                        fontWeight: 500,
+                        color: isPartial ? colors.warning.main || '#f57c00' :
+                            isOverpaid ? colors.info.main || '#17a2b8' :
+                                colors.text.primary
+                    }}>
+                        ${paymentAmount}
+                    </span>
+                );
+            }
+        },
+        {
             field: 'billingStatus',
             headerName: 'Billing Status',
             flex: 1,
@@ -317,10 +375,10 @@ const BillingPage: React.FC = () => {
             renderCell: (params) => {
                 if (params.row.billingStatus === 'invoiced') {
                     return (
-                        <Tooltip title="Mark Payment Received">
+                        <Tooltip title="Update Payment Status">
                             <IconButton
                                 size="small"
-                                onClick={() => handleMarkAsPaid(params.row.id)}
+                                onClick={() => handleOpenPaymentModal(params.row)}
                                 sx={{ color: colors.success }}
                             >
                                 <CheckIcon />
@@ -329,9 +387,15 @@ const BillingPage: React.FC = () => {
                     );
                 } else if (params.row.billingStatus === 'paid') {
                     return (
-                        <span className="px-3 py-1 rounded-xl text-sm font-semibold bg-green-100 text-green-800">
-                            PAYMENT RECEIVED
-                        </span>
+                        <Tooltip title="Update Payment Status">
+                            <IconButton
+                                size="small"
+                                onClick={() => handleOpenPaymentModal(params.row)}
+                                sx={{ color: colors.button.primary }}
+                            >
+                                <CheckIcon />
+                            </IconButton>
+                        </Tooltip>
                     );
                 } else {
                     return (
@@ -475,6 +539,15 @@ const BillingPage: React.FC = () => {
                 onClose={() => setInvoiceModalOpen(false)}
                 selectedOrderIds={selectedOrders}
                 onInvoiceCreated={handleInvoiceCreated}
+            />
+
+            {/* Payment Status Modal */}
+            <PaymentStatusModal
+                open={paymentModal.open}
+                onClose={handleClosePaymentModal}
+                order={paymentModal.order}
+                onUpdate={handleUpdatePayment}
+                loading={loading}
             />
         </div>
     );

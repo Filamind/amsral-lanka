@@ -23,7 +23,6 @@ export interface CreateOrderRequest {
 
 export interface CreateOrderRecordRequest {
   orderId?: number; // Optional, can be included in request body if needed
-  itemId: string;
   quantity: number;
   washType: WashType;
   processTypes: ProcessType[];
@@ -32,7 +31,6 @@ export interface CreateOrderRecordRequest {
 
 export interface UpdateOrderRecordRequest {
   orderId?: number; // Optional, can be included in request body if needed
-  itemId: string;
   quantity: number;
   washType: WashType;
   processTypes: ProcessType[];

@@ -34,6 +34,7 @@ export interface MachineAssignment {
   dryingMachine: string;
   assignedAt: string;
   status: string;
+  returnQuantity?: number; // Actual quantity returned (may be less than assigned due to damage)
   createdAt: string;
   updatedAt: string;
 }
@@ -162,9 +163,11 @@ class RecordService {
   }
 
   // Complete assignment
-  async completeAssignment(recordId: string, assignmentId: string): Promise<MachineAssignment> {
+  async completeAssignment(recordId: string, assignmentId: string, returnQuantity?: number): Promise<MachineAssignment> {
     try {
-      const response = await apiClient.put(`/records/${recordId}/assignments/${assignmentId}/complete`);
+      const response = await apiClient.put(`/records/${recordId}/assignments/${assignmentId}/complete`, {
+        returnQuantity: returnQuantity
+      });
       return response.data.data;
     } catch (error: unknown) {
       const apiError = error as { response?: { data?: { success: false; message: string } } };
@@ -182,6 +185,20 @@ class RecordService {
     } catch (error: unknown) {
       const apiError = error as { response?: { data?: { success: false; message: string } } };
       throw apiError.response?.data || { success: false, message: 'Failed to set assignment to In Progress' };
+    }
+  }
+
+  // Update assignment completion status with return quantity
+  async updateAssignmentCompletion(recordId: string, assignmentId: string, isCompleted: boolean, returnQuantity?: number): Promise<MachineAssignment> {
+    try {
+      const response = await apiClient.put(`/records/${recordId}/assignments/${assignmentId}/completion`, {
+        isCompleted,
+        returnQuantity: returnQuantity
+      });
+      return response.data.data;
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: { success: false; message: string } } };
+      throw apiError.response?.data || { success: false, message: 'Failed to update assignment completion status' };
     }
   }
 

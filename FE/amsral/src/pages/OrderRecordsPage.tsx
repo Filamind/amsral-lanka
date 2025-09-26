@@ -13,7 +13,6 @@ import PrimaryMultiSelect from '../components/common/PrimaryMultiSelect';
 import ConfirmationDialog from '../components/common/ConfirmationDialog';
 import colors from '../styles/colors';
 import { orderService, type Order, type CreateOrderRecordRequest, type UpdateOrderRecordRequest, type ErrorResponse } from '../services/orderService';
-import { itemService } from '../services/itemService';
 import { washingTypeService } from '../services/washingTypeService';
 import { processTypeService } from '../services/processTypeService';
 import { useAuth } from '../hooks/useAuth';
@@ -24,7 +23,6 @@ import toast from 'react-hot-toast';
 interface ProcessRecord {
     id: string;
     orderId?: number;
-    itemId?: string; // Optional since API doesn't always include it
     quantity: number;
     washType: string;
     processTypes: string[];
@@ -61,14 +59,12 @@ export default function OrderRecordsPage() {
     // New record form
     const [newRecord, setNewRecord] = useState<ProcessRecord>({
         id: '',
-        itemId: '',
         quantity: 1,
         washType: '',
         processTypes: [],
     });
 
     // Dropdown options
-    const [itemOptions, setItemOptions] = useState<{ value: string; label: string }[]>([]);
     const [washTypeOptions, setWashTypeOptions] = useState<{ value: string; label: string; name: string; code: string }[]>([]);
     const [processTypeOptions, setProcessTypeOptions] = useState<{ value: string; label: string }[]>([]);
     const [optionsLoading, setOptionsLoading] = useState(true);
@@ -96,7 +92,6 @@ export default function OrderRecordsPage() {
                 // Convert API records to our format
                 const convertedRecords: ProcessRecord[] = response.data.records.map(record => ({
                     id: record.id.toString(),
-                    itemId: record.itemId,
                     quantity: record.quantity,
                     washType: record.washType,
                     processTypes: record.processTypes,
@@ -134,10 +129,6 @@ export default function OrderRecordsPage() {
         try {
             setOptionsLoading(true);
 
-            // Fetch items
-            const itemsResponse = await itemService.getItemsList();
-            setItemOptions(itemsResponse.data);
-
             // Fetch washing types
             const washingTypesResponse = await washingTypeService.getWashingTypes({
                 limit: 100
@@ -169,7 +160,6 @@ export default function OrderRecordsPage() {
     const validateRecord = (record: ProcessRecord): { [key: string]: string } => {
         const newErrors: { [key: string]: string } = {};
 
-        if (!record.itemId) newErrors.itemId = 'Item is required';
         if (!record.washType) newErrors.washType = 'Wash type is required';
         if (!record.quantity || record.quantity <= 0) newErrors.quantity = 'Quantity must be greater than 0';
         if (!record.processTypes || record.processTypes.length === 0) newErrors.processTypes = 'At least one process type is required';
@@ -200,7 +190,6 @@ export default function OrderRecordsPage() {
 
             const recordData: CreateOrderRecordRequest = {
                 orderId: parseInt(orderId),
-                itemId: newRecord.itemId || '',
                 quantity: newRecord.quantity,
                 washType: newRecord.washType as any, // Send the ID directly
                 processTypes: newRecord.processTypes as any,
@@ -212,7 +201,6 @@ export default function OrderRecordsPage() {
             if (response.success) {
                 const newProcessRecord: ProcessRecord = {
                     id: response.data.id.toString(),
-                    itemId: response.data.itemId,
                     quantity: response.data.quantity,
                     washType: response.data.washType,
                     processTypes: response.data.processTypes,
@@ -222,7 +210,6 @@ export default function OrderRecordsPage() {
                 setRecords(prev => [...prev, newProcessRecord]);
                 setNewRecord({
                     id: '',
-                    itemId: '',
                     quantity: 1,
                     washType: '',
                     processTypes: [],
@@ -269,7 +256,6 @@ export default function OrderRecordsPage() {
             setSaving(true);
             const recordData: UpdateOrderRecordRequest = {
                 orderId: parseInt(orderId),
-                itemId: newRecord.itemId || '',
                 quantity: newRecord.quantity,
                 washType: newRecord.washType as any, // Send the ID directly
                 processTypes: newRecord.processTypes as any,
@@ -284,7 +270,6 @@ export default function OrderRecordsPage() {
             if (response.success) {
                 const updatedProcessRecord: ProcessRecord = {
                     id: response.data.id.toString(),
-                    itemId: response.data.itemId,
                     quantity: response.data.quantity,
                     washType: response.data.washType,
                     processTypes: response.data.processTypes,
@@ -296,7 +281,6 @@ export default function OrderRecordsPage() {
 
                 setNewRecord({
                     id: '',
-                    itemId: '',
                     quantity: 1,
                     washType: '',
                     processTypes: [],
@@ -363,7 +347,6 @@ export default function OrderRecordsPage() {
     const handleCancelEdit = () => {
         setNewRecord({
             id: '',
-            itemId: '',
             quantity: 1,
             washType: '',
             processTypes: [],
@@ -435,7 +418,6 @@ export default function OrderRecordsPage() {
             )
         },
         { field: 'customerName', headerName: 'Customer', flex: 1.2, minWidth: 150 },
-        { field: 'itemName', headerName: 'Item', flex: 1.5, minWidth: 200 },
         { field: 'quantity', headerName: 'Quantity', flex: 0.8, minWidth: 100, type: 'number' },
         { field: 'washTypeName', headerName: 'Wash Type', flex: 1, minWidth: 150 },
         { field: 'processTypes', headerName: 'Process Types', flex: 2, minWidth: 250 },
@@ -493,11 +475,6 @@ export default function OrderRecordsPage() {
 
     // Convert records to table format
     const tableRows = records.map(record => {
-        // Since API doesn't include itemId in records, we'll show a placeholder or try to find it
-        const itemName = record.itemId
-            ? (itemOptions.find(item => item.value === record.itemId)?.label || 'Unknown Item')
-            : 'No Item Specified'; // Show this when itemId is missing from API
-
         // For wash type display, use the direct value from API since it's already the correct format
         const washTypeName = record.washType || 'Unknown Wash Type';
 
@@ -509,7 +486,6 @@ export default function OrderRecordsPage() {
             id: record.id,
             trackingNumber: record.trackingNumber || 'N/A', // Add tracking number field
             customerName: order?.customerName || 'N/A',
-            itemName,
             quantity: record.quantity,
             washTypeName,
             processTypes: processTypesText,
@@ -779,24 +755,6 @@ export default function OrderRecordsPage() {
                     </Typography>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4 items-start">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Item *</label>
-                            <div className="uniform-height-dropdown">
-                                <PrimaryDropdown
-                                    name="itemId"
-                                    value={newRecord.itemId}
-                                    onChange={(e) => handleRecordChange('itemId', e.target.value)}
-                                    options={itemOptions}
-                                    placeholder={optionsLoading ? "Loading items..." : "Select an item"}
-                                    error={!!errors.itemId}
-                                    disabled={optionsLoading}
-                                    className="px-4 py-4 text-base"
-                                    style={{ borderColor: errors.itemId ? '#ef4444' : colors.border.light }}
-                                />
-                            </div>
-                            {errors.itemId && <span className="text-xs text-red-500 mt-1 block">{errors.itemId}</span>}
-                        </div>
-
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Quantity *</label>
                             <div className="uniform-height-number-input">

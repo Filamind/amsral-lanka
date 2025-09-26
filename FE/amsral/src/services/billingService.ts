@@ -377,6 +377,22 @@ export class BillingService {
   }
 
   /**
+   * Update order payment status with payment amount
+   */
+  static async updateOrderPaymentStatus(orderId: number, isPaid: boolean, paymentAmount?: number): Promise<BillingResponse<any>> {
+    try {
+      const response = await apiClient.patch(`/billing/orders/${orderId}/payment`, { 
+        isPaid,
+        paymentAmount: paymentAmount
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error updating order payment status:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get customer billing history
    */
   static async getCustomerBillingHistory(customerId: string, filters: {

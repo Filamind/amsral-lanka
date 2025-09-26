@@ -8,7 +8,6 @@ import colors from '../../styles/colors';
 
 interface ProcessRecord {
     id: string;
-    itemId: string;
     quantity: number;
     washType: string;
     processTypes: string[];
@@ -17,7 +16,6 @@ interface ProcessRecord {
 interface ProcessRecordsProps {
     records: ProcessRecord[];
     errors: { [key: string]: string };
-    itemOptions: { value: string; label: string }[];
     washTypeOptions: { value: string; label: string }[];
     processTypeOptions: { value: string; label: string }[];
     optionsLoading: boolean;
@@ -30,7 +28,6 @@ interface ProcessRecordsProps {
 const ProcessRecords: React.FC<ProcessRecordsProps> = ({
     records,
     errors,
-    itemOptions,
     washTypeOptions,
     processTypeOptions,
     optionsLoading,
@@ -88,23 +85,6 @@ const ProcessRecords: React.FC<ProcessRecordsProps> = ({
                     </div>
 
                     <div className="flex items-center gap-4 mb-4">
-                        <div className="flex-1">
-                            <PrimaryDropdown
-                                name="itemId"
-                                value={record.itemId || ''}
-                                onChange={(e) => onUpdateRecord(record.id, 'itemId', e.target.value)}
-                                options={itemOptions}
-                                placeholder={optionsLoading ? "Loading items..." : "Select an item"}
-                                error={!!errors[`record_${record.id}_itemId`]}
-                                disabled={optionsLoading}
-                                className="px-4 py-3 text-base"
-                                style={{ borderColor: errors[`record_${record.id}_itemId`] ? '#ef4444' : colors.border.light }}
-                            />
-                            {errors[`record_${record.id}_itemId`] && (
-                                <span className="text-xs text-red-500 mt-1 block">{errors[`record_${record.id}_itemId`]}</span>
-                            )}
-                        </div>
-
                         <div className="flex-1">
                             <PrimaryNumberInput
                                 value={record.quantity}
