@@ -17,6 +17,7 @@ import RecordAssignmentsPage from './pages/RecordAssignmentsPage';
 import SystemDataPage from './pages/SystemDataPage';
 import ManagementPage from './pages/ManagementPage';
 import OrderDetailsPage from './pages/OrderDetailsPage';
+import QCPage from './pages/QCPage';
 import ProfilePage from './pages/ProfilePage';
 import BillingPage from './pages/BillingPage';
 import PrinterTestPage from './pages/PrinterTestPage';
@@ -69,6 +70,7 @@ function App() {
               <Route path="production/record/:recordId" element={<RecordAssignmentsPage />} />
               <Route path="management" element={<ManagementPage />} />
               <Route path="management/orders/:orderId" element={<OrderDetailsPage />} />
+              <Route path="qc" element={<QCPage />} />
               <Route path="billing" element={<BillingPage />} />
               <Route path="printer-test" element={<PrinterTestPage />} />
               <Route path="users" element={<UserPage />} />

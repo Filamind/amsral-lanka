@@ -10,7 +10,7 @@ import {
 } from '@mui/material';
 import {
     Receipt as ReceiptIcon,
-    Check as CheckIcon,
+    Payment as PaymentIcon,
 } from '@mui/icons-material';
 import type { GridColDef } from '@mui/x-data-grid';
 import { useAuth } from '../hooks/useAuth';
@@ -20,7 +20,6 @@ import PrimaryTable from '../components/common/PrimaryTable';
 import PrimaryDropdown from '../components/common/PrimaryDropdown';
 import { CustomerService, type Customer } from '../services/customerService';
 import { BillingService, type Invoice, type InvoiceFilters } from '../services/billingService';
-import { getStatusColor, getStatusLabel, normalizeStatus } from '../utils/statusUtils';
 import toast from 'react-hot-toast';
 import InvoiceCreationModal from '../components/modals/InvoiceCreationModal';
 import PaymentStatusModal from '../components/modals/PaymentStatusModal';
@@ -35,7 +34,7 @@ interface BillingOrder {
     quantity: number;
     notes: string | null;
     deliveryDate: string;
-    status: 'Pending' | 'Invoiced' | 'Complete' | 'Paid' | 'In Progress' | 'Completed' | 'Confirmed' | 'Processing' | 'Delivered';
+    status: 'Pending' | 'Invoiced' | 'Complete' | 'Paid' | 'In Progress' | 'Completed' | 'Confirmed' | 'Processing' | 'Delivered' | 'QC';
     billingStatus: 'pending' | 'invoiced' | 'paid';
     recordsCount: number;
     complete: boolean;
@@ -95,15 +94,18 @@ const BillingPage: React.FC = () => {
                 page: currentPage,
                 limit: pageSize,
                 customerName: customerFilter || undefined,
-                billingStatus: 'pending', // Only fetch pending orders for Orders tab
+                status: 'QC', // Only fetch orders with QC status
+                billingStatus: 'pending', // Only fetch orders with pending billing status
             });
 
             if (response.success) {
-                // Filter orders by billingStatus and search on the frontend if API doesn't support it
+                // Filter orders by status and billing status on the frontend if API doesn't support it
                 let filteredOrders = response.data.orders as BillingOrder[];
 
-                // Only show pending orders (not invoiced or paid)
-                filteredOrders = filteredOrders.filter(order => order.billingStatus === 'pending');
+                // Only show orders with QC status and pending billing status
+                filteredOrders = filteredOrders.filter(order =>
+                    order.status === 'QC' && order.billingStatus === 'pending'
+                );
 
                 // Apply search filter - search by Order ID (displayed as Reference No) and customer name
                 if (search && search.trim()) {
@@ -243,8 +245,10 @@ const BillingPage: React.FC = () => {
     // Handle select all
     const handleSelectAll = (selected: boolean) => {
         if (selected) {
-            // Only select orders that are pending (can be invoiced)
-            const selectableOrders = orders.filter(order => order.billingStatus === 'pending');
+            // Select all QC orders with pending billing status (can be invoiced)
+            const selectableOrders = orders.filter(order =>
+                order.status === 'QC' && order.billingStatus === 'pending'
+            );
             setSelectedOrders(selectableOrders.map(order => order.id));
         } else {
             setSelectedOrders([]);
@@ -330,7 +334,9 @@ const BillingPage: React.FC = () => {
             width: 50,
             sortable: false,
             renderHeader: () => {
-                const selectableOrders = orders.filter(order => order.billingStatus === 'pending');
+                const selectableOrders = orders.filter(order =>
+                    order.status === 'QC' && order.billingStatus === 'pending'
+                );
                 const allSelected = selectableOrders.length > 0 && selectableOrders.every(order => selectedOrders.includes(order.id));
                 const someSelected = selectedOrders.length > 0 && selectedOrders.length < selectableOrders.length;
 
@@ -351,7 +357,7 @@ const BillingPage: React.FC = () => {
                     type="checkbox"
                     checked={selectedOrders.includes(params.row.id)}
                     onChange={(e) => handleOrderSelect(params.row.id, e.target.checked)}
-                    disabled={params.row.billingStatus !== 'pending'}
+                    disabled={params.row.status !== 'QC' || params.row.billingStatus !== 'pending'}
                     style={{ transform: 'scale(1.2)' }}
                 />
             ),
@@ -381,102 +387,6 @@ const BillingPage: React.FC = () => {
                 </span>
             )
         },
-        {
-            field: 'amount',
-            headerName: 'Invoice Amount',
-            flex: 1,
-            minWidth: 120,
-            type: 'number',
-            renderCell: (params) => (
-                <span style={{ fontWeight: 500, color: colors.text.primary }}>
-                    ${params.value || 0}
-                </span>
-            )
-        },
-        {
-            field: 'paymentAmount',
-            headerName: 'Payment Amount',
-            flex: 1,
-            minWidth: 120,
-            type: 'number',
-            renderCell: (params) => {
-                const paymentAmount = params.value || 0;
-                const invoiceAmount = params.row.amount || 0;
-                const isPartial = paymentAmount > 0 && paymentAmount < invoiceAmount;
-                const isOverpaid = paymentAmount > invoiceAmount;
-
-                return (
-                    <span style={{
-                        fontWeight: 500,
-                        color: isPartial ? '#f57c00' :
-                            isOverpaid ? '#17a2b8' :
-                                colors.text.primary
-                    }}>
-                        ${paymentAmount}
-                    </span>
-                );
-            }
-        },
-        {
-            field: 'billingStatus',
-            headerName: 'Billing Status',
-            flex: 1,
-            minWidth: 130,
-            renderCell: (params) => {
-                const status = params.row.billingStatus || 'pending';
-                const normalizedStatus = normalizeStatus(status, 'billing');
-                const statusColor = getStatusColor(normalizedStatus, 'billing');
-                const statusLabel = getStatusLabel(normalizedStatus, 'billing');
-
-                return (
-                    <span
-                        className={`px-3 py-1 rounded-xl text-sm font-semibold ${statusColor}`}
-                    >
-                        {statusLabel}
-                    </span>
-                );
-            }
-        },
-        {
-            field: 'paymentStatus',
-            headerName: 'Payment Status',
-            flex: 1,
-            minWidth: 130,
-            sortable: false,
-            renderCell: (params) => {
-                if (params.row.billingStatus === 'invoiced') {
-                    return (
-                        <Tooltip title="Update Payment Status">
-                            <IconButton
-                                size="small"
-                                onClick={() => handleOpenPaymentModal(params.row)}
-                                sx={{ color: colors.success }}
-                            >
-                                <CheckIcon />
-                            </IconButton>
-                        </Tooltip>
-                    );
-                } else if (params.row.billingStatus === 'paid') {
-                    return (
-                        <Tooltip title="Update Payment Status">
-                            <IconButton
-                                size="small"
-                                onClick={() => handleOpenPaymentModal(params.row)}
-                                sx={{ color: colors.button.primary }}
-                            >
-                                <CheckIcon />
-                            </IconButton>
-                        </Tooltip>
-                    );
-                } else {
-                    return (
-                        <span className="text-sm text-gray-500">
-                            Create Invoice First
-                        </span>
-                    );
-                }
-            }
-        },
     ];
 
     // Invoices table columns definition
@@ -491,21 +401,6 @@ const BillingPage: React.FC = () => {
             renderCell: (params) => params.row.createdAt ? new Date(params.row.createdAt).toLocaleDateString() : 'N/A'
         },
         {
-            field: 'balance',
-            headerName: 'Customer Balance',
-            flex: 1,
-            minWidth: 120,
-            type: 'number',
-            renderCell: (params) => (
-                <span style={{
-                    fontWeight: 500,
-                    color: params.value && params.value > 0 ? '#f57c00' : colors.text.primary
-                }}>
-                    ${params.value || 0}
-                </span>
-            )
-        },
-        {
             field: 'total',
             headerName: 'Invoice Amount',
             flex: 1,
@@ -518,8 +413,8 @@ const BillingPage: React.FC = () => {
             )
         },
         {
-            field: 'paymentAmount',
-            headerName: 'Payment Amount',
+            field: 'payment',
+            headerName: 'Paid Amount',
             flex: 1,
             minWidth: 120,
             type: 'number',
@@ -604,9 +499,9 @@ const BillingPage: React.FC = () => {
                             <IconButton
                                 size="small"
                                 onClick={() => handleOpenPaymentModal(params.row)}
-                                sx={{ color: colors.button.primary }}
+                                sx={{ color: '#000000' }}
                             >
-                                <CheckIcon />
+                                <PaymentIcon />
                             </IconButton>
                         </Tooltip>
                     );
@@ -616,9 +511,9 @@ const BillingPage: React.FC = () => {
                             <IconButton
                                 size="small"
                                 onClick={() => handleOpenPaymentModal(params.row)}
-                                sx={{ color: colors.success }}
+                                sx={{ color: '#000000' }}
                             >
-                                <CheckIcon />
+                                <PaymentIcon />
                             </IconButton>
                         </Tooltip>
                     );

@@ -22,7 +22,8 @@ interface Invoice {
     total: number;
     dueDate: string;
     status: 'draft' | 'sent' | 'paid' | 'overdue';
-    paymentAmount?: number;
+    paymentAmount?: number; // Legacy field
+    payment?: number; // New payment field
     balance?: number; // Customer balance amount
     createdAt: string;
     updatedAt?: string;
@@ -49,7 +50,12 @@ const PaymentStatusModal: React.FC<PaymentStatusModalProps> = ({
     // Initialize form when order changes
     useEffect(() => {
         if (order) {
-            setPaymentAmount(order.paymentAmount || order.total || 0);
+            // Calculate default payment amount as (Invoice Amount - Paid Amount)
+            const invoiceAmount = order.total || 0;
+            const paidAmount = order.payment || order.paymentAmount || 0;
+            const remainingAmount = Math.max(0, invoiceAmount - paidAmount);
+
+            setPaymentAmount(remainingAmount);
             setErrors({});
         }
     }, [order]);
@@ -64,8 +70,12 @@ const PaymentStatusModal: React.FC<PaymentStatusModalProps> = ({
             newErrors.paymentAmount = 'Payment amount cannot be negative';
         }
 
-        if (paymentAmount > (order.total || 0)) {
-            newErrors.paymentAmount = `Payment amount cannot exceed invoice amount (${order.total || 0})`;
+        const invoiceAmount = order.total || 0;
+        const currentPaidAmount = order.payment || order.paymentAmount || 0;
+        const totalPaymentAfterThis = currentPaidAmount + paymentAmount;
+
+        if (totalPaymentAfterThis > invoiceAmount) {
+            newErrors.paymentAmount = `Total payment (${currentPaidAmount} + ${paymentAmount} = ${totalPaymentAfterThis}) cannot exceed invoice amount (${invoiceAmount})`;
         }
 
         if (Object.keys(newErrors).length > 0) {
@@ -219,20 +229,26 @@ const PaymentStatusModal: React.FC<PaymentStatusModalProps> = ({
                     </Box>
                 )}
 
-                {paymentAmount > (order.total || 0) && (
-                    <Box sx={{
-                        p: 2,
-                        backgroundColor: '#d1ecf1',
-                        borderRadius: '8px',
-                        border: '1px solid #17a2b8',
-                        mb: 2
-                    }}>
-                        <Typography variant="body2" color="#0c5460">
-                            <strong>Note:</strong> Payment amount (${paymentAmount}) exceeds invoice amount (${order.total || 0}).
-                            This will be recorded as an overpayment.
-                        </Typography>
-                    </Box>
-                )}
+                {(() => {
+                    const invoiceAmount = order.total || 0;
+                    const currentPaidAmount = order.payment || order.paymentAmount || 0;
+                    const totalPaymentAfterThis = currentPaidAmount + paymentAmount;
+
+                    return totalPaymentAfterThis > invoiceAmount && (
+                        <Box sx={{
+                            p: 2,
+                            backgroundColor: '#d1ecf1',
+                            borderRadius: '8px',
+                            border: '1px solid #17a2b8',
+                            mb: 2
+                        }}>
+                            <Typography variant="body2" color="#0c5460">
+                                <strong>Note:</strong> Total payment (${currentPaidAmount} + ${paymentAmount} = ${totalPaymentAfterThis}) exceeds invoice amount (${invoiceAmount}).
+                                This will be recorded as an overpayment.
+                            </Typography>
+                        </Box>
+                    );
+                })()}
             </DialogContent>
 
             <DialogActions sx={{

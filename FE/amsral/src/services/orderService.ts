@@ -1,7 +1,7 @@
 import apiClient from '../config/api';
 
 // Order Status Types
-export type OrderStatus = 'Pending' | 'In Progress' | 'Completed' | 'Confirmed' | 'Processing' | 'Delivered';
+export type OrderStatus = 'Pending' | 'In Progress' | 'Completed' | 'Confirmed' | 'Processing' | 'Delivered' | 'QC';
 
 // Process Types
 export type ProcessType = 'viscose' | 'rib' | 'sand_blast' | 'chevron' | 'stone_wash' | 'enzyme_wash';
@@ -45,6 +45,7 @@ export interface UpdateOrderRequest {
   notes?: string;
   deliveryDate?: string;
   status?: OrderStatus;
+  deliveryCount?: number; // Number of items delivered
 }
 
 // Response Interfaces
@@ -503,6 +504,22 @@ class OrderService {
     } catch (error: unknown) {
       const apiError = error as { response?: { data?: ErrorResponse } };
       throw apiError.response?.data || { success: false, message: 'Failed to fetch invoice preview' };
+    }
+  }
+
+  /**
+   * Save damage records for quality control
+   * POST /api/orders/:orderId/damage-records
+   */
+  async saveDamageRecords(orderId: number, damageCounts: { [recordId: number]: number }): Promise<{ success: boolean; data: { message: string } }> {
+    try {
+      const response = await apiClient.post(`/orders/${orderId}/damage-records`, {
+        damageCounts
+      });
+      return response.data;
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: ErrorResponse } };
+      throw apiError.response?.data || { success: false, message: 'Failed to save damage records' };
     }
   }
 }

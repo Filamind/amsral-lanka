@@ -58,7 +58,8 @@ export interface Invoice {
   total: number;
   dueDate: string;
   status: 'draft' | 'sent' | 'paid' | 'overdue';
-  paymentAmount?: number; // Actual payment amount received
+  paymentAmount?: number; // Actual payment amount received (legacy field)
+  payment?: number; // New payment field from API
   balance?: number; // Customer balance amount
   createdAt: string;
   updatedAt?: string;
@@ -70,6 +71,7 @@ export interface BillingFilters {
   customerName?: string;
   orderId?: string;
   billingStatus?: string;
+  status?: string;
   dateFrom?: string;
   dateTo?: string;
 }
@@ -115,6 +117,7 @@ export class BillingService {
       if (filters.customerName) params.append('customerName', filters.customerName);
       if (filters.orderId) params.append('orderId', filters.orderId);
       if (filters.billingStatus) params.append('billingStatus', filters.billingStatus);
+      if (filters.status) params.append('status', filters.status);
       if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
       if (filters.dateTo) params.append('dateTo', filters.dateTo);
 
