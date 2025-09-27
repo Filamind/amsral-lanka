@@ -2,10 +2,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IconButton } from '@mui/material';
-import { CheckCircle, RadioButtonUnchecked } from '@mui/icons-material';
+import { LocalShipping } from '@mui/icons-material';
 import type { GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
 import PrimaryTable from '../components/common/PrimaryTable';
 import PrimaryButton from '../components/common/PrimaryButton';
+import DeliveryModal from '../components/modals/DeliveryModal';
 import colors from '../styles/colors';
 import { orderService, type ManagementOrder, type UpdateOrderRequest, type ErrorResponse } from '../services/orderService';
 import { getStatusColor, getStatusLabel, normalizeStatus } from '../utils/statusUtils';
@@ -22,6 +23,10 @@ export default function ManagementPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [orderIdFilter, setOrderIdFilter] = useState('');
     const [customerNameFilter, setCustomerNameFilter] = useState('');
+    const [deliveryModal, setDeliveryModal] = useState({
+        open: false,
+        order: null as ManagementOrder | null,
+    });
 
     // Permission checks
     const canMarkDelivered = hasPermission(user, 'canMarkDelivered');
@@ -64,7 +69,7 @@ export default function ManagementPage() {
             )
         },
         { field: 'customerName', headerName: 'Customer', flex: 1.2, minWidth: 120 },
-        { field: 'quantity', headerName: 'Qty', flex: 0.6, minWidth: 60, type: 'number' },
+        { field: 'returnQuantity', headerName: 'Qty', flex: 0.6, minWidth: 60, type: 'number' },
         { field: 'date', headerName: 'Order Date', flex: 1, minWidth: 100 },
         { field: 'deliveryDate', headerName: 'Delivery Date', flex: 1, minWidth: 100 },
         {
@@ -109,10 +114,10 @@ export default function ManagementPage() {
         },
         { field: 'recordsCount', headerName: 'Records', flex: 0.6, minWidth: 60, type: 'number' },
         ...(canMarkDelivered ? [{
-            field: 'delivered',
-            headerName: 'Delivered',
+            field: 'delivery',
+            headerName: 'Delivery',
             flex: 0.5,
-            minWidth: 60,
+            minWidth: 80,
             sortable: false,
             renderCell: (params: GridRenderCellParams) => {
                 const isDelivered = (params.row.status || '').toLowerCase() === 'delivered';
@@ -120,16 +125,19 @@ export default function ManagementPage() {
                     <IconButton
                         onClick={(e) => {
                             e.stopPropagation();
-                            handleToggleDelivery(params.row);
+                            setDeliveryModal({
+                                open: true,
+                                order: params.row
+                            });
                         }}
                         size="small"
                         sx={{
                             color: isDelivered ? colors.button.primary : colors.text.secondary
                         }}
-                        title={isDelivered ? 'Mark as Completed' : 'Mark as Delivered'}
+                        title="Update Delivery Status"
                         disabled={loading}
                     >
-                        {isDelivered ? <CheckCircle /> : <RadioButtonUnchecked />}
+                        <LocalShipping />
                     </IconButton>
                 );
             }
@@ -207,32 +215,40 @@ export default function ManagementPage() {
         navigate(`/management/orders/${params.id}`);
     };
 
-    // Handle delivery toggle
-    const handleToggleDelivery = async (order: ManagementOrder) => {
-        const isDelivered = (order.status || '').toLowerCase() === 'delivered';
+    // Handle opening delivery modal
 
+    const handleCloseDeliveryModal = () => {
+        setDeliveryModal({
+            open: false,
+            order: null
+        });
+    };
+
+    const handleUpdateDelivery = async (orderId: number, deliveryCount: number, isDelivered: boolean) => {
         try {
             setLoading(true);
 
-            // Update order status via API
+            // Update order delivery status via API
             const updateData: UpdateOrderRequest = {
-                status: isDelivered ? 'Completed' : 'Delivered'
+                status: isDelivered ? 'Delivered' : 'Completed',
+                deliveryCount: deliveryCount
             };
 
-            const response = await orderService.updateOrder(order.id, updateData);
+            const response = await orderService.updateOrder(orderId, updateData);
 
             if (response.success) {
                 // Update order in local state
                 setOrders(prev => prev.map(row =>
-                    row.id === order.id ? { ...row, status: response.data.status } : row
+                    row.id === orderId ? { ...row, status: response.data.status } : row
                 ));
 
-                toast.success(`Order ${isDelivered ? 'marked as Completed' : 'marked as Delivered'} successfully`);
+                toast.success(`Order delivery status updated successfully`);
             }
         } catch (error) {
-            console.error('Error updating order status:', error);
+            console.error('Error updating delivery status:', error);
             const apiError = error as ErrorResponse;
-            toast.error(apiError.message || 'Failed to update order status');
+            toast.error(apiError.message || 'Failed to update delivery status');
+            throw error; // Re-throw to let the modal handle the error
         } finally {
             setLoading(false);
         }
@@ -251,7 +267,7 @@ export default function ManagementPage() {
     return (
         <div className="w-full mx-auto px-2 sm:px-3 md:px-4 py-3">
             <div className="flex flex-col gap-2 sm:gap-3 mb-4">
-                <h2 className="text-lg sm:text-xl md:text-2xl font-bold" style={{ color: colors.text.primary }}>Order Management</h2>
+                <h2 className="text-xl md:text-2xl font-bold" style={{ color: colors.text.primary }}>Order Management</h2>
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-2 w-full">
                     <div className="flex flex-1 items-center w-full sm:w-auto">
                         <input
@@ -312,6 +328,15 @@ export default function ManagementPage() {
                     }
                 />
             </div>
+
+            {/* Delivery Modal */}
+            <DeliveryModal
+                open={deliveryModal.open}
+                onClose={handleCloseDeliveryModal}
+                order={deliveryModal.order}
+                onUpdate={handleUpdateDelivery}
+                loading={loading}
+            />
         </div>
     );
 }

@@ -52,6 +52,7 @@ interface InvoiceData {
   dueDate: string;
   poNumber?: string; // Purchase Order Number
   includeStyleNo: boolean; // Whether to include Style No column
+  customerBalance?: number; // Customer balance amount
   orders: {
     id: number;
     referenceNo: string;
@@ -75,6 +76,7 @@ interface InvoiceOrder {
   quantity: number;
   status: string;
   gpNo?: string; // Gate Pass Number from backend
+  balance?: number; // Customer balance amount
   records: InvoiceRecord[];
 }
 
@@ -166,6 +168,7 @@ const InvoiceCreationModal: React.FC<InvoiceCreationModalProps> = ({
           dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days default
           poNumber: poNumber,
           includeStyleNo: includeStyleNo,
+          customerBalance: firstOrder.balance, // Include customer balance
           orders: validOrders.map(order => ({
             id: order.id,
             referenceNo: order.referenceNo,
@@ -189,7 +192,7 @@ const InvoiceCreationModal: React.FC<InvoiceCreationModalProps> = ({
           subtotal: 0,
           taxRate: 0,
           taxAmount: 0,
-          total: 0,
+          total: firstOrder.balance || 0, // Include customer balance in initial total
         };
         setInvoiceData(invoiceData);
       }
@@ -242,7 +245,8 @@ const InvoiceCreationModal: React.FC<InvoiceCreationModalProps> = ({
         sum + order.records.reduce((orderSum, record) => orderSum + record.totalPrice, 0), 0
       );
       const taxAmount = 0;
-      const total = subtotal;
+      const customerBalance = orderDetails.length > 0 ? (orderDetails[0].balance || 0) : 0;
+      const total = subtotal + customerBalance;
 
       updatedInvoiceData.subtotal = subtotal;
       updatedInvoiceData.taxAmount = taxAmount;
@@ -345,6 +349,7 @@ const InvoiceCreationModal: React.FC<InvoiceCreationModalProps> = ({
       ...invoiceData,
       poNumber: poNumber,
       includeStyleNo: includeStyleNo,
+      customerBalance: orderDetails.length > 0 ? orderDetails[0].balance : undefined, // Include current balance
       orders: invoiceData.orders.map(order => ({
         ...order,
         records: order.records.map(record => ({
@@ -457,6 +462,16 @@ const InvoiceCreationModal: React.FC<InvoiceCreationModalProps> = ({
                     <Typography variant="body2" color="text.secondary">
                       Due: {invoiceData.dueDate ? new Date(invoiceData.dueDate).toLocaleDateString() : 'N/A'}
                     </Typography>
+                    {/* Display customer balance if available */}
+                    {orderDetails.length > 0 && orderDetails[0].balance !== undefined && (
+                      <Typography variant="body2" sx={{
+                        color: orderDetails[0].balance > 0 ? '#f57c00' : 'text.secondary',
+                        fontWeight: 500,
+                        mt: 0.5
+                      }}>
+                        Customer Balance: ${orderDetails[0].balance || 0}
+                      </Typography>
+                    )}
                   </Box>
                 </Box>
 
@@ -592,12 +607,21 @@ const InvoiceCreationModal: React.FC<InvoiceCreationModalProps> = ({
                   <Typography sx={{ fontWeight: 500 }}>Rs. {invoiceData.subtotal.toFixed(2)}</Typography>
                 </Box>
                 <Divider sx={{ my: 2 }} />
+                {/* Customer Balance Addition */}
+                {orderDetails.length > 0 && orderDetails[0].balance !== undefined && orderDetails[0].balance > 0 && (
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography sx={{ fontWeight: 500 }}>Customer Balance:</Typography>
+                    <Typography sx={{ fontWeight: 500 }}>
+                      Rs. {(orderDetails[0].balance || 0).toFixed(2)}
+                    </Typography>
+                  </Box>
+                )}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
                     Total:
                   </Typography>
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                    Rs. {invoiceData.total.toFixed(2)}
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    Rs. {(invoiceData.subtotal + (orderDetails.length > 0 && orderDetails[0].balance ? orderDetails[0].balance : 0)).toFixed(2)}
                   </Typography>
                 </Box>
               </Box>

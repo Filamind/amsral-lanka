@@ -1,7 +1,7 @@
 import apiClient from '../config/api';
 
 // Order Status Types
-export type OrderStatus = 'Pending' | 'In Progress' | 'Completed' | 'Confirmed' | 'Processing' | 'Delivered';
+export type OrderStatus = 'Pending' | 'In Progress' | 'Completed' | 'Confirmed' | 'Processing' | 'Delivered' | 'QC';
 
 // Process Types
 export type ProcessType = 'viscose' | 'rib' | 'sand_blast' | 'chevron' | 'stone_wash' | 'enzyme_wash';
@@ -13,6 +13,7 @@ export type WashType = 'normal' | 'heavy' | 'light' | 'silicon' | 'soft';
 export interface CreateOrderRequest {
   date: string;
   customerId: string;
+  itemId: string;
   quantity: number;
   gpNo?: string;
   notes?: string;
@@ -22,7 +23,6 @@ export interface CreateOrderRequest {
 
 export interface CreateOrderRecordRequest {
   orderId?: number; // Optional, can be included in request body if needed
-  itemId: string;
   quantity: number;
   washType: WashType;
   processTypes: ProcessType[];
@@ -31,7 +31,6 @@ export interface CreateOrderRecordRequest {
 
 export interface UpdateOrderRecordRequest {
   orderId?: number; // Optional, can be included in request body if needed
-  itemId: string;
   quantity: number;
   washType: WashType;
   processTypes: ProcessType[];
@@ -41,10 +40,12 @@ export interface UpdateOrderRecordRequest {
 export interface UpdateOrderRequest {
   date?: string;
   customerId?: string;
+  itemId?: string;
   quantity?: number;
   notes?: string;
   deliveryDate?: string;
   status?: OrderStatus;
+  deliveryCount?: number; // Number of items delivered
 }
 
 // Response Interfaces
@@ -257,6 +258,7 @@ export interface OrderSummaryData {
   deliveryDate: string;
   status: string;
   notes: string | null;
+  balance?: number; // Customer balance amount
   records: OrderSummaryRecord[];
 }
 
@@ -502,6 +504,22 @@ class OrderService {
     } catch (error: unknown) {
       const apiError = error as { response?: { data?: ErrorResponse } };
       throw apiError.response?.data || { success: false, message: 'Failed to fetch invoice preview' };
+    }
+  }
+
+  /**
+   * Save damage records for quality control
+   * POST /api/orders/:orderId/damage-records
+   */
+  async saveDamageRecords(orderId: number, damageCounts: { [recordId: number]: number }): Promise<{ success: boolean; data: { message: string } }> {
+    try {
+      const response = await apiClient.post(`/orders/${orderId}/damage-records`, {
+        damageCounts
+      });
+      return response.data;
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: ErrorResponse } };
+      throw apiError.response?.data || { success: false, message: 'Failed to save damage records' };
     }
   }
 }

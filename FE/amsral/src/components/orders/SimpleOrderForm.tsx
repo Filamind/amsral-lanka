@@ -8,6 +8,7 @@ import colors from '../../styles/colors';
 interface SimpleOrderFormProps {
     form: {
         customerId: string;
+        itemId: string;
         quantity: number;
         gpNo: string;
         date: string;
@@ -16,6 +17,7 @@ interface SimpleOrderFormProps {
     };
     errors: { [key: string]: string };
     customerOptions: { value: string; label: string }[];
+    itemOptions: { value: string; label: string }[];
     optionsLoading: boolean;
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
     showAdditional: boolean;
@@ -27,6 +29,7 @@ const SimpleOrderForm: React.FC<SimpleOrderFormProps> = ({
     form,
     errors,
     customerOptions,
+    itemOptions,
     optionsLoading,
     onChange,
     showAdditional,
@@ -77,24 +80,47 @@ const SimpleOrderForm: React.FC<SimpleOrderFormProps> = ({
                     </div>
                 </div>
 
-                {/* Customer Selection - Second Row */}
-                <div className="w-full">
-                    <PrimaryDropdown
-                        name="customerId"
-                        value={form.customerId}
-                        onChange={onChange}
-                        options={customerOptions}
-                        placeholder={optionsLoading ? "Loading customers..." : "Select a customer"}
-                        error={!!errors.customerId}
-                        disabled={optionsLoading}
-                        className="w-full py-4 text-lg"
-                        style={{
-                            borderColor: errors.customerId ? '#ef4444' : colors.border.light,
-                            paddingLeft: '0px',
-                            paddingRight: '16px'
-                        }}
-                    />
-                    {errors.customerId && <span className="text-xs text-red-500 mt-1 block">{errors.customerId}</span>}
+                {/* Customer and Item Selection - Second Row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Customer Selection */}
+                    <div>
+                        <PrimaryDropdown
+                            name="customerId"
+                            value={form.customerId}
+                            onChange={onChange}
+                            options={customerOptions}
+                            placeholder={optionsLoading ? "Loading customers..." : "Select a customer"}
+                            error={!!errors.customerId}
+                            disabled={optionsLoading}
+                            className="w-full py-4 text-lg"
+                            style={{
+                                borderColor: errors.customerId ? '#ef4444' : colors.border.light,
+                                paddingLeft: '0px',
+                                paddingRight: '16px'
+                            }}
+                        />
+                        {errors.customerId && <span className="text-xs text-red-500 mt-1 block">{errors.customerId}</span>}
+                    </div>
+
+                    {/* Item Selection */}
+                    <div>
+                        <PrimaryDropdown
+                            name="itemId"
+                            value={form.itemId}
+                            onChange={onChange}
+                            options={itemOptions}
+                            placeholder={optionsLoading ? "Loading items..." : "Select an item"}
+                            error={!!errors.itemId}
+                            disabled={optionsLoading}
+                            className="w-full py-4 text-lg"
+                            style={{
+                                borderColor: errors.itemId ? '#ef4444' : colors.border.light,
+                                paddingLeft: '0px',
+                                paddingRight: '16px'
+                            }}
+                        />
+                        {errors.itemId && <span className="text-xs text-red-500 mt-1 block">{errors.itemId}</span>}
+                    </div>
                 </div>
 
                 {/* Additional Information - Collapsible */}

@@ -22,6 +22,7 @@ export interface InvoiceData {
   dueDate: string;
   poNumber?: string; // Purchase Order Number
   includeStyleNo: boolean; // Whether to include Style No column
+  customerBalance?: number; // Customer balance amount
   orders: {
     id: number;
     referenceNo: string;
@@ -533,6 +534,13 @@ export const generateAmsralInvoice = (invoiceData: InvoiceData): void => {
     // Left side - Customer info
     doc.text(`Customer: ${invoiceData.customerName}`, margin, yPosition);
     doc.text(`Date: ${new Date().toLocaleDateString()}`, margin, yPosition + 8);
+    
+    // Add customer balance if available
+    if (invoiceData.customerBalance !== undefined && invoiceData.customerBalance > 0) {
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Outstanding Balance: $${invoiceData.customerBalance.toFixed(2)}`, margin, yPosition + 16);
+      doc.setFont('helvetica', 'normal');
+    }
 
     // Right side - Invoice info
     const rightInfoX = pageWidth - 100;
@@ -718,8 +726,27 @@ export const generateAmsralInvoice = (invoiceData: InvoiceData): void => {
      // Calculate Amount column position for alignment
      const amountColumnX = columns[columns.length - 1].x; // Last column (Amount)
      
-     doc.text('Total Amount (Rs)', margin + 5, yPosition + 8);
+     // Show subtotal
+     doc.text('Subtotal (Rs)', margin + 5, yPosition + 8);
      doc.text(totalAmount.toFixed(2), amountColumnX + 2, yPosition + 8); // Aligned with Amount column
+     
+     yPosition += rowHeight;
+     
+     // Add customer balance if available
+     if (invoiceData.customerBalance !== undefined && invoiceData.customerBalance > 0) {
+       doc.setLineWidth(0.2);
+       doc.rect(margin, yPosition, tableWidth, rowHeight);
+       doc.text('Customer Balance (Rs)', margin + 5, yPosition + 8);
+       doc.text(invoiceData.customerBalance.toFixed(2), amountColumnX + 2, yPosition + 8);
+       yPosition += rowHeight;
+     }
+     
+     // Final total
+     doc.setLineWidth(0.2);
+     doc.rect(margin, yPosition, tableWidth, rowHeight);
+     const finalTotal = totalAmount + (invoiceData.customerBalance || 0);
+     doc.text('Total Amount (Rs)', margin + 5, yPosition + 8);
+     doc.text(finalTotal.toFixed(2), amountColumnX + 2, yPosition + 8);
 
      yPosition += rowHeight + 15;
 

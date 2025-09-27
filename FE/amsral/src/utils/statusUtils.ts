@@ -4,7 +4,7 @@
  */
 
 // Standardized status types
-export type OrderStatus = 'Pending' | 'In Progress' | 'Completed' | 'Confirmed' | 'Processing' | 'Delivered';
+export type OrderStatus = 'Pending' | 'In Progress' | 'Completed' | 'Confirmed' | 'Processing' | 'Delivered' | 'QC';
 export type BillingStatus = 'pending' | 'invoiced' | 'paid';
 export type AssignmentStatus = 'Pending' | 'In Progress' | 'Completed';
 
@@ -17,6 +17,7 @@ export const STATUS_COLORS = {
   'Confirmed': 'bg-purple-100 text-purple-800',      // Purple for confirmed
   'Processing': 'bg-orange-100 text-orange-800',     // Orange for processing
   'Delivered': 'bg-blue-100 text-blue-800',          // Blue for delivered
+  'QC': 'bg-pink-100 text-pink-800',               // Amber for QC (quality control)
   
   // Billing Status Colors - now consistent with order status
   'pending': 'bg-yellow-100 text-yellow-800',        // Same as Pending (yellow/orange)
@@ -41,6 +42,7 @@ export const STATUS_LABELS = {
   'delivered': 'Delivered',
   'assigned': 'Assigned',
   'complete': 'Completed', // Map 'complete' to 'Completed' for consistency
+  'qc': 'QC',              // Quality Control status
   
   // Billing Status Labels - now using sentence case (removed duplicate 'pending')
   'invoiced': 'Invoiced',
@@ -90,6 +92,8 @@ export const normalizeStatus = (status: string, type: 'order' | 'billing' | 'ass
         return 'Delivered';
       case 'assigned':
         return 'Assigned';
+      case 'qc':
+        return 'QC';
       default:
         return 'Pending';
     }

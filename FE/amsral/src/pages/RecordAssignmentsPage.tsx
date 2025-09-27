@@ -2,12 +2,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Modal, Box, Typography, IconButton, Menu, MenuItem, Fab, Tooltip } from '@mui/material';
-import { ArrowBack, MoreVert, CheckCircle, RadioButtonUnchecked, Print, PrintOutlined, PrintDisabled } from '@mui/icons-material';
+import { ArrowBack, MoreVert, RadioButtonUnchecked, Print, PrintOutlined, PrintDisabled, AssignmentTurnedIn } from '@mui/icons-material';
 import type { GridColDef } from '@mui/x-data-grid';
 import PrimaryButton from '../components/common/PrimaryButton';
 import PrimaryTable from '../components/common/PrimaryTable';
 import PrimaryDropdown from '../components/common/PrimaryDropdown';
 import ConfirmationDialog from '../components/common/ConfirmationDialog';
+import CompletionStatusModal from '../components/modals/CompletionStatusModal';
 import colors from '../styles/colors';
 import EmployeeService, { type Employee } from '../services/employeeService';
 import recordService, { type ProcessRecord, type MachineAssignment } from '../services/recordService';
@@ -54,6 +55,10 @@ export default function RecordAssignmentsPage() {
         confirmText: 'Confirm',
         onConfirm: () => { },
     });
+    const [completionModal, setCompletionModal] = useState({
+        open: false,
+        assignment: null as MachineAssignment | null,
+    });
 
     // Pagination state
     const [pagination, setPagination] = useState({
@@ -86,10 +91,53 @@ export default function RecordAssignmentsPage() {
             )
         },
         { field: 'assignedTo', headerName: 'Assign To', flex: 1.2, minWidth: 120 },
-        { field: 'quantity', headerName: 'Quantity', flex: 0.8, minWidth: 100, type: 'number' },
-        { field: 'washingMachine', headerName: 'Washing Machine', flex: 1.4, minWidth: 140 },
-        { field: 'dryingMachine', headerName: 'Drying Machine', flex: 1.4, minWidth: 140 },
-        { field: 'assignedAt', headerName: 'Assigned At', flex: 1.5, minWidth: 150 },
+        { field: 'quantity', headerName: 'Assigned Qty', flex: 0.8, minWidth: 100, type: 'number' },
+        {
+            field: 'returnQuantity',
+            headerName: 'Return Qty',
+            flex: 0.8,
+            minWidth: 100,
+            type: 'number',
+            renderCell: (params) => (
+                <span style={{
+                    color: params.value < params.row.quantity ? '#f57c00' : colors.text.primary,
+                    fontWeight: params.value < params.row.quantity ? 600 : 'normal'
+                }}>
+                    {params.value || 0}
+                </span>
+            )
+        },
+        { field: 'washingMachine', headerName: 'WM', flex: 1, minWidth: 80 },
+        { field: 'dryingMachine', headerName: 'DM', flex: 1, minWidth: 80 },
+        {
+            field: 'assignedAt',
+            headerName: 'Assigned At',
+            flex: 1.5,
+            minWidth: 150,
+            renderCell: (params) => {
+                const date = new Date(params.value);
+                const formattedDate = date.toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric'
+                });
+                const formattedTime = date.toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                });
+                return (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                        <span style={{ fontWeight: 500, color: colors.text.primary }}>
+                            {formattedDate}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', color: colors.text.secondary }}>
+                            {formattedTime}
+                        </span>
+                    </div>
+                );
+            }
+        },
         {
             field: 'status',
             headerName: 'Status',
@@ -111,7 +159,7 @@ export default function RecordAssignmentsPage() {
             }
         },
         {
-            field: 'toggleStatus',
+            field: 'completion',
             headerName: 'Complete',
             flex: 0.5,
             minWidth: 80,
@@ -120,14 +168,18 @@ export default function RecordAssignmentsPage() {
                 <IconButton
                     onClick={(e) => {
                         e.stopPropagation();
-                        handleToggleStatusDirect(params.row);
+                        setCompletionModal({
+                            open: true,
+                            assignment: params.row
+                        });
                     }}
                     size="small"
                     sx={{
                         color: params.row.status === 'Completed' ? colors.button.primary : colors.text.secondary
                     }}
+                    title={params.row.status === 'Completed' ? 'Update completion status' : 'Mark as completed'}
                 >
-                    {params.row.status === 'Completed' ? <CheckCircle /> : <RadioButtonUnchecked />}
+                    {params.row.status === 'Completed' ? <AssignmentTurnedIn /> : <RadioButtonUnchecked />}
                 </IconButton>
             )
         },
@@ -404,28 +456,36 @@ export default function RecordAssignmentsPage() {
     };
 
 
-    const handleToggleStatusDirect = async (assignment: MachineAssignment) => {
-        if (!record || !recordId) return;
 
-        const isCompleted = assignment.status === 'Completed';
+    const handleCloseCompletionModal = () => {
+        setCompletionModal({
+            open: false,
+            assignment: null
+        });
+    };
+
+    const handleUpdateCompletion = async (assignmentId: string, isCompleted: boolean, returnQuantity: number) => {
+        if (!recordId) return;
 
         try {
             setSaving(true);
-
-            // Toggle status via API based on current status
-            const updatedAssignment = isCompleted
-                ? await recordService.setAssignmentInProgress(recordId, assignment.id)
-                : await recordService.completeAssignment(recordId, assignment.id);
+            const updatedAssignment = await recordService.updateAssignmentCompletion(
+                recordId,
+                assignmentId,
+                isCompleted,
+                returnQuantity
+            );
 
             // Update assignment in local state
             setAssignments(prev => prev.map(a =>
-                a.id === assignment.id ? updatedAssignment : a
+                a.id === assignmentId ? updatedAssignment : a
             ));
 
-            toast.success(`Assignment ${isCompleted ? 'marked as In Progress' : 'completed'} successfully`);
+            toast.success(`Assignment ${isCompleted ? 'marked as completed' : 'marked as incomplete'} successfully`);
         } catch (error) {
-            console.error('Error updating assignment status:', error);
-            toast.error('Failed to update assignment status');
+            console.error('Error updating completion status:', error);
+            toast.error('Failed to update completion status');
+            throw error; // Re-throw to let the modal handle the error
         } finally {
             setSaving(false);
         }
@@ -781,6 +841,15 @@ export default function RecordAssignmentsPage() {
                 cancelText="Cancel"
                 onConfirm={confirmDialog.onConfirm}
                 onCancel={() => setConfirmDialog(prev => ({ ...prev, open: false }))}
+                loading={saving}
+            />
+
+            {/* Completion Status Modal */}
+            <CompletionStatusModal
+                open={completionModal.open}
+                onClose={handleCloseCompletionModal}
+                assignment={completionModal.assignment}
+                onUpdate={handleUpdateCompletion}
                 loading={saving}
             />
 

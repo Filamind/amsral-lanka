@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 
 import { useState, useEffect, useCallback } from 'react';
 import { Box, Typography, CircularProgress, Alert } from '@mui/material';
@@ -213,10 +212,10 @@ export default function DashboardPage() {
   return (
     <Box sx={{ p: 3 }}>
       {/* Header */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" sx={{ fontWeight: 700, color: colors.text.primary, mb: 1 }}>
+      <div className="mb-4">
+        <h2 className="text-xl md:text-2xl font-bold" style={{ color: colors.text.primary }}>
           Dashboard
-        </Typography>
+        </h2>
         <Typography variant="body1" sx={{ color: colors.text.secondary, mb: 3 }}>
           Welcome back! Here's what's happening with your orders today.
         </Typography>
@@ -227,7 +226,7 @@ export default function DashboardPage() {
           onChange={handleDateRangeChange}
           loading={loading}
         />
-      </Box>
+      </div>
 
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 400 }}>
@@ -251,7 +250,7 @@ export default function DashboardPage() {
             <MetricCard
               title="Completed Orders"
               value={quickStats?.completedOrders.toLocaleString() || '0'}
-              subtitle={quickStats ? `${Math.round((quickStats.completedOrders / quickStats.totalOrders) * 100)}% completion rate` : '0% completion rate'}
+              subtitle={quickStats && quickStats.totalOrders > 0 ? `${Math.round((quickStats.completedOrders / quickStats.totalOrders) * 100)}% completion rate` : '0% completion rate'}
               icon={<CheckCircle />}
               color="success"
             />

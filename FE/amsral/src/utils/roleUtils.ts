@@ -21,6 +21,7 @@ export interface RolePermissions {
   canViewOrders: boolean;
   canViewProduction: boolean;
   canViewManagement: boolean;
+  canViewQC: boolean;
   canViewBilling: boolean;
   canViewPrinter: boolean;
   canViewIntegrations: boolean;
@@ -82,6 +83,7 @@ export const getRolePermissions = (user: User | null): RolePermissions => {
         canViewOrders: true,
         canViewProduction: true,
         canViewManagement: true,
+        canViewQC: true,
         canViewBilling: true,
         canViewPrinter: true,
         canViewIntegrations: true,
@@ -100,6 +102,7 @@ export const getRolePermissions = (user: User | null): RolePermissions => {
         canViewOrders: true,
         canViewProduction: true,
         canViewManagement: true,
+        canViewQC: true,
         canViewBilling: false,
         canViewPrinter: true,
         canViewIntegrations: false,
@@ -119,6 +122,7 @@ export const getRolePermissions = (user: User | null): RolePermissions => {
         canViewOrders: true,
         canViewProduction: true,
         canViewManagement: false,
+        canViewQC: false,
         canViewBilling: false,
         canViewPrinter: true,
         canViewIntegrations: false,

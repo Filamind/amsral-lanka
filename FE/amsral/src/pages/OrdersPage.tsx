@@ -10,6 +10,7 @@ import ConfirmationDialog from '../components/common/ConfirmationDialog';
 import colors from '../styles/colors';
 import { orderService, type CreateOrderRequest, type ErrorResponse } from '../services/orderService';
 import CustomerService from '../services/customerService';
+import { itemService } from '../services/itemService';
 import { type BagLabelData } from '../utils/pdfUtils';
 import { usePrinter } from '../context/PrinterContext';
 import bagLabelPrinterService from '../services/bagLabelPrinterService';
@@ -37,6 +38,7 @@ type OrderRow = {
   date: string;
   customerId: string;
   customerName: string;
+  itemId?: string;
   quantity: number;
   gpNo?: string;
   notes: string;
@@ -99,11 +101,13 @@ export default function OrdersPage() {
 
   // State for dropdown options
   const [customerOptions, setCustomerOptions] = useState<{ value: string; label: string }[]>([]);
+  const [itemOptions, setItemOptions] = useState<{ value: string; label: string }[]>([]);
   const [optionsLoading, setOptionsLoading] = useState(true);
 
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0], // Today's date as default
     customerId: '',
+    itemId: '',
     quantity: 1,
     gpNo: '',
     notes: '',
@@ -140,6 +144,7 @@ export default function OrdersPage() {
           date: order.date,
           customerId: order.customerId,
           customerName: order.customerName,
+          itemId: order.itemId || undefined,
           quantity: order.quantity,
           notes: order.notes,
           records: order.records.map(record => ({
@@ -193,6 +198,10 @@ export default function OrdersPage() {
         }));
         setCustomerOptions(customerOpts);
 
+        // Fetch items
+        const itemsResponse = await itemService.getItemsList();
+        setItemOptions(itemsResponse.data);
+
         // Fetch orders
         await fetchOrders();
 
@@ -233,6 +242,7 @@ export default function OrdersPage() {
     const newErrors: { [key: string]: string } = {};
     if (!form.date) newErrors.date = 'Date is required';
     if (!form.customerId) newErrors.customerId = 'Customer is required';
+    if (!form.itemId) newErrors.itemId = 'Item is required';
     if (!form.quantity || form.quantity <= 0) newErrors.quantity = 'Quantity must be greater than 0';
     if (!form.deliveryDate) newErrors.deliveryDate = 'Delivery date is required';
 
@@ -246,6 +256,7 @@ export default function OrdersPage() {
       setForm({
         date: order.date,
         customerId: order.customerId,
+        itemId: order.itemId || '',
         quantity: order.quantity,
         gpNo: order.gpNo || '',
         notes: order.notes,
@@ -257,6 +268,7 @@ export default function OrdersPage() {
       setForm({
         date: new Date().toISOString().split('T')[0],
         customerId: '',
+        itemId: '',
         quantity: 1,
         gpNo: '',
         notes: '',
@@ -677,7 +689,7 @@ export default function OrdersPage() {
       minWidth: 50,
       sortable: false,
       renderCell: (params) => {
-        const isComplete = (params.row.status || '').toLowerCase() === 'complete';
+        const isComplete = (params.row.status || '').toLowerCase() === 'complete' || (params.row.status || '').toLowerCase() === 'qc';
         const canPrint = isComplete && isConnected;
         return (
           <IconButton
@@ -757,6 +769,7 @@ export default function OrdersPage() {
         const updateData: Partial<CreateOrderRequest> = {
           date: form.date,
           customerId: form.customerId,
+          itemId: form.itemId,
           quantity: form.quantity,
           notes: form.notes || undefined,
           deliveryDate: form.deliveryDate,
@@ -786,6 +799,7 @@ export default function OrdersPage() {
         const orderData: CreateOrderRequest = {
           date: form.date,
           customerId: form.customerId,
+          itemId: form.itemId,
           quantity: form.quantity,
           gpNo: form.gpNo || undefined,
           notes: form.notes || undefined,
@@ -830,6 +844,7 @@ export default function OrdersPage() {
       setForm({
         date: new Date().toISOString().split('T')[0],
         customerId: '',
+        itemId: '',
         quantity: 1,
         gpNo: '',
         notes: '',
@@ -1009,6 +1024,7 @@ export default function OrdersPage() {
               form={form}
               errors={errors}
               customerOptions={customerOptions}
+              itemOptions={itemOptions}
               optionsLoading={optionsLoading}
               onChange={handleChange}
               showAdditional={showAdditional}
