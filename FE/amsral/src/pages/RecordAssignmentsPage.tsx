@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Modal, Box, Typography, IconButton, Menu, MenuItem, Fab, Tooltip } from '@mui/material';
-import { ArrowBack, MoreVert, CheckCircle, RadioButtonUnchecked, Print, PrintOutlined, PrintDisabled, AssignmentTurnedIn } from '@mui/icons-material';
+import { ArrowBack, MoreVert, RadioButtonUnchecked, Print, PrintOutlined, PrintDisabled, AssignmentTurnedIn } from '@mui/icons-material';
 import type { GridColDef } from '@mui/x-data-grid';
 import PrimaryButton from '../components/common/PrimaryButton';
 import PrimaryTable from '../components/common/PrimaryTable';
@@ -100,7 +100,7 @@ export default function RecordAssignmentsPage() {
             type: 'number',
             renderCell: (params) => (
                 <span style={{
-                    color: params.value < params.row.quantity ? colors.warning.main || '#f57c00' : colors.text.primary,
+                    color: params.value < params.row.quantity ? '#f57c00' : colors.text.primary,
                     fontWeight: params.value < params.row.quantity ? 600 : 'normal'
                 }}>
                     {params.value || 0}
@@ -456,12 +456,6 @@ export default function RecordAssignmentsPage() {
     };
 
 
-    const handleOpenCompletionModal = (assignment: MachineAssignment) => {
-        setCompletionModal({
-            open: true,
-            assignment: assignment
-        });
-    };
 
     const handleCloseCompletionModal = () => {
         setCompletionModal({

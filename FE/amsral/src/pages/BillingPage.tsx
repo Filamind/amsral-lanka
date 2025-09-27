@@ -4,6 +4,9 @@ import {
     Tooltip,
     Alert,
     CircularProgress,
+    Tabs,
+    Tab,
+    Box,
 } from '@mui/material';
 import {
     Receipt as ReceiptIcon,
@@ -15,9 +18,8 @@ import { hasPermission } from '../utils/roleUtils';
 import PrimaryButton from '../components/common/PrimaryButton';
 import PrimaryTable from '../components/common/PrimaryTable';
 import PrimaryDropdown from '../components/common/PrimaryDropdown';
-import { orderService } from '../services/orderService';
 import { CustomerService, type Customer } from '../services/customerService';
-import { BillingService } from '../services/billingService';
+import { BillingService, type Invoice, type InvoiceFilters } from '../services/billingService';
 import { getStatusColor, getStatusLabel, normalizeStatus } from '../utils/statusUtils';
 import toast from 'react-hot-toast';
 import InvoiceCreationModal from '../components/modals/InvoiceCreationModal';
@@ -42,24 +44,36 @@ interface BillingOrder {
     records: unknown[];
     amount?: number;
     paymentAmount?: number; // Actual payment amount received (may be less than invoice amount)
+    balance?: number; // Customer balance amount
 }
 
 const BillingPage: React.FC = () => {
     const { user } = useAuth();
+    const [activeTab, setActiveTab] = useState(0);
+
+    // Orders tab state
     const [orders, setOrders] = useState<BillingOrder[]>([]);
-    const [customers, setCustomers] = useState<Customer[]>([]);
-    const [loading, setLoading] = useState(true);
     const [selectedOrders, setSelectedOrders] = useState<number[]>([]);
     const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
+
+    // Invoices tab state
+    const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [paymentModal, setPaymentModal] = useState({
         open: false,
-        order: null as BillingOrder | null,
+        invoice: null as Invoice | null,
     });
+
+    // Common state
+    const [customers, setCustomers] = useState<Customer[]>([]);
+    const [loading, setLoading] = useState(true);
 
     // Filter states
     const [search, setSearch] = useState('');
     const [customerFilter, setCustomerFilter] = useState('');
-    const [billingStatusFilter, setBillingStatusFilter] = useState('');
+
+    // Invoice filter states
+    const [invoiceStatusFilter, setInvoiceStatusFilter] = useState('');
+    const [invoiceCustomerFilter, setInvoiceCustomerFilter] = useState('');
 
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
@@ -77,25 +91,19 @@ const BillingPage: React.FC = () => {
     const fetchOrders = useCallback(async () => {
         try {
             setLoading(true);
-            const response = await orderService.getOrders({
+            const response = await BillingService.getBillingOrders({
                 page: currentPage,
                 limit: pageSize,
-                // Remove search from API call - we'll filter on frontend
-                // search: search || undefined,
                 customerName: customerFilter || undefined,
-                // Note: billingStatus filter might not be supported by the API yet
-                // billingStatus: billingStatusFilter || undefined,
+                billingStatus: 'pending', // Only fetch pending orders for Orders tab
             });
 
             if (response.success) {
                 // Filter orders by billingStatus and search on the frontend if API doesn't support it
                 let filteredOrders = response.data.orders as BillingOrder[];
 
-                if (billingStatusFilter) {
-                    filteredOrders = filteredOrders.filter(order =>
-                        order.billingStatus === billingStatusFilter
-                    );
-                }
+                // Only show pending orders (not invoiced or paid)
+                filteredOrders = filteredOrders.filter(order => order.billingStatus === 'pending');
 
                 // Apply search filter - search by Order ID (displayed as Reference No) and customer name
                 if (search && search.trim()) {
@@ -115,8 +123,8 @@ const BillingPage: React.FC = () => {
                 setPagination({
                     currentPage: response.data.pagination?.currentPage || 1,
                     totalPages: response.data.pagination?.totalPages || 1,
-                    totalItems: response.data.pagination?.totalRecords || filteredOrders.length,
-                    itemsPerPage: response.data.pagination?.limit || pageSize,
+                    totalItems: response.data.pagination?.totalItems || filteredOrders.length,
+                    itemsPerPage: response.data.pagination?.itemsPerPage || pageSize,
                     hasNextPage: (response.data.pagination?.currentPage || 1) < (response.data.pagination?.totalPages || 1),
                     hasPrevPage: (response.data.pagination?.currentPage || 1) > 1
                 });
@@ -129,7 +137,39 @@ const BillingPage: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [search, currentPage, pageSize, customerFilter, billingStatusFilter]);
+    }, [search, currentPage, pageSize, customerFilter]);
+
+    // Fetch invoices (for Invoices tab)
+    const fetchInvoices = useCallback(async () => {
+        try {
+            setLoading(true);
+            const filters: InvoiceFilters = {
+                page: currentPage,
+                limit: pageSize,
+                status: (invoiceStatusFilter as 'draft' | 'sent' | 'paid' | 'overdue') || undefined,
+                customerName: invoiceCustomerFilter || undefined,
+            };
+
+            const response = await BillingService.getInvoices(filters);
+
+            if (response.success) {
+                setInvoices(response.data.invoices);
+                setPagination({
+                    currentPage: response.data.pagination?.currentPage || 1,
+                    totalPages: response.data.pagination?.totalPages || 1,
+                    totalItems: response.data.pagination?.totalItems || response.data.invoices.length,
+                    itemsPerPage: response.data.pagination?.itemsPerPage || pageSize,
+                    hasNextPage: (response.data.pagination?.currentPage || 1) < (response.data.pagination?.totalPages || 1),
+                    hasPrevPage: (response.data.pagination?.currentPage || 1) > 1
+                });
+            }
+        } catch (error) {
+            console.error('Error fetching invoices:', error);
+            toast.error('Failed to fetch invoices');
+        } finally {
+            setLoading(false);
+        }
+    }, [currentPage, pageSize, invoiceStatusFilter, invoiceCustomerFilter]);
 
     // Fetch customers for filter dropdown
     const fetchCustomers = useCallback(async () => {
@@ -150,8 +190,12 @@ const BillingPage: React.FC = () => {
             try {
                 // Fetch customers
                 await fetchCustomers();
-                // Fetch orders
-                await fetchOrders();
+                // Fetch data based on active tab
+                if (activeTab === 0) {
+                    await fetchOrders();
+                } else {
+                    await fetchInvoices();
+                }
             } catch (error) {
                 console.error('Error fetching data:', error);
                 toast.error('Failed to load data. Please refresh the page.');
@@ -159,25 +203,33 @@ const BillingPage: React.FC = () => {
         };
 
         fetchData();
-    }, [fetchOrders, fetchCustomers]);
+    }, [activeTab, fetchOrders, fetchInvoices, fetchCustomers]);
 
-    // Fetch orders when search changes
+    // Fetch data when search changes
     useEffect(() => {
         const timeoutId = setTimeout(() => {
             if (search !== undefined) {
                 setCurrentPage(1); // Reset to first page when search changes
-                fetchOrders();
+                if (activeTab === 0) {
+                    fetchOrders();
+                } else {
+                    fetchInvoices();
+                }
             }
         }, 500);
 
         return () => clearTimeout(timeoutId);
-    }, [search, fetchOrders]);
+    }, [search, activeTab, fetchOrders, fetchInvoices]);
 
-    // Fetch orders when filters change
+    // Fetch data when filters change
     useEffect(() => {
         setCurrentPage(1); // Reset to first page when filters change
-        fetchOrders();
-    }, [customerFilter, billingStatusFilter, fetchOrders]);
+        if (activeTab === 0) {
+            fetchOrders();
+        } else {
+            fetchInvoices();
+        }
+    }, [activeTab, customerFilter, invoiceStatusFilter, invoiceCustomerFilter, fetchOrders, fetchInvoices]);
 
     // Handle order selection
     const handleOrderSelect = (orderId: number, selected: boolean) => {
@@ -213,8 +265,12 @@ const BillingPage: React.FC = () => {
     // Handle filters
     const handleClearFilters = () => {
         setSearch('');
-        setCustomerFilter('');
-        setBillingStatusFilter('');
+        if (activeTab === 0) {
+            setCustomerFilter('');
+        } else {
+            setInvoiceCustomerFilter('');
+            setInvoiceStatusFilter('');
+        }
         setCurrentPage(1);
     };
 
@@ -227,32 +283,32 @@ const BillingPage: React.FC = () => {
     };
 
     // Handle opening payment modal
-    const handleOpenPaymentModal = (order: BillingOrder) => {
+    const handleOpenPaymentModal = (invoice: Invoice) => {
         setPaymentModal({
             open: true,
-            order: order
+            invoice: invoice
         });
     };
 
     const handleClosePaymentModal = () => {
         setPaymentModal({
             open: false,
-            order: null
+            invoice: null
         });
     };
 
-    const handleUpdatePayment = async (orderId: number, isPaid: boolean, paymentAmount: number) => {
+    const handleUpdatePayment = async (invoiceId: number, paymentAmount: number) => {
         try {
-            const response = await BillingService.updateOrderPaymentStatus(orderId, isPaid, paymentAmount);
+            const response = await BillingService.updateInvoicePaymentStatus(invoiceId, true, paymentAmount);
             if (response.success) {
-                toast.success('Payment status updated successfully');
-                fetchOrders(); // Refresh the orders list
+                toast.success('Payment updated successfully');
+                fetchInvoices(); // Refresh the invoices list
             } else {
-                toast.error('Failed to update payment status');
+                toast.error('Failed to update payment');
             }
         } catch (error) {
-            console.error('Error updating payment status:', error);
-            toast.error('Error updating payment status');
+            console.error('Error updating payment:', error);
+            toast.error('Error updating payment');
             throw error; // Re-throw to let the modal handle the error
         }
     };
@@ -266,8 +322,8 @@ const BillingPage: React.FC = () => {
         }, 1000); // Small delay to ensure backend has processed the update
     };
 
-    // Table columns definition
-    const columns: GridColDef[] = [
+    // Orders table columns definition
+    const ordersColumns: GridColDef[] = [
         {
             field: 'select',
             headerName: '',
@@ -311,6 +367,21 @@ const BillingPage: React.FC = () => {
         },
         { field: 'quantity', headerName: 'Total Qty', flex: 0.8, minWidth: 100, type: 'number' },
         {
+            field: 'balance',
+            headerName: 'Customer Balance',
+            flex: 1,
+            minWidth: 120,
+            type: 'number',
+            renderCell: (params) => (
+                <span style={{
+                    fontWeight: 500,
+                    color: params.value && params.value > 0 ? '#f57c00' : colors.text.primary
+                }}>
+                    ${params.value || 0}
+                </span>
+            )
+        },
+        {
             field: 'amount',
             headerName: 'Invoice Amount',
             flex: 1,
@@ -337,8 +408,8 @@ const BillingPage: React.FC = () => {
                 return (
                     <span style={{
                         fontWeight: 500,
-                        color: isPartial ? colors.warning.main || '#f57c00' :
-                            isOverpaid ? colors.info.main || '#17a2b8' :
+                        color: isPartial ? '#f57c00' :
+                            isOverpaid ? '#17a2b8' :
                                 colors.text.primary
                     }}>
                         ${paymentAmount}
@@ -408,6 +479,153 @@ const BillingPage: React.FC = () => {
         },
     ];
 
+    // Invoices table columns definition
+    const invoicesColumns: GridColDef[] = [
+        { field: 'invoiceNumber', headerName: 'Invoice #', flex: 1, minWidth: 120 },
+        { field: 'customerName', headerName: 'Customer', flex: 1.5, minWidth: 150 },
+        {
+            field: 'createdAt',
+            headerName: 'Created Date',
+            flex: 1,
+            minWidth: 120,
+            renderCell: (params) => params.row.createdAt ? new Date(params.row.createdAt).toLocaleDateString() : 'N/A'
+        },
+        {
+            field: 'balance',
+            headerName: 'Customer Balance',
+            flex: 1,
+            minWidth: 120,
+            type: 'number',
+            renderCell: (params) => (
+                <span style={{
+                    fontWeight: 500,
+                    color: params.value && params.value > 0 ? '#f57c00' : colors.text.primary
+                }}>
+                    ${params.value || 0}
+                </span>
+            )
+        },
+        {
+            field: 'total',
+            headerName: 'Invoice Amount',
+            flex: 1,
+            minWidth: 120,
+            type: 'number',
+            renderCell: (params) => (
+                <span style={{ fontWeight: 500, color: colors.text.primary }}>
+                    ${params.value || 0}
+                </span>
+            )
+        },
+        {
+            field: 'paymentAmount',
+            headerName: 'Payment Amount',
+            flex: 1,
+            minWidth: 120,
+            type: 'number',
+            renderCell: (params) => {
+                const paymentAmount = params.value || 0;
+                const invoiceAmount = params.row.total || 0;
+                const isPartial = paymentAmount > 0 && paymentAmount < invoiceAmount;
+                const isOverpaid = paymentAmount > invoiceAmount;
+
+                return (
+                    <span style={{
+                        fontWeight: 500,
+                        color: isPartial ? '#f57c00' :
+                            isOverpaid ? '#17a2b8' :
+                                colors.text.primary
+                    }}>
+                        ${paymentAmount}
+                    </span>
+                );
+            }
+        },
+        {
+            field: 'status',
+            headerName: 'Status',
+            flex: 1,
+            minWidth: 120,
+            renderCell: (params) => {
+                const status = params.value || 'draft';
+                // Map invoice status to appropriate colors
+                const getInvoiceStatusColor = (status: string) => {
+                    switch (status.toLowerCase()) {
+                        case 'draft':
+                            return 'bg-gray-100 text-gray-800';
+                        case 'sent':
+                            return 'bg-blue-100 text-blue-800';
+                        case 'paid':
+                            return 'bg-green-100 text-green-800';
+                        case 'overdue':
+                            return 'bg-red-100 text-red-800';
+                        default:
+                            return 'bg-gray-100 text-gray-800';
+                    }
+                };
+
+                const getInvoiceStatusLabel = (status: string) => {
+                    switch (status.toLowerCase()) {
+                        case 'draft':
+                            return 'Draft';
+                        case 'sent':
+                            return 'Sent';
+                        case 'paid':
+                            return 'Paid';
+                        case 'overdue':
+                            return 'Overdue';
+                        default:
+                            return status.toUpperCase();
+                    }
+                };
+
+                const statusColor = getInvoiceStatusColor(status);
+                const statusLabel = getInvoiceStatusLabel(status);
+
+                return (
+                    <span
+                        className={`px-3 py-1 rounded-xl text-sm font-semibold ${statusColor}`}
+                    >
+                        {statusLabel}
+                    </span>
+                );
+            }
+        },
+        {
+            field: 'paymentStatus',
+            headerName: 'Payment',
+            flex: 1,
+            minWidth: 130,
+            sortable: false,
+            renderCell: (params) => {
+                if (params.row.status === 'paid') {
+                    return (
+                        <Tooltip title="Update Payment Status">
+                            <IconButton
+                                size="small"
+                                onClick={() => handleOpenPaymentModal(params.row)}
+                                sx={{ color: colors.button.primary }}
+                            >
+                                <CheckIcon />
+                            </IconButton>
+                        </Tooltip>
+                    );
+                } else {
+                    return (
+                        <Tooltip title="Mark as Paid">
+                            <IconButton
+                                size="small"
+                                onClick={() => handleOpenPaymentModal(params.row)}
+                                sx={{ color: colors.success }}
+                            >
+                                <CheckIcon />
+                            </IconButton>
+                        </Tooltip>
+                    );
+                }
+            }
+        },
+    ];
 
     // Check permissions
     const canViewBilling = hasPermission(user, 'canViewBilling');
@@ -427,12 +645,30 @@ const BillingPage: React.FC = () => {
             <div className="flex flex-col gap-3 mb-4">
                 <h2 className="text-xl md:text-2xl font-bold" style={{ color: colors.text.primary }}>Billing Management</h2>
 
+                {/* Tabs */}
+                <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                    <Tabs
+                        value={activeTab}
+                        onChange={(_, newValue) => setActiveTab(newValue)}
+                        sx={{
+                            '& .MuiTab-root': {
+                                textTransform: 'none',
+                                fontWeight: 500,
+                                fontSize: '1rem',
+                            }
+                        }}
+                    >
+                        <Tab label="Orders (Create Invoice)" />
+                        <Tab label="Invoices (Payment Management)" />
+                    </Tabs>
+                </Box>
+
                 {/* Search and Filters Row */}
                 <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center">
                     <div className="flex-1 w-full lg:w-auto">
                         <input
                             type="text"
-                            placeholder="Search by reference number or customer..."
+                            placeholder={activeTab === 0 ? "Search pending orders by reference number or customer..." : "Search invoices by invoice number or customer..."}
                             value={search}
                             onChange={e => setSearch(e.target.value)}
                             className="w-full px-3 py-2 border rounded-xl focus:outline-none text-sm"
@@ -442,8 +678,8 @@ const BillingPage: React.FC = () => {
 
                     <div className="flex flex-wrap gap-2 items-center">
                         <PrimaryDropdown
-                            value={customerFilter}
-                            onChange={(e) => setCustomerFilter(e.target.value)}
+                            value={activeTab === 0 ? customerFilter : invoiceCustomerFilter}
+                            onChange={(e) => activeTab === 0 ? setCustomerFilter(e.target.value) : setInvoiceCustomerFilter(e.target.value)}
                             options={[
                                 { value: '', label: 'All Customers' },
                                 ...customers.map(customer => ({
@@ -454,18 +690,21 @@ const BillingPage: React.FC = () => {
                             placeholder="Customer"
                             style={{ minWidth: 140 }}
                         />
-                        <PrimaryDropdown
-                            value={billingStatusFilter}
-                            onChange={(e) => setBillingStatusFilter(e.target.value)}
-                            options={[
-                                { value: '', label: 'All Status' },
-                                { value: 'pending', label: 'Pending' },
-                                { value: 'invoiced', label: 'Invoiced' },
-                                { value: 'paid', label: 'Paid' }
-                            ]}
-                            placeholder="Status"
-                            style={{ minWidth: 100 }}
-                        />
+                        {activeTab === 1 && (
+                            <PrimaryDropdown
+                                value={invoiceStatusFilter}
+                                onChange={(e) => setInvoiceStatusFilter(e.target.value)}
+                                options={[
+                                    { value: '', label: 'All Status' },
+                                    { value: 'draft', label: 'Draft' },
+                                    { value: 'sent', label: 'Sent' },
+                                    { value: 'paid', label: 'Paid' },
+                                    { value: 'overdue', label: 'Overdue' }
+                                ]}
+                                placeholder="Invoice Status"
+                                style={{ minWidth: 140 }}
+                            />
+                        )}
                         <PrimaryButton
                             onClick={handleClearFilters}
                             style={{ minWidth: 70 }}
@@ -475,17 +714,19 @@ const BillingPage: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Action Button Row */}
-                <div className="flex justify-end">
-                    <PrimaryButton
-                        style={{ minWidth: 180 }}
-                        onClick={handleCreateInvoice}
-                        disabled={selectedOrders.length === 0}
-                    >
-                        <ReceiptIcon style={{ marginRight: 8 }} />
-                        Create Invoice ({selectedOrders.length})
-                    </PrimaryButton>
-                </div>
+                {/* Action Button Row - Only show for Orders tab */}
+                {activeTab === 0 && (
+                    <div className="flex justify-end">
+                        <PrimaryButton
+                            style={{ minWidth: 180 }}
+                            onClick={handleCreateInvoice}
+                            disabled={selectedOrders.length === 0}
+                        >
+                            <ReceiptIcon style={{ marginRight: 8 }} />
+                            Create Invoice ({selectedOrders.length})
+                        </PrimaryButton>
+                    </div>
+                )}
             </div>
 
             {/* Table Section */}
@@ -494,21 +735,25 @@ const BillingPage: React.FC = () => {
                     <div className="flex justify-center items-center py-12">
                         <div className="flex flex-col items-center gap-3">
                             <CircularProgress size={40} />
-                            <span className="text-sm text-gray-500">Loading orders...</span>
+                            <span className="text-sm text-gray-500">
+                                {activeTab === 0 ? 'Loading orders...' : 'Loading invoices...'}
+                            </span>
                         </div>
                     </div>
-                ) : orders.length === 0 ? (
+                ) : (activeTab === 0 ? orders.length === 0 : invoices.length === 0) ? (
                     <div className="flex justify-center items-center py-12">
                         <div className="text-center">
-                            <p className="text-gray-500 mb-2">No orders found</p>
+                            <p className="text-gray-500 mb-2">
+                                {activeTab === 0 ? 'No orders found' : 'No invoices found'}
+                            </p>
                             <p className="text-sm text-gray-400">Try adjusting your search or filters</p>
                         </div>
                     </div>
                 ) : (
                     <div className="bg-white rounded-lg shadow-sm border" style={{ borderColor: colors.border.light }}>
                         <PrimaryTable
-                            columns={columns}
-                            rows={orders}
+                            columns={activeTab === 0 ? ordersColumns : invoicesColumns}
+                            rows={activeTab === 0 ? orders : invoices}
                             pageSizeOptions={[5, 10, 20, 50]}
                             pagination
                             paginationMode="server"
@@ -545,7 +790,7 @@ const BillingPage: React.FC = () => {
             <PaymentStatusModal
                 open={paymentModal.open}
                 onClose={handleClosePaymentModal}
-                order={paymentModal.order}
+                order={paymentModal.invoice}
                 onUpdate={handleUpdatePayment}
                 loading={loading}
             />

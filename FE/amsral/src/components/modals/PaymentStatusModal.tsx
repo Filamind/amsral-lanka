@@ -6,39 +6,33 @@ import {
     DialogActions,
     Box,
     Typography,
-    FormControlLabel,
-    Checkbox,
     TextField,
     Divider
 } from '@mui/material';
 import PrimaryButton from '../common/PrimaryButton';
 import colors from '../../styles/colors';
 
-interface BillingOrder {
+interface Invoice {
     id: number;
-    date: string;
-    referenceNo: string;
-    customerId: string;
+    invoiceNumber: string;
     customerName: string;
-    quantity: number;
-    notes: string | null;
-    deliveryDate: string;
-    status: string;
-    billingStatus: 'pending' | 'invoiced' | 'paid';
-    recordsCount: number;
-    complete: boolean;
-    createdAt: string;
-    updatedAt: string;
-    records: unknown[];
-    amount?: number;
+    customerId: string;
+    subtotal: number;
+    taxAmount: number;
+    total: number;
+    dueDate: string;
+    status: 'draft' | 'sent' | 'paid' | 'overdue';
     paymentAmount?: number;
+    balance?: number; // Customer balance amount
+    createdAt: string;
+    updatedAt?: string;
 }
 
 interface PaymentStatusModalProps {
     open: boolean;
     onClose: () => void;
-    order: BillingOrder | null;
-    onUpdate: (orderId: number, isPaid: boolean, paymentAmount: number) => Promise<void>;
+    order: Invoice | null;
+    onUpdate: (orderId: number, paymentAmount: number) => Promise<void>;
     loading?: boolean;
 }
 
@@ -49,15 +43,13 @@ const PaymentStatusModal: React.FC<PaymentStatusModalProps> = ({
     onUpdate,
     loading = false
 }) => {
-    const [isPaid, setIsPaid] = useState(false);
     const [paymentAmount, setPaymentAmount] = useState(0);
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
     // Initialize form when order changes
     useEffect(() => {
         if (order) {
-            setIsPaid(order.billingStatus === 'paid');
-            setPaymentAmount(order.paymentAmount || order.amount || 0);
+            setPaymentAmount(order.paymentAmount || order.total || 0);
             setErrors({});
         }
     }, [order]);
@@ -72,8 +64,8 @@ const PaymentStatusModal: React.FC<PaymentStatusModalProps> = ({
             newErrors.paymentAmount = 'Payment amount cannot be negative';
         }
 
-        if (paymentAmount > (order.amount || 0)) {
-            newErrors.paymentAmount = `Payment amount cannot exceed invoice amount (${order.amount || 0})`;
+        if (paymentAmount > (order.total || 0)) {
+            newErrors.paymentAmount = `Payment amount cannot exceed invoice amount (${order.total || 0})`;
         }
 
         if (Object.keys(newErrors).length > 0) {
@@ -82,7 +74,8 @@ const PaymentStatusModal: React.FC<PaymentStatusModalProps> = ({
         }
 
         try {
-            await onUpdate(order.id, isPaid, paymentAmount);
+            // Backend will determine payment status based on payment amount
+            await onUpdate(order.id, paymentAmount);
             onClose();
         } catch (error) {
             console.error('Error updating payment status:', error);
@@ -112,24 +105,24 @@ const PaymentStatusModal: React.FC<PaymentStatusModalProps> = ({
             <DialogTitle sx={{
                 pb: 1,
                 borderBottom: `1px solid ${colors.border.light}`,
-                backgroundColor: colors.background.light
+                backgroundColor: colors.background.card
             }}>
                 <Typography variant="h6" fontWeight={600} color={colors.text.primary}>
-                    Update Payment Status
+                    Record Payment
                 </Typography>
                 <Typography variant="body2" color={colors.text.secondary} sx={{ mt: 0.5 }}>
-                    Order #{order.referenceNo}
+                    Invoice #{order.invoiceNumber}
                 </Typography>
             </DialogTitle>
 
             <DialogContent sx={{ py: 3 }}>
                 <Box sx={{ mb: 3 }}>
                     <Typography variant="subtitle2" color={colors.text.primary} sx={{ mb: 1, fontWeight: 600 }}>
-                        Order Details
+                        Invoice Details
                     </Typography>
                     <Box sx={{
                         p: 2,
-                        backgroundColor: colors.background.light,
+                        backgroundColor: colors.background.card,
                         borderRadius: '8px',
                         border: `1px solid ${colors.border.light}`
                     }}>
@@ -138,22 +131,32 @@ const PaymentStatusModal: React.FC<PaymentStatusModalProps> = ({
                             <Typography variant="body2" fontWeight={500}>{order.customerName}</Typography>
                         </Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                            <Typography variant="body2" color={colors.text.secondary}>Quantity:</Typography>
-                            <Typography variant="body2" fontWeight={500}>{order.quantity}</Typography>
+                            <Typography variant="body2" color={colors.text.secondary}>Due Date:</Typography>
+                            <Typography variant="body2" fontWeight={500}>
+                                {order.dueDate ? new Date(order.dueDate).toLocaleDateString() : 'N/A'}
+                            </Typography>
                         </Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                             <Typography variant="body2" color={colors.text.secondary}>Invoice Amount:</Typography>
                             <Typography variant="body2" fontWeight={500} color={colors.button.primary}>
-                                ${order.amount || 0}
+                                ${order.total || 0}
                             </Typography>
                         </Box>
+                        {order.balance !== undefined && (
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                                <Typography variant="body2" color={colors.text.secondary}>Customer Balance:</Typography>
+                                <Typography variant="body2" fontWeight={500} color={order.balance > 0 ? '#f57c00' : colors.text.primary}>
+                                    ${order.balance || 0}
+                                </Typography>
+                            </Box>
+                        )}
                         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                             <Typography variant="body2" color={colors.text.secondary}>Status:</Typography>
                             <Typography variant="body2" fontWeight={500} sx={{
-                                color: order.billingStatus === 'paid' ? colors.success :
-                                    order.billingStatus === 'invoiced' ? colors.warning.main : colors.text.secondary
+                                color: order.status === 'paid' ? colors.success :
+                                    order.status === 'sent' ? colors.warning : colors.text.secondary
                             }}>
-                                {order.billingStatus.toUpperCase()}
+                                {order.status.toUpperCase()}
                             </Typography>
                         </Box>
                     </Box>
@@ -161,35 +164,13 @@ const PaymentStatusModal: React.FC<PaymentStatusModalProps> = ({
 
                 <Divider sx={{ my: 2 }} />
 
-                <Box sx={{ mb: 3 }}>
-                    <FormControlLabel
-                        control={
-                            <Checkbox
-                                checked={isPaid}
-                                onChange={(e) => setIsPaid(e.target.checked)}
-                                sx={{
-                                    color: colors.button.primary,
-                                    '&.Mui-checked': {
-                                        color: colors.button.primary,
-                                    },
-                                }}
-                            />
-                        }
-                        label={
-                            <Typography variant="body1" fontWeight={500} color={colors.text.primary}>
-                                Mark as Paid
-                            </Typography>
-                        }
-                    />
-                </Box>
-
                 <Box sx={{ mb: 2 }}>
                     <Typography variant="subtitle2" color={colors.text.primary} sx={{ mb: 1, fontWeight: 600 }}>
                         Payment Amount
                     </Typography>
-                    <Typography variant="body2" color={colors.text.secondary} sx={{ mb: 2 }}>
+                    {/* <Typography variant="body2" color={colors.text.secondary} sx={{ mb: 2 }}>
                         Enter the actual payment amount received. This may be less than the invoice amount due to discounts or partial payments.
-                    </Typography>
+                    </Typography> */}
                     <TextField
                         fullWidth
                         type="number"
@@ -200,7 +181,7 @@ const PaymentStatusModal: React.FC<PaymentStatusModalProps> = ({
                         placeholder="Enter payment amount"
                         inputProps={{
                             min: 0,
-                            max: order.amount || 0,
+                            max: order.total || 0,
                             step: 0.01
                         }}
                         InputProps={{
@@ -223,31 +204,31 @@ const PaymentStatusModal: React.FC<PaymentStatusModalProps> = ({
                     />
                 </Box>
 
-                {paymentAmount < (order.amount || 0) && (
+                {paymentAmount < (order.total || 0) && (
                     <Box sx={{
                         p: 2,
-                        backgroundColor: colors.warning.light || '#fff3cd',
+                        backgroundColor: '#fff3cd',
                         borderRadius: '8px',
-                        border: `1px solid ${colors.warning.main || '#ffc107'}`,
+                        border: '1px solid #ffc107',
                         mb: 2
                     }}>
-                        <Typography variant="body2" color={colors.warning.dark || '#856404'}>
-                            <strong>Note:</strong> Payment amount (${paymentAmount}) is less than invoice amount (${order.amount || 0}).
+                        <Typography variant="body2" color="#856404">
+                            <strong>Note:</strong> Payment amount (${paymentAmount}) is less than invoice amount (${order.total || 0}).
                             This will be recorded as a partial payment.
                         </Typography>
                     </Box>
                 )}
 
-                {paymentAmount > (order.amount || 0) && (
+                {paymentAmount > (order.total || 0) && (
                     <Box sx={{
                         p: 2,
-                        backgroundColor: colors.info.light || '#d1ecf1',
+                        backgroundColor: '#d1ecf1',
                         borderRadius: '8px',
-                        border: `1px solid ${colors.info.main || '#17a2b8'}`,
+                        border: '1px solid #17a2b8',
                         mb: 2
                     }}>
-                        <Typography variant="body2" color={colors.info.dark || '#0c5460'}>
-                            <strong>Note:</strong> Payment amount (${paymentAmount}) exceeds invoice amount (${order.amount || 0}).
+                        <Typography variant="body2" color="#0c5460">
+                            <strong>Note:</strong> Payment amount (${paymentAmount}) exceeds invoice amount (${order.total || 0}).
                             This will be recorded as an overpayment.
                         </Typography>
                     </Box>
@@ -258,18 +239,14 @@ const PaymentStatusModal: React.FC<PaymentStatusModalProps> = ({
                 p: 3,
                 pt: 0,
                 borderTop: `1px solid ${colors.border.light}`,
-                backgroundColor: colors.background.light
+                backgroundColor: colors.background.card
             }}>
                 <PrimaryButton
                     onClick={handleClose}
                     disabled={loading}
-                    sx={{
+                    style={{
                         backgroundColor: colors.text.muted,
-                        color: colors.text.white,
-                        '&:hover': {
-                            backgroundColor: colors.text.muted,
-                            opacity: 0.9
-                        }
+                        color: colors.text.white
                     }}
                 >
                     Cancel
@@ -277,16 +254,12 @@ const PaymentStatusModal: React.FC<PaymentStatusModalProps> = ({
                 <PrimaryButton
                     onClick={handleSubmit}
                     disabled={loading}
-                    sx={{
+                    style={{
                         backgroundColor: colors.button.primary,
-                        color: colors.text.white,
-                        '&:hover': {
-                            backgroundColor: colors.button.primary,
-                            opacity: 0.9
-                        }
+                        color: colors.text.white
                     }}
                 >
-                    {loading ? 'Updating...' : 'Update Payment'}
+                    {loading ? 'Recording...' : 'Record Payment'}
                 </PrimaryButton>
             </DialogActions>
         </Dialog>

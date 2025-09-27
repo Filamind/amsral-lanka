@@ -113,7 +113,7 @@ const CompletionStatusModal: React.FC<CompletionStatusModalProps> = ({
             <DialogTitle sx={{
                 pb: 1,
                 borderBottom: `1px solid ${colors.border.light}`,
-                backgroundColor: colors.background.light
+                backgroundColor: colors.background.card
             }}>
                 <Typography variant="h6" fontWeight={600} color={colors.text.primary}>
                     Update Assignment Status
@@ -130,7 +130,7 @@ const CompletionStatusModal: React.FC<CompletionStatusModalProps> = ({
                     </Typography>
                     <Box sx={{
                         p: 2,
-                        backgroundColor: colors.background.light,
+                        backgroundColor: colors.background.card,
                         borderRadius: '8px',
                         border: `1px solid ${colors.border.light}`
                     }}>
@@ -217,12 +217,12 @@ const CompletionStatusModal: React.FC<CompletionStatusModalProps> = ({
                 {returnQuantity < assignment.quantity && (
                     <Box sx={{
                         p: 2,
-                        backgroundColor: colors.warning.light || '#fff3cd',
+                        backgroundColor: '#fff3cd',
                         borderRadius: '8px',
-                        border: `1px solid ${colors.warning.main || '#ffc107'}`,
+                        border: '1px solid #ffc107',
                         mb: 2
                     }}>
-                        <Typography variant="body2" color={colors.warning.dark || '#856404'}>
+                        <Typography variant="body2" color="#856404">
                             <strong>Note:</strong> Return quantity ({returnQuantity}) is less than assigned quantity ({assignment.quantity}).
                             This difference will be tracked for inventory management.
                         </Typography>
@@ -234,18 +234,14 @@ const CompletionStatusModal: React.FC<CompletionStatusModalProps> = ({
                 p: 3,
                 pt: 0,
                 borderTop: `1px solid ${colors.border.light}`,
-                backgroundColor: colors.background.light
+                backgroundColor: colors.background.card
             }}>
                 <PrimaryButton
                     onClick={handleClose}
                     disabled={loading}
-                    sx={{
+                    style={{
                         backgroundColor: colors.text.muted,
-                        color: colors.text.white,
-                        '&:hover': {
-                            backgroundColor: colors.text.muted,
-                            opacity: 0.9
-                        }
+                        color: colors.text.white
                     }}
                 >
                     Cancel
@@ -253,13 +249,9 @@ const CompletionStatusModal: React.FC<CompletionStatusModalProps> = ({
                 <PrimaryButton
                     onClick={handleSubmit}
                     disabled={loading}
-                    sx={{
+                    style={{
                         backgroundColor: colors.button.primary,
-                        color: colors.text.white,
-                        '&:hover': {
-                            backgroundColor: colors.button.primary,
-                            opacity: 0.9
-                        }
+                        color: colors.text.white
                     }}
                 >
                     {loading ? 'Updating...' : 'Update Status'}

@@ -9,6 +9,7 @@ export interface BillingOrder {
   date: string;
   quantity: number;
   billingStatus: 'pending' | 'invoiced' | 'paid';
+  balance?: number; // Customer balance amount
   createdAt: string;
   updatedAt: string;
 }
@@ -52,17 +53,15 @@ export interface Invoice {
   invoiceNumber: string;
   customerName: string;
   customerId: string;
-  orderIds: number[];
   subtotal: number;
-  taxRate: number;
   taxAmount: number;
   total: number;
-  paymentTerms: number;
   dueDate: string;
   status: 'draft' | 'sent' | 'paid' | 'overdue';
+  paymentAmount?: number; // Actual payment amount received
+  balance?: number; // Customer balance amount
   createdAt: string;
-  updatedAt: string;
-  orders: BillingOrder[];
+  updatedAt?: string;
 }
 
 export interface BillingFilters {
@@ -71,6 +70,15 @@ export interface BillingFilters {
   customerName?: string;
   orderId?: string;
   billingStatus?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface InvoiceFilters {
+  page?: number;
+  limit?: number;
+  status?: 'draft' | 'sent' | 'paid' | 'overdue';
+  customerName?: string;
   dateFrom?: string;
   dateTo?: string;
 }
@@ -206,34 +214,6 @@ export class BillingService {
     }
   }
 
-  /**
-   * Get all invoices
-   */
-  static async getInvoices(filters: {
-    page?: number;
-    limit?: number;
-    customerName?: string;
-    status?: string;
-    dateFrom?: string;
-    dateTo?: string;
-  } = {}): Promise<BillingResponse<{ invoices: Invoice[]; pagination: any }>> {
-    try {
-      const params = new URLSearchParams();
-      
-      if (filters.page) params.append('page', filters.page.toString());
-      if (filters.limit) params.append('limit', filters.limit.toString());
-      if (filters.customerName) params.append('customerName', filters.customerName);
-      if (filters.status) params.append('status', filters.status);
-      if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
-      if (filters.dateTo) params.append('dateTo', filters.dateTo);
-
-      const response = await apiClient.get(`/billing/invoices?${params.toString()}`);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching invoices:', error);
-      throw error;
-    }
-  }
 
   /**
    * Get invoice by ID
@@ -366,7 +346,7 @@ export class BillingService {
   /**
    * Update order billing status
    */
-  static async updateOrderBillingStatus(orderId: number, status: 'pending' | 'invoiced' | 'paid'): Promise<BillingResponse<any>> {
+  static async updateOrderBillingStatus(orderId: number, status: 'pending' | 'invoiced' | 'paid'): Promise<BillingResponse<{ message: string }>> {
     try {
       const response = await apiClient.patch(`/billing/orders/${orderId}/status`, { billingStatus: status });
       return response.data;
@@ -379,7 +359,7 @@ export class BillingService {
   /**
    * Update order payment status with payment amount
    */
-  static async updateOrderPaymentStatus(orderId: number, isPaid: boolean, paymentAmount?: number): Promise<BillingResponse<any>> {
+  static async updateOrderPaymentStatus(orderId: number, isPaid: boolean, paymentAmount?: number): Promise<BillingResponse<{ message: string }>> {
     try {
       const response = await apiClient.patch(`/billing/orders/${orderId}/payment`, { 
         isPaid,
@@ -388,6 +368,51 @@ export class BillingService {
       return response.data;
     } catch (error) {
       console.error('Error updating order payment status:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get invoices with filters
+   */
+  static async getInvoices(filters: InvoiceFilters = {}): Promise<BillingResponse<{
+    invoices: Invoice[];
+    pagination: {
+      currentPage: number;
+      totalPages: number;
+      totalItems: number;
+      itemsPerPage: number;
+    };
+  }>> {
+    try {
+      const queryParams = new URLSearchParams();
+      if (filters.page) queryParams.append('page', filters.page.toString());
+      if (filters.limit) queryParams.append('limit', filters.limit.toString());
+      if (filters.status) queryParams.append('status', filters.status);
+      if (filters.customerName) queryParams.append('customerName', filters.customerName);
+      if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
+      if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
+
+      const response = await apiClient.get(`/billing/invoices?${queryParams.toString()}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching invoices:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update invoice payment status
+   */
+  static async updateInvoicePaymentStatus(invoiceId: number, isPaid: boolean, paymentAmount?: number): Promise<BillingResponse<{ message: string }>> {
+    try {
+      const response = await apiClient.patch(`/billing/invoices/${invoiceId}/payment`, { 
+        isPaid,
+        paymentAmount: paymentAmount
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error updating invoice payment status:', error);
       throw error;
     }
   }
@@ -403,7 +428,12 @@ export class BillingService {
   } = {}): Promise<BillingResponse<{
     invoices: Invoice[];
     orders: BillingOrder[];
-    pagination: any;
+    pagination: {
+      currentPage: number;
+      totalPages: number;
+      totalItems: number;
+      itemsPerPage: number;
+    };
   }>> {
     try {
       const params = new URLSearchParams();

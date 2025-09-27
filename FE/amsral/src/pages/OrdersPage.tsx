@@ -144,7 +144,7 @@ export default function OrdersPage() {
           date: order.date,
           customerId: order.customerId,
           customerName: order.customerName,
-          itemId: order.itemId,
+          itemId: order.itemId || undefined,
           quantity: order.quantity,
           notes: order.notes,
           records: order.records.map(record => ({
@@ -844,6 +844,7 @@ export default function OrdersPage() {
       setForm({
         date: new Date().toISOString().split('T')[0],
         customerId: '',
+        itemId: '',
         quantity: 1,
         gpNo: '',
         notes: '',

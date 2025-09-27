@@ -257,6 +257,7 @@ export interface OrderSummaryData {
   deliveryDate: string;
   status: string;
   notes: string | null;
+  balance?: number; // Customer balance amount
   records: OrderSummaryRecord[];
 }
 
