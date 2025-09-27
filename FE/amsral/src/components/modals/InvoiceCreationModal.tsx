@@ -551,7 +551,7 @@ const InvoiceCreationModal: React.FC<InvoiceCreationModalProps> = ({
                           <TableRow key={record.id}>
                             <TableCell>{record.itemName}</TableCell>
                             <TableCell>{record.washType}</TableCell>
-                            <TableCell>{record.processTypes.join(', ')}</TableCell>
+                            <TableCell>{record.processTypes ? record.processTypes.join(', ') : 'None'}</TableCell>
                             <TableCell align="right">{record.quantity}</TableCell>
                             <TableCell align="right">
                               <TextField

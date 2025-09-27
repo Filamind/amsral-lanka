@@ -791,7 +791,7 @@ class PrinterService {
       await this.printText(`Tracking ID:      ${assignmentData.trackingNumber}`, { bold: true, doubleHeight: true, align: 'left' });
       await this.printText(`Item:             ${assignmentData.itemName}`, { bold: true, doubleHeight: true, align: 'left' });
       await this.printText(`Wash Type:        ${assignmentData.washType}`, { bold: true, doubleHeight: true, align: 'left' });
-      await this.printText(`Process:          ${assignmentData.processTypes.join(', ')}`, { bold: true, doubleHeight: true, align: 'left' });
+      await this.printText(`Process:          ${assignmentData.processTypes ? assignmentData.processTypes.join(', ') : 'None'}`, { bold: true, doubleHeight: true, align: 'left' });
       await this.printText(`Assigned To:      ${assignmentData.assignedTo}`, { bold: true, doubleHeight: true, align: 'left' });
       await this.printText(`Quantity:         ${assignmentData.quantity}`, { bold: true, doubleHeight: true, align: 'left' });
 
@@ -897,7 +897,7 @@ class PrinterService {
         await this.printText(`Status:           Remaining Quantity`, { bold: true, doubleHeight: true, align: 'left' });
       } else {
         await this.printText(`Wash Type:        ${receiptData.washType}`, { bold: true, doubleHeight: true, align: 'left' });
-        await this.printText(`Process:          ${receiptData.processTypes.join(', ')}`, { bold: true, doubleHeight: true, align: 'left' });
+        await this.printText(`Process:          ${receiptData.processTypes ? receiptData.processTypes.join(', ') : 'None'}`, { bold: true, doubleHeight: true, align: 'left' });
       }
       
       await this.printText(''); // Empty line

@@ -315,7 +315,7 @@ class PrintService {
             <div class="field"><span class="field-label">Tracking ID:</span> ${assignmentData.trackingNumber}</div>
             <div class="field"><span class="field-label">Item:</span> ${assignmentData.itemName}</div>
             <div class="field"><span class="field-label">Wash Type:</span> ${assignmentData.washType}</div>
-            <div class="field"><span class="field-label">Process:</span> ${assignmentData.processTypes.join(', ')}</div>
+            <div class="field"><span class="field-label">Process:</span> ${assignmentData.processTypes ? assignmentData.processTypes.join(', ') : 'None'}</div>
             <div class="field"><span class="field-label">Assigned To:</span> ${assignmentData.assignedTo}</div>
             <div class="field"><span class="field-label">Quantity:</span> ${assignmentData.quantity}</div>
             <div class="separator"></div>
@@ -363,7 +363,7 @@ class PrintService {
             ${receiptData.isRemaining ? 
               `<div class="field"><span class="field-label">Status:</span> Remaining Quantity</div>` :
               `<div class="field"><span class="field-label">Wash Type:</span> ${receiptData.washType}</div>
-               <div class="field"><span class="field-label">Process:</span> ${receiptData.processTypes.join(', ')}</div>`
+               <div class="field"><span class="field-label">Process:</span> ${receiptData.processTypes ? receiptData.processTypes.join(', ') : 'None'}</div>`
             }
             <div class="separator"></div>
             <div class="field" style="text-align: center; font-size: 10px;">

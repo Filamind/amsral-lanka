@@ -68,11 +68,12 @@ const SimpleOrderForm: React.FC<SimpleOrderFormProps> = ({
                     {/* GP No - No Label */}
                     <div>
                         <input
-                            type="text"
+                            type="number"
                             name="gpNo"
                             value={form.gpNo}
                             onChange={onChange}
                             placeholder="GP No"
+                            min={1}
                             className="w-full px-4 py-4 text-lg border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                             style={{ borderColor: errors.gpNo ? '#ef4444' : colors.border.light }}
                         />

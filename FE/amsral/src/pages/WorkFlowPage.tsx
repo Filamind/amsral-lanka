@@ -273,10 +273,11 @@ export default function WorkFlowPage() {
                             // Find wash type name
                             const washTypeName = washTypeOptions.find(wash => wash.value === record.washType)?.label || record.washType;
 
-                            // Find process type names
-                            const processTypeNames = record.processTypes.map((pt: string) =>
-                                processTypeOptions.find(p => p.value === pt)?.label || pt
-                            );
+                            // Find process type names - handle null processTypes
+                            const processTypeNames = record.processTypes ?
+                                record.processTypes.map((pt: string) =>
+                                    processTypeOptions.find(p => p.value === pt)?.label || pt
+                                ) : [];
 
                             productionRecords.push({
                                 id: record.id.toString(),
@@ -361,10 +362,11 @@ export default function WorkFlowPage() {
                                 // Find wash type name
                                 const washTypeName = washTypeOptions.find(wash => wash.value === record.washType)?.label || record.washType;
 
-                                // Find process type names
-                                const processTypeNames = record.processTypes.map((pt: string) =>
-                                    processTypeOptions.find(p => p.value === pt)?.label || pt
-                                );
+                                // Find process type names - handle null processTypes
+                                const processTypeNames = record.processTypes ?
+                                    record.processTypes.map((pt: string) =>
+                                        processTypeOptions.find(p => p.value === pt)?.label || pt
+                                    ) : [];
 
                                 productionRecords.push({
                                     id: record.id.toString(),
@@ -421,7 +423,7 @@ export default function WorkFlowPage() {
     // Format process types for display
     const recordsWithFormattedProcesses = records.map(record => ({
         ...record,
-        processTypes: record.processTypes.join(', '),
+        processTypes: record.processTypes ? record.processTypes.join(', ') : '',
     }));
 
     return (

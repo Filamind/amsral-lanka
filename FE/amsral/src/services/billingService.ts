@@ -69,6 +69,7 @@ export interface BillingFilters {
   page?: number;
   limit?: number;
   customerName?: string;
+  customerId?: string;
   orderId?: string;
   billingStatus?: string;
   status?: string;
@@ -115,6 +116,7 @@ export class BillingService {
       if (filters.page) params.append('page', filters.page.toString());
       if (filters.limit) params.append('limit', filters.limit.toString());
       if (filters.customerName) params.append('customerName', filters.customerName);
+      if (filters.customerId) params.append('customerId', filters.customerId);
       if (filters.orderId) params.append('orderId', filters.orderId);
       if (filters.billingStatus) params.append('billingStatus', filters.billingStatus);
       if (filters.status) params.append('status', filters.status);

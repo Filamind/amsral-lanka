@@ -140,7 +140,7 @@ export const generateInvoice = (invoiceData: InvoiceData): void => {
 
         doc.text(record.itemName, 20, yPosition);
         doc.text(record.washType, 80, yPosition);
-        doc.text(record.processTypes.join(', '), 120, yPosition);
+        doc.text(record.processTypes ? record.processTypes.join(', ') : 'None', 120, yPosition);
         doc.text(record.quantity.toString(), 160, yPosition);
         doc.text(`$${record.unitPrice.toFixed(2)}`, 180, yPosition);
         doc.text(`$${record.totalPrice.toFixed(2)}`, pageWidth - 30, yPosition);
@@ -411,7 +411,7 @@ export const generateA4Invoice = (invoiceData: InvoiceData): void => {
       order.records.forEach((record) => {
         doc.text(record.itemName, colPositions[0], yPosition);
         doc.text(record.washType, colPositions[1], yPosition);
-        doc.text(record.processTypes.join(', '), colPositions[2], yPosition);
+        doc.text(record.processTypes ? record.processTypes.join(', ') : 'None', colPositions[2], yPosition);
         doc.text(record.quantity.toString(), colPositions[3], yPosition);
         doc.text(`$${record.unitPrice.toFixed(2)}`, colPositions[4], yPosition);
         doc.text(`$${record.totalPrice.toFixed(2)}`, colPositions[5], yPosition);
@@ -535,12 +535,7 @@ export const generateAmsralInvoice = (invoiceData: InvoiceData): void => {
     doc.text(`Customer: ${invoiceData.customerName}`, margin, yPosition);
     doc.text(`Date: ${new Date().toLocaleDateString()}`, margin, yPosition + 8);
     
-    // Add customer balance if available
-    if (invoiceData.customerBalance !== undefined && invoiceData.customerBalance > 0) {
-      doc.setFont('helvetica', 'bold');
-      doc.text(`Outstanding Balance: $${invoiceData.customerBalance.toFixed(2)}`, margin, yPosition + 16);
-      doc.setFont('helvetica', 'normal');
-    }
+    // Removed Outstanding Balance from top section as requested
 
     // Right side - Invoice info
     const rightInfoX = pageWidth - 100;
@@ -624,7 +619,10 @@ export const generateAmsralInvoice = (invoiceData: InvoiceData): void => {
     doc.setFont('helvetica', 'bold');
     
     columns.forEach(col => {
-      doc.text(col.header, col.x + 2, tableStartY + 8);
+      // Center the header text within each column
+      const textWidth = doc.getTextWidth(col.header);
+      const centerX = col.x + (col.width / 2) - (textWidth / 2);
+      doc.text(col.header, centerX, tableStartY + 8);
     });
 
     // Draw vertical lines for header
@@ -651,6 +649,10 @@ export const generateAmsralInvoice = (invoiceData: InvoiceData): void => {
           yPosition = 20;
         }
 
+         // Create description with wash type and process types
+         const processTypesText = record.processTypes ? record.processTypes.join(', ') : '';
+         const description = processTypesText ? `${record.washType} - ${processTypesText}` : record.washType;
+
          // Row data
          const rowData = invoiceData.includeStyleNo 
            ? [
@@ -658,7 +660,7 @@ export const generateAmsralInvoice = (invoiceData: InvoiceData): void => {
                order.gpNumber || '-', // GP No always shown
                record.styleNo || '-', // St No only when included
                record.itemName,
-               record.washType,
+               description,
                record.quantity.toString(),
                record.unitPrice.toFixed(2),
                record.totalPrice.toFixed(2)
@@ -667,7 +669,7 @@ export const generateAmsralInvoice = (invoiceData: InvoiceData): void => {
                order.id.toString(), // Show Order ID instead of reference number
                order.gpNumber || '-', // GP No always shown
                record.itemName,
-               record.washType,
+               description,
                record.quantity.toString(),
                record.unitPrice.toFixed(2),
                record.totalPrice.toFixed(2)
@@ -681,26 +683,43 @@ export const generateAmsralInvoice = (invoiceData: InvoiceData): void => {
          columns.forEach((col, index) => {
            const cellText = rowData[index];
            
-           // Handle multi-line text for description column
-           if (col.header === 'Description' && cellText.length > 20) {
-             const words = cellText.split(' ');
-             let line1 = '';
-             let line2 = '';
-             
-             for (const word of words) {
-               if ((line1 + word).length <= 20) {
-                 line1 += (line1 ? ' ' : '') + word;
-               } else {
-                 line2 += (line2 ? ' ' : '') + word;
-               }
-             }
-             
-             doc.text(line1, col.x + 2, yPosition + 6);
-             if (line2) {
-               doc.text(line2, col.x + 2, yPosition + 10);
-             }
+           // Right-align Amount column, center all others
+           if (col.header === 'Amount') {
+             // Right-align for Amount column
+             const textWidth = doc.getTextWidth(cellText);
+             const rightX = col.x + col.width - textWidth - 2;
+             doc.text(cellText, rightX, yPosition + 8);
            } else {
-             doc.text(cellText, col.x + 2, yPosition + 8);
+             // Handle multi-line text for description column
+             if (col.header === 'Description' && cellText.length > 20) {
+               const words = cellText.split(' ');
+               let line1 = '';
+               let line2 = '';
+               
+               for (const word of words) {
+                 if ((line1 + word).length <= 20) {
+                   line1 += (line1 ? ' ' : '') + word;
+                 } else {
+                   line2 += (line2 ? ' ' : '') + word;
+                 }
+               }
+               
+               // Center the text
+               const line1Width = doc.getTextWidth(line1);
+               const centerX1 = col.x + (col.width / 2) - (line1Width / 2);
+               doc.text(line1, centerX1, yPosition + 6);
+               
+               if (line2) {
+                 const line2Width = doc.getTextWidth(line2);
+                 const centerX2 = col.x + (col.width / 2) - (line2Width / 2);
+                 doc.text(line2, centerX2, yPosition + 10);
+               }
+             } else {
+               // Center the text for all other columns
+               const textWidth = doc.getTextWidth(cellText);
+               const centerX = col.x + (col.width / 2) - (textWidth / 2);
+               doc.text(cellText, centerX, yPosition + 8);
+             }
            }
          });
 
@@ -728,7 +747,11 @@ export const generateAmsralInvoice = (invoiceData: InvoiceData): void => {
      
      // Show subtotal
      doc.text('Subtotal (Rs)', margin + 5, yPosition + 8);
-     doc.text(totalAmount.toFixed(2), amountColumnX + 2, yPosition + 8); // Aligned with Amount column
+     // Right-align the amount
+     const subtotalText = totalAmount.toFixed(2);
+     const subtotalWidth = doc.getTextWidth(subtotalText);
+     const subtotalX = amountColumnX + columns[columns.length - 1].width - subtotalWidth - 2;
+     doc.text(subtotalText, subtotalX, yPosition + 8);
      
      yPosition += rowHeight;
      
@@ -736,8 +759,12 @@ export const generateAmsralInvoice = (invoiceData: InvoiceData): void => {
      if (invoiceData.customerBalance !== undefined && invoiceData.customerBalance > 0) {
        doc.setLineWidth(0.2);
        doc.rect(margin, yPosition, tableWidth, rowHeight);
-       doc.text('Customer Balance (Rs)', margin + 5, yPosition + 8);
-       doc.text(invoiceData.customerBalance.toFixed(2), amountColumnX + 2, yPosition + 8);
+       doc.text('Outstanding Balance (Rs)', margin + 5, yPosition + 8);
+       // Right-align the amount
+       const balanceText = invoiceData.customerBalance.toFixed(2);
+       const balanceWidth = doc.getTextWidth(balanceText);
+       const balanceX = amountColumnX + columns[columns.length - 1].width - balanceWidth - 2;
+       doc.text(balanceText, balanceX, yPosition + 8);
        yPosition += rowHeight;
      }
      
@@ -746,7 +773,11 @@ export const generateAmsralInvoice = (invoiceData: InvoiceData): void => {
      doc.rect(margin, yPosition, tableWidth, rowHeight);
      const finalTotal = totalAmount + (invoiceData.customerBalance || 0);
      doc.text('Total Amount (Rs)', margin + 5, yPosition + 8);
-     doc.text(finalTotal.toFixed(2), amountColumnX + 2, yPosition + 8);
+     // Right-align the amount
+     const totalText = finalTotal.toFixed(2);
+     const totalWidth = doc.getTextWidth(totalText);
+     const totalX = amountColumnX + columns[columns.length - 1].width - totalWidth - 2;
+     doc.text(totalText, totalX, yPosition + 8);
 
      yPosition += rowHeight + 15;
 
