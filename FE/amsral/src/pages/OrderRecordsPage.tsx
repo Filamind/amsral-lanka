@@ -162,7 +162,7 @@ export default function OrderRecordsPage() {
 
         if (!record.washType) newErrors.washType = 'Wash type is required';
         if (!record.quantity || record.quantity <= 0) newErrors.quantity = 'Quantity must be greater than 0';
-        if (!record.processTypes || record.processTypes.length === 0) newErrors.processTypes = 'At least one process type is required';
+        // Process types are now optional - no validation required
 
         // Check if total quantity exceeds order quantity
         const otherRecordsTotal = records
@@ -478,9 +478,9 @@ export default function OrderRecordsPage() {
         // For wash type display, use the direct value from API since it's already the correct format
         const washTypeName = record.washType || 'Unknown Wash Type';
 
-        const processTypesText = record.processTypes
-            .map(pt => processTypeOptions.find(p => p.value === pt)?.label || pt)
-            .join(', ');
+        const processTypesText = record.processTypes ?
+            record.processTypes.map(pt => processTypeOptions.find(p => p.value === pt)?.label || pt).join(', ') :
+            'None';
 
         return {
             id: record.id,
@@ -790,7 +790,7 @@ export default function OrderRecordsPage() {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Process Types *</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Process Types </label>
                             <div className="uniform-height-multiselect">
                                 <PrimaryMultiSelect
                                     name="processTypes"

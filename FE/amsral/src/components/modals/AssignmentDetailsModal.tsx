@@ -206,7 +206,7 @@ export default function AssignmentDetailsModal({ open, onClose, record }: Assign
                                             Process Types
                                         </Typography>
                                         <div className="flex flex-wrap gap-1">
-                                            {record.processTypes.map((type, index) => (
+                                            {record.processTypes?.map((type, index) => (
                                                 <Chip
                                                     key={`${record.id}-process-${index}`}
                                                     label={type}

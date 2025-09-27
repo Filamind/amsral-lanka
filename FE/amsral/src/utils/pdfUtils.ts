@@ -479,7 +479,7 @@ export const generateGatepass = (gatepassData: GatepassData): void => {
     const rowData = [
       record.quantity.toString(),
       record.washType,
-      record.processTypes.join(', '),
+      record.processTypes ? record.processTypes.join(', ') : 'None',
       record.itemName,
       record.itemId,
       record.trackingNumber

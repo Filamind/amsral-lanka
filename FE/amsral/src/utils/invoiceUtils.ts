@@ -140,7 +140,7 @@ export const generateInvoice = (invoiceData: InvoiceData): void => {
 
         doc.text(record.itemName, 20, yPosition);
         doc.text(record.washType, 80, yPosition);
-        doc.text(record.processTypes.join(', '), 120, yPosition);
+        doc.text(record.processTypes ? record.processTypes.join(', ') : 'None', 120, yPosition);
         doc.text(record.quantity.toString(), 160, yPosition);
         doc.text(`$${record.unitPrice.toFixed(2)}`, 180, yPosition);
         doc.text(`$${record.totalPrice.toFixed(2)}`, pageWidth - 30, yPosition);
@@ -411,7 +411,7 @@ export const generateA4Invoice = (invoiceData: InvoiceData): void => {
       order.records.forEach((record) => {
         doc.text(record.itemName, colPositions[0], yPosition);
         doc.text(record.washType, colPositions[1], yPosition);
-        doc.text(record.processTypes.join(', '), colPositions[2], yPosition);
+        doc.text(record.processTypes ? record.processTypes.join(', ') : 'None', colPositions[2], yPosition);
         doc.text(record.quantity.toString(), colPositions[3], yPosition);
         doc.text(`$${record.unitPrice.toFixed(2)}`, colPositions[4], yPosition);
         doc.text(`$${record.totalPrice.toFixed(2)}`, colPositions[5], yPosition);
@@ -649,6 +649,10 @@ export const generateAmsralInvoice = (invoiceData: InvoiceData): void => {
           yPosition = 20;
         }
 
+         // Create description with wash type and process types
+         const processTypesText = record.processTypes ? record.processTypes.join(', ') : '';
+         const description = processTypesText ? `${record.washType} - ${processTypesText}` : record.washType;
+
          // Row data
          const rowData = invoiceData.includeStyleNo 
            ? [
@@ -656,7 +660,7 @@ export const generateAmsralInvoice = (invoiceData: InvoiceData): void => {
                order.gpNumber || '-', // GP No always shown
                record.styleNo || '-', // St No only when included
                record.itemName,
-               record.washType,
+               description,
                record.quantity.toString(),
                record.unitPrice.toFixed(2),
                record.totalPrice.toFixed(2)
@@ -665,7 +669,7 @@ export const generateAmsralInvoice = (invoiceData: InvoiceData): void => {
                order.id.toString(), // Show Order ID instead of reference number
                order.gpNumber || '-', // GP No always shown
                record.itemName,
-               record.washType,
+               description,
                record.quantity.toString(),
                record.unitPrice.toFixed(2),
                record.totalPrice.toFixed(2)

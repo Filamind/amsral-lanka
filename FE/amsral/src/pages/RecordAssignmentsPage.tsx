@@ -577,7 +577,7 @@ export default function RecordAssignmentsPage() {
                             </span>
                         </div>
                         <div>
-                            <span className="font-semibold">Process Types:</span> {record.processTypes.join(', ')}
+                            <span className="font-semibold">Process Types:</span> {record.processTypes ? record.processTypes.join(', ') : 'None'}
                         </div>
                         <div>
                             <span className="font-semibold">Status:</span>
