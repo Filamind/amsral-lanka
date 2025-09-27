@@ -4,20 +4,21 @@
  */
 
 import printerService from './printerService';
+import printService from './printService';
 import type { BagLabelData } from '../utils/pdfUtils';
 
 class BagLabelPrinterService {
   /**
-   * Print bag label to thermal printer
+   * Print bag label using the best available method
    */
   async printBagLabel(bagData: BagLabelData): Promise<void> {
-    if (!printerService.isConnected()) {
-      throw new Error('Printer not connected');
-    }
-
     try {
-      // Use the existing printer service's printBagLabel method
-      await printerService.printBagLabel(bagData);
+      // Use the universal print service which handles different environments
+      const result = await printService.printBagLabelAuto(bagData);
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Print failed');
+      }
     } catch (error) {
       console.error('Error printing bag label:', error);
       throw error;
@@ -28,13 +29,13 @@ class BagLabelPrinterService {
    * Print single bag receipt
    */
   async printSingleBagReceipt(bagData: BagLabelData): Promise<void> {
-    if (!printerService.isConnected()) {
-      throw new Error('Printer not connected');
-    }
-
     try {
-      // Use the existing printer service's printBagLabel method
-      await printerService.printBagLabel(bagData);
+      // Use the universal print service which handles different environments
+      const result = await printService.printBagLabelAuto(bagData);
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Print failed');
+      }
     } catch (error) {
       console.error('Error printing bag receipt:', error);
       throw error;
@@ -74,10 +75,25 @@ class BagLabelPrinterService {
   }
 
   /**
-   * Check if printer is connected
+   * Check if printer is connected (for serial printing)
    */
   isConnected(): boolean {
     return printerService.isConnected();
+  }
+
+  /**
+   * Check if any printing method is available
+   */
+  isPrintAvailable(): boolean {
+    const availableMethods = printService.getAvailableMethods();
+    return availableMethods.length > 0;
+  }
+
+  /**
+   * Get available printing methods
+   */
+  getAvailableMethods(): string[] {
+    return printService.getAvailableMethods();
   }
 }
 

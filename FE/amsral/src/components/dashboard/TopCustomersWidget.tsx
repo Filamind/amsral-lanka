@@ -102,7 +102,7 @@ const TopCustomersWidget: React.FC<TopCustomersWidgetProps> = ({ customers, load
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                                 <AttachMoney sx={{ fontSize: 16, color: colors.success[500] }} />
                                                 <Typography variant="body2" sx={{ color: colors.success[600], fontWeight: 500 }}>
-                                                    Rs. {customer.totalPaid.toLocaleString()}
+                                                    Rs. {(customer.totalPaid || customer.totalInvoiced || 0).toLocaleString()}
                                                 </Typography>
                                             </Box>
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>

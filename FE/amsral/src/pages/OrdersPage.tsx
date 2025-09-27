@@ -689,7 +689,7 @@ export default function OrdersPage() {
       minWidth: 50,
       sortable: false,
       renderCell: (params) => {
-        const isComplete = (params.row.status || '').toLowerCase() === 'complete';
+        const isComplete = (params.row.status || '').toLowerCase() === 'complete' || (params.row.status || '').toLowerCase() === 'qc';
         const canPrint = isComplete && isConnected;
         return (
           <IconButton

@@ -19,7 +19,8 @@ export interface IncomeByPeriod {
 export interface TopCustomer {
   customerId: string;
   customerName: string;
-  totalPaid: number;
+  totalPaid?: number;
+  totalInvoiced?: number;
   invoiceCount: number;
 }
 
