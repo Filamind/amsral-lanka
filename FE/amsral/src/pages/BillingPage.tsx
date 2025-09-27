@@ -87,25 +87,32 @@ const BillingPage: React.FC = () => {
     });
 
     // Fetch orders with billing status
-    const fetchOrders = useCallback(async () => {
+    const fetchOrdersData = useCallback(async () => {
         try {
             setLoading(true);
-            const response = await BillingService.getBillingOrders({
-                page: currentPage,
-                limit: pageSize,
-                customerName: customerFilter || undefined,
-                status: 'QC', // Only fetch orders with QC status
-                billingStatus: 'pending', // Only fetch orders with pending billing status
-            });
+            // Make two API calls to get both QC and Complete orders
+            const [qcResponse, completeResponse] = await Promise.all([
+                BillingService.getBillingOrders({
+                    page: currentPage,
+                    limit: pageSize,
+                    customerId: customerFilter || undefined,
+                    status: 'QC',
+                    billingStatus: 'pending',
+                }),
+                BillingService.getBillingOrders({
+                    page: currentPage,
+                    limit: pageSize,
+                    customerId: customerFilter || undefined,
+                    status: 'Complete',
+                    billingStatus: 'pending',
+                })
+            ]);
 
-            if (response.success) {
-                // Filter orders by status and billing status on the frontend if API doesn't support it
-                let filteredOrders = response.data.orders as BillingOrder[];
-
-                // Only show orders with QC status and pending billing status
-                filteredOrders = filteredOrders.filter(order =>
-                    order.status === 'QC' && order.billingStatus === 'pending'
-                );
+            if (qcResponse.success && completeResponse.success) {
+                // Combine orders from both responses
+                const qcOrders = qcResponse.data.orders as BillingOrder[];
+                const completeOrders = completeResponse.data.orders as BillingOrder[];
+                let filteredOrders = [...qcOrders, ...completeOrders];
 
                 // Apply search filter - search by Order ID (displayed as Reference No) and customer name
                 if (search && search.trim()) {
@@ -121,14 +128,15 @@ const BillingPage: React.FC = () => {
 
                 setOrders(filteredOrders);
 
-                // Update pagination info
+                // Update pagination info - use combined totals
+                const totalItems = (qcResponse.data.pagination?.totalItems || 0) + (completeResponse.data.pagination?.totalItems || 0);
                 setPagination({
-                    currentPage: response.data.pagination?.currentPage || 1,
-                    totalPages: response.data.pagination?.totalPages || 1,
-                    totalItems: response.data.pagination?.totalItems || filteredOrders.length,
-                    itemsPerPage: response.data.pagination?.itemsPerPage || pageSize,
-                    hasNextPage: (response.data.pagination?.currentPage || 1) < (response.data.pagination?.totalPages || 1),
-                    hasPrevPage: (response.data.pagination?.currentPage || 1) > 1
+                    currentPage: currentPage,
+                    totalPages: Math.ceil(totalItems / pageSize),
+                    totalItems: totalItems,
+                    itemsPerPage: pageSize,
+                    hasNextPage: currentPage < Math.ceil(totalItems / pageSize),
+                    hasPrevPage: currentPage > 1
                 });
             } else {
                 toast.error('Failed to fetch orders');
@@ -139,7 +147,7 @@ const BillingPage: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [search, currentPage, pageSize, customerFilter]);
+    }, [currentPage, pageSize, customerFilter, search]);
 
     // Fetch invoices (for Invoices tab)
     const fetchInvoices = useCallback(async () => {
@@ -186,7 +194,7 @@ const BillingPage: React.FC = () => {
         }
     }, []);
 
-    // Fetch data on component mount
+    // Consolidated data fetching - handles all triggers in one useEffect
     useEffect(() => {
         const fetchData = async () => {
             try {
@@ -194,7 +202,7 @@ const BillingPage: React.FC = () => {
                 await fetchCustomers();
                 // Fetch data based on active tab
                 if (activeTab === 0) {
-                    await fetchOrders();
+                    await fetchOrdersData();
                 } else {
                     await fetchInvoices();
                 }
@@ -204,34 +212,13 @@ const BillingPage: React.FC = () => {
             }
         };
 
-        fetchData();
-    }, [activeTab, fetchOrders, fetchInvoices, fetchCustomers]);
-
-    // Fetch data when search changes
-    useEffect(() => {
+        // Debounce search changes
         const timeoutId = setTimeout(() => {
-            if (search !== undefined) {
-                setCurrentPage(1); // Reset to first page when search changes
-                if (activeTab === 0) {
-                    fetchOrders();
-                } else {
-                    fetchInvoices();
-                }
-            }
-        }, 500);
+            fetchData();
+        }, search !== undefined ? 500 : 0);
 
         return () => clearTimeout(timeoutId);
-    }, [search, activeTab, fetchOrders, fetchInvoices]);
-
-    // Fetch data when filters change
-    useEffect(() => {
-        setCurrentPage(1); // Reset to first page when filters change
-        if (activeTab === 0) {
-            fetchOrders();
-        } else {
-            fetchInvoices();
-        }
-    }, [activeTab, customerFilter, invoiceStatusFilter, invoiceCustomerFilter, fetchOrders, fetchInvoices]);
+    }, [activeTab, search, customerFilter, invoiceStatusFilter, invoiceCustomerFilter, fetchOrdersData, fetchInvoices, fetchCustomers]);
 
     // Handle order selection
     const handleOrderSelect = (orderId: number, selected: boolean) => {
@@ -322,7 +309,7 @@ const BillingPage: React.FC = () => {
         setSelectedOrders([]);
         // Refresh orders to update billing status
         setTimeout(() => {
-            fetchOrders();
+            fetchOrdersData();
         }, 1000); // Small delay to ensure backend has processed the update
     };
 
@@ -536,9 +523,20 @@ const BillingPage: React.FC = () => {
     }
 
     return (
-        <div className="w-full mx-auto px-1 sm:px-3 md:px-4 py-3">
-            <div className="flex flex-col gap-3 mb-4">
-                <h2 className="text-xl md:text-2xl font-bold" style={{ color: colors.text.primary }}>Billing Management</h2>
+        <div className="w-full mx-auto px-1 sm:px-3 md:px-4 py-4">
+            <div className="flex flex-col gap-6 mb-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <h2 className="text-2xl md:text-3xl font-bold" style={{ color: colors.text.primary }}>
+                        Billing Management
+                    </h2>
+                    {activeTab === 0 && selectedOrders.length > 0 && (
+                        <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg border" style={{ borderColor: colors.border.light }}>
+                            <span className="text-sm font-medium text-blue-700">
+                                {selectedOrders.length} order{selectedOrders.length !== 1 ? 's' : ''} selected
+                            </span>
+                        </div>
+                    )}
+                </div>
 
                 {/* Tabs */}
                 <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
@@ -558,74 +556,111 @@ const BillingPage: React.FC = () => {
                     </Tabs>
                 </Box>
 
-                {/* Search and Filters Row */}
-                <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center">
-                    <div className="flex-1 w-full lg:w-auto">
-                        <input
-                            type="text"
-                            placeholder={activeTab === 0 ? "Search pending orders by reference number or customer..." : "Search invoices by invoice number or customer..."}
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                            className="w-full px-3 py-2 border rounded-xl focus:outline-none text-sm"
-                            style={{ borderColor: colors.border.light, maxWidth: 400 }}
-                        />
-                    </div>
+                {/* Search and Filters Section */}
+                <div className="bg-white rounded-lg shadow-sm border p-4" style={{ borderColor: colors.border.light }}>
+                    <div className="flex flex-col gap-4">
+                        {/* Search Bar */}
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <div className="flex-1">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Search
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder={activeTab === 0 ? "Search by reference number or customer name..." : "Search by invoice number or customer name..."}
+                                    value={search}
+                                    onChange={e => setSearch(e.target.value)}
+                                    className="w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-all duration-200"
+                                    style={{ borderColor: colors.border.light }}
+                                />
+                            </div>
+                        </div>
 
-                    <div className="flex flex-wrap gap-2 items-center">
-                        <PrimaryDropdown
-                            value={activeTab === 0 ? customerFilter : invoiceCustomerFilter}
-                            onChange={(e) => activeTab === 0 ? setCustomerFilter(e.target.value) : setInvoiceCustomerFilter(e.target.value)}
-                            options={[
-                                { value: '', label: 'All Customers' },
-                                ...customers.map(customer => ({
-                                    value: `${customer.firstName} - ${customer.customerCode || 'N/A'}`,
-                                    label: `${customer.firstName} - ${customer.customerCode || 'N/A'}`
-                                }))
-                            ]}
-                            placeholder="Customer"
-                            style={{ minWidth: 140 }}
-                        />
-                        {activeTab === 1 && (
-                            <PrimaryDropdown
-                                value={invoiceStatusFilter}
-                                onChange={(e) => setInvoiceStatusFilter(e.target.value)}
-                                options={[
-                                    { value: '', label: 'All Status' },
-                                    { value: 'draft', label: 'Draft' },
-                                    { value: 'sent', label: 'Sent' },
-                                    { value: 'paid', label: 'Paid' },
-                                    { value: 'overdue', label: 'Overdue' }
-                                ]}
-                                placeholder="Invoice Status"
-                                style={{ minWidth: 140 }}
-                            />
-                        )}
-                        <PrimaryButton
-                            onClick={handleClearFilters}
-                            style={{ minWidth: 70 }}
-                        >
-                            Clear
-                        </PrimaryButton>
+                        {/* Filters Row */}
+                        <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-end">
+                            <div className="flex flex-wrap gap-4 flex-1">
+                                <div className="min-w-[220px] flex-1 max-w-[300px]">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Customer
+                                    </label>
+                                    <PrimaryDropdown
+                                        value={activeTab === 0 ? customerFilter : invoiceCustomerFilter}
+                                        onChange={(e) => activeTab === 0 ? setCustomerFilter(e.target.value) : setInvoiceCustomerFilter(e.target.value)}
+                                        options={[
+                                            { value: '', label: 'All Customers' },
+                                            ...customers.map(customer => ({
+                                                value: customer.id?.toString() || '',
+                                                label: `${customer.firstName} - ${customer.customerCode || 'N/A'}`
+                                            }))
+                                        ]}
+                                        placeholder="Select Customer"
+                                        style={{ width: '100%' }}
+                                    />
+                                </div>
+
+                                {activeTab === 1 && (
+                                    <div className="min-w-[180px] flex-1 max-w-[250px]">
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Status
+                                        </label>
+                                        <PrimaryDropdown
+                                            value={invoiceStatusFilter}
+                                            onChange={(e) => setInvoiceStatusFilter(e.target.value)}
+                                            options={[
+                                                { value: '', label: 'All Status' },
+                                                { value: 'draft', label: 'Draft' },
+                                                { value: 'sent', label: 'Sent' },
+                                                { value: 'paid', label: 'Paid' },
+                                                { value: 'overdue', label: 'Overdue' }
+                                            ]}
+                                            placeholder="Select Status"
+                                            style={{ width: '100%' }}
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Clear Button - positioned right after filters */}
+                                <div className="flex items-end">
+                                    <PrimaryButton
+                                        onClick={handleClearFilters}
+                                        style={{
+                                            minWidth: 120,
+                                            height: 40,
+                                            backgroundColor: colors.background.primary,
+                                            border: `1px solid ${colors.border.light}`,
+                                            color: colors.text.secondary
+                                        }}
+                                    >
+                                        Clear Filters
+                                    </PrimaryButton>
+                                </div>
+                            </div>
+
+                            {/* Create Invoice Button - positioned separately */}
+                            {activeTab === 0 && (
+                                <div className="flex items-end">
+                                    <PrimaryButton
+                                        style={{
+                                            minWidth: 280,
+                                            height: 40,
+                                            backgroundColor: selectedOrders.length > 0 ? colors.primary[500] : colors.border.light,
+                                            color: selectedOrders.length > 0 ? 'white' : colors.text.secondary
+                                        }}
+                                        onClick={handleCreateInvoice}
+                                        disabled={selectedOrders.length === 0}
+                                    >
+                                        <ReceiptIcon style={{ marginRight: 8, fontSize: 18 }} />
+                                        Create Invoice ({selectedOrders.length})
+                                    </PrimaryButton>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
-
-                {/* Action Button Row - Only show for Orders tab */}
-                {activeTab === 0 && (
-                    <div className="flex justify-end">
-                        <PrimaryButton
-                            style={{ minWidth: 180 }}
-                            onClick={handleCreateInvoice}
-                            disabled={selectedOrders.length === 0}
-                        >
-                            <ReceiptIcon style={{ marginRight: 8 }} />
-                            Create Invoice ({selectedOrders.length})
-                        </PrimaryButton>
-                    </div>
-                )}
             </div>
 
             {/* Table Section */}
-            <div className="mt-1">
+            <div className="mt-6">
                 {loading ? (
                     <div className="flex justify-center items-center py-12">
                         <div className="flex flex-col items-center gap-3">
@@ -636,12 +671,30 @@ const BillingPage: React.FC = () => {
                         </div>
                     </div>
                 ) : (activeTab === 0 ? orders.length === 0 : invoices.length === 0) ? (
-                    <div className="flex justify-center items-center py-12">
-                        <div className="text-center">
-                            <p className="text-gray-500 mb-2">
+                    <div className="flex justify-center items-center py-16">
+                        <div className="text-center max-w-md">
+                            <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                                {activeTab === 0 ? (
+                                    <ReceiptIcon style={{ fontSize: 32, color: colors.text.secondary }} />
+                                ) : (
+                                    <PaymentIcon style={{ fontSize: 32, color: colors.text.secondary }} />
+                                )}
+                            </div>
+                            <h3 className="text-lg font-semibold text-gray-700 mb-2">
                                 {activeTab === 0 ? 'No orders found' : 'No invoices found'}
+                            </h3>
+                            <p className="text-sm text-gray-500 mb-4">
+                                {activeTab === 0
+                                    ? 'No pending orders available for invoicing. Orders need to be in QC or Complete status with pending billing status.'
+                                    : 'No invoices match your current filters.'
+                                }
                             </p>
-                            <p className="text-sm text-gray-400">Try adjusting your search or filters</p>
+                            <button
+                                onClick={handleClearFilters}
+                                className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                            >
+                                Clear filters to see all {activeTab === 0 ? 'orders' : 'invoices'}
+                            </button>
                         </div>
                     </div>
                 ) : (

@@ -1,14 +1,13 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Modal, Box, Typography, IconButton, Menu, MenuItem, Fab, Tooltip } from '@mui/material';
+import { Typography, IconButton, Menu, MenuItem, Fab, Tooltip } from '@mui/material';
 import { ArrowBack, MoreVert, RadioButtonUnchecked, Print, PrintOutlined, PrintDisabled, AssignmentTurnedIn } from '@mui/icons-material';
 import type { GridColDef } from '@mui/x-data-grid';
 import PrimaryButton from '../components/common/PrimaryButton';
 import PrimaryTable from '../components/common/PrimaryTable';
-import PrimaryDropdown from '../components/common/PrimaryDropdown';
 import ConfirmationDialog from '../components/common/ConfirmationDialog';
 import CompletionStatusModal from '../components/modals/CompletionStatusModal';
+import MachineAssignmentModal from '../components/modals/MachineAssignmentModal';
 import colors from '../styles/colors';
 import EmployeeService, { type Employee } from '../services/employeeService';
 import recordService, { type ProcessRecord, type MachineAssignment } from '../services/recordService';
@@ -39,13 +38,6 @@ export default function RecordAssignmentsPage() {
     // Permission checks
     const canEdit = hasPermission(user, 'canEdit');
     const canDelete = hasPermission(user, 'canDelete');
-    const [form, setForm] = useState({
-        assignedBy: '',
-        quantity: 1,
-        washingMachine: '',
-        dryingMachine: '',
-    });
-    const [errors, setErrors] = useState<{ [key: string]: string }>({});
     const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
     const [selectedAssignment, setSelectedAssignment] = useState<MachineAssignment | null>(null);
     const [confirmDialog, setConfirmDialog] = useState({
@@ -329,27 +321,7 @@ export default function RecordAssignmentsPage() {
         setCurrentPage(1); // Reset to first page when page size changes
     };
 
-    // Validation
-    const validate = () => {
-        const newErrors: { [key: string]: string } = {};
-        if (!form.assignedBy) newErrors.assignedBy = 'Required';
-        if (!form.quantity || form.quantity <= 0) newErrors.quantity = 'Quantity must be greater than 0';
-        if (record && form.quantity > record.remainingQuantity) {
-            newErrors.quantity = `Cannot exceed remaining quantity (${record.remainingQuantity})`;
-        }
-        // Washing and drying machines are now optional
-        return newErrors;
-    };
-
     const handleOpen = () => {
-        if (!record) return;
-        setForm({
-            assignedBy: '',
-            quantity: Math.min(record.remainingQuantity, 100),
-            washingMachine: '',
-            dryingMachine: '',
-        });
-        setErrors({});
         setOpen(true);
     };
 
@@ -357,22 +329,12 @@ export default function RecordAssignmentsPage() {
         setOpen(false);
     };
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const { name, value, type } = e.target;
-        setForm(prev => ({
-            ...prev,
-            [name]: type === 'number' ? Number(value) : value,
-        }));
-    };
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const validation = validate();
-        if (Object.keys(validation).length > 0) {
-            setErrors(validation);
-            return;
-        }
-
+    const handleSubmit = async (data: {
+        assignedBy: string;
+        quantity: number;
+        washingMachine?: string;
+        dryingMachine?: string;
+    }) => {
         if (!record || !recordId) return;
 
         try {
@@ -380,10 +342,10 @@ export default function RecordAssignmentsPage() {
 
             // Create assignment via API
             const assignmentData = {
-                assignedById: form.assignedBy,
-                quantity: form.quantity,
-                washingMachine: form.washingMachine,
-                dryingMachine: form.dryingMachine,
+                assignedById: data.assignedBy,
+                quantity: data.quantity,
+                washingMachine: data.washingMachine || '',
+                dryingMachine: data.dryingMachine || '',
                 orderId: record.orderId,
                 itemId: record.itemId || '',
                 recordId: record.id,
@@ -398,11 +360,11 @@ export default function RecordAssignmentsPage() {
             const updatedRecord = await recordService.getRecord(recordId);
             setRecord(updatedRecord);
 
-            setOpen(false);
             toast.success('Assignment created successfully');
         } catch (error) {
             console.error('Error creating assignment:', error);
             toast.error('Failed to create assignment');
+            throw error; // Re-throw to let the modal handle the error state
         } finally {
             setSaving(false);
         }
@@ -693,112 +655,15 @@ export default function RecordAssignmentsPage() {
             </div>
 
             {/* Assignment Modal */}
-            <Modal open={open} onClose={handleClose}>
-                <Box
-                    sx={{
-                        position: 'absolute',
-                        top: '50%',
-                        left: '50%',
-                        transform: 'translate(-50%, -50%)',
-                        bgcolor: 'background.paper',
-                        boxShadow: 24,
-                        borderRadius: 2,
-                        p: { xs: 4, sm: 5, md: 6, lg: 8, xl: 10 },
-                        width: { xs: '98vw', sm: '95vw', md: '1200px', lg: '1400px', xl: '1600px' },
-                        maxWidth: '98vw',
-                        maxHeight: '95vh',
-                        overflowY: 'auto',
-                    }}
-                >
-                    <Typography variant="h6" fontWeight={700} mb={2} color={colors.text.primary}>
-                        Add Machine Assignment
-                    </Typography>
-
-                    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="flex flex-col">
-                                <label className="block text-sm font-medium mb-2">Assign To <span className="text-red-500">*</span></label>
-                                <PrimaryDropdown
-                                    name="assignedBy"
-                                    value={form.assignedBy}
-                                    onChange={handleChange}
-                                    options={employeeOptions}
-                                    placeholder="Select employee"
-                                    error={!!errors.assignedBy}
-                                    className="px-4 py-3 text-base"
-                                    style={{ borderColor: colors.border.light }}
-                                />
-                                {errors.assignedBy && <span className="text-xs text-red-500 mt-1">{errors.assignedBy}</span>}
-                            </div>
-
-                            <div className="flex flex-col">
-                                <label className="block text-sm font-medium mb-2">Quantity <span className="text-red-500">*</span></label>
-                                <input
-                                    name="quantity"
-                                    type="number"
-                                    min="1"
-                                    max={record?.remainingQuantity || 1}
-                                    value={form.quantity}
-                                    onChange={handleChange}
-                                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none text-base ${errors.quantity ? 'border-red-500' : ''}`}
-                                    style={{ borderColor: colors.border.light }}
-                                />
-                                {errors.quantity && <span className="text-xs text-red-500 mt-1">{errors.quantity}</span>}
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="flex flex-col">
-                                <label className="block text-sm font-medium mb-2">Washing Machine <span className="text-gray-500">(Optional)</span></label>
-                                <PrimaryDropdown
-                                    name="washingMachine"
-                                    value={form.washingMachine}
-                                    onChange={handleChange}
-                                    options={washingMachineOptions}
-                                    placeholder="Select washing machine (optional)"
-                                    error={!!errors.washingMachine}
-                                    className="px-4 py-3 text-base"
-                                    style={{ borderColor: colors.border.light }}
-                                />
-                                {errors.washingMachine && <span className="text-xs text-red-500 mt-1">{errors.washingMachine}</span>}
-                            </div>
-
-                            <div className="flex flex-col">
-                                <label className="block text-sm font-medium mb-2">Drying Machine <span className="text-gray-500">(Optional)</span></label>
-                                <PrimaryDropdown
-                                    name="dryingMachine"
-                                    value={form.dryingMachine}
-                                    onChange={handleChange}
-                                    options={dryingMachineOptions}
-                                    placeholder="Select drying machine (optional)"
-                                    error={!!errors.dryingMachine}
-                                    className="px-4 py-3 text-base"
-                                    style={{ borderColor: colors.border.light }}
-                                />
-                                {errors.dryingMachine && <span className="text-xs text-red-500 mt-1">{errors.dryingMachine}</span>}
-                            </div>
-                        </div>
-
-                        <div className="flex gap-4 mt-4 justify-end">
-                            <PrimaryButton
-                                type="button"
-                                style={{ minWidth: 120, background: colors.primary[100], color: colors.text.primary }}
-                                onClick={handleClose}
-                                disabled={saving}
-                            >
-                                Cancel
-                            </PrimaryButton>
-                            <PrimaryButton
-                                type="submit"
-                                style={{ minWidth: 140 }}
-                                disabled={saving}
-                            >
-                                {saving ? 'Creating...' : 'Create Assignment'}
-                            </PrimaryButton>
-                        </div>
-                    </form>
-                </Box>
-            </Modal>
+            <MachineAssignmentModal
+                open={open}
+                onClose={handleClose}
+                onSubmit={handleSubmit}
+                record={record}
+                employeeOptions={employeeOptions}
+                washingMachineOptions={washingMachineOptions}
+                dryingMachineOptions={dryingMachineOptions}
+            />
 
             {/* Actions Menu */}
             <Menu
