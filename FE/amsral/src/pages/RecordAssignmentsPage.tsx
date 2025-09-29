@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Typography, IconButton, Menu, MenuItem, Fab, Tooltip } from '@mui/material';
 import { ArrowBack, MoreVert, RadioButtonUnchecked, Print, PrintOutlined, PrintDisabled, AssignmentTurnedIn } from '@mui/icons-material';
@@ -9,15 +9,23 @@ import ConfirmationDialog from '../components/common/ConfirmationDialog';
 import CompletionStatusModal from '../components/modals/CompletionStatusModal';
 import MachineAssignmentModal from '../components/modals/MachineAssignmentModal';
 import colors from '../styles/colors';
-import EmployeeService, { type Employee } from '../services/employeeService';
-import recordService, { type ProcessRecord, type MachineAssignment } from '../services/recordService';
-import machineService, { type Machine } from '../services/machineService';
 import { generateAssignmentReceipt, type AssignmentReceiptData } from '../utils/pdfUtils';
 import { usePrinter } from '../context/PrinterContext';
 import printerService from '../services/printerService';
 import { useAuth } from '../hooks/useAuth';
 import { hasPermission } from '../utils/roleUtils';
 import { getStatusColor, getStatusLabel, normalizeStatus } from '../utils/statusUtils';
+import {
+    useRecord,
+    useRecordAssignments,
+    useEmployees,
+    useMachines,
+    useCreateMachineAssignment,
+    useUpdateMachineAssignment,
+    useDeleteMachineAssignment,
+    useUpdateAssignmentCompletion
+} from '../hooks/useRecordAssignments';
+import { type MachineAssignment } from '../services/recordService';
 import toast from 'react-hot-toast';
 
 // Types are now imported from services
@@ -29,15 +37,9 @@ export default function RecordAssignmentsPage() {
     const navigate = useNavigate();
     const { user } = useAuth();
     const { isConnected, isConnecting, connect } = usePrinter();
-    const [record, setRecord] = useState<ProcessRecord | null>(null);
-    const [assignments, setAssignments] = useState<MachineAssignment[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [open, setOpen] = useState(false);
-    const [saving, setSaving] = useState(false);
 
-    // Permission checks
-    const canEdit = hasPermission(user, 'canEdit');
-    const canDelete = hasPermission(user, 'canDelete');
+    // Local state for UI
+    const [open, setOpen] = useState(false);
     const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
     const [selectedAssignment, setSelectedAssignment] = useState<MachineAssignment | null>(null);
     const [confirmDialog, setConfirmDialog] = useState({
@@ -53,21 +55,85 @@ export default function RecordAssignmentsPage() {
     });
 
     // Pagination state
-    const [pagination, setPagination] = useState({
-        currentPage: 1,
-        totalPages: 1,
-        totalItems: 0,
-        itemsPerPage: 10,
-        hasNextPage: false,
-        hasPrevPage: false
-    });
     const [pageSize, setPageSize] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
 
-    // Dropdown options
-    const [employeeOptions, setEmployeeOptions] = useState<{ value: string; label: string }[]>([]);
-    const [washingMachineOptions, setWashingMachineOptions] = useState<{ value: string; label: string }[]>([]);
-    const [dryingMachineOptions, setDryingMachineOptions] = useState<{ value: string; label: string }[]>([]);
+    // Permission checks
+    const canEdit = hasPermission(user, 'canEdit');
+    const canDelete = hasPermission(user, 'canDelete');
+
+    // TanStack Query hooks
+    const {
+        data: record,
+        isLoading: recordLoading
+    } = useRecord(recordId || '');
+
+    const {
+        data: assignmentsData,
+        isLoading: assignmentsLoading
+    } = useRecordAssignments(recordId || '', {
+        page: currentPage,
+        limit: pageSize
+    });
+
+    const {
+        data: employeeOptions = []
+    } = useEmployees();
+
+    const {
+        data: machinesData
+    } = useMachines();
+
+    // Mutation hooks
+    const createAssignmentMutation = useCreateMachineAssignment();
+    const updateAssignmentMutation = useUpdateMachineAssignment();
+    const deleteAssignmentMutation = useDeleteMachineAssignment();
+    const updateCompletionMutation = useUpdateAssignmentCompletion();
+
+    // Derived state
+    const assignments = assignmentsData?.assignments || [];
+    const pagination = assignmentsData?.pagination || {
+        currentPage: 1,
+        totalPages: 1,
+        totalRecords: 0,
+        limit: pageSize,
+    };
+
+    const washingMachineOptions = machinesData?.washing || [];
+    const dryingMachineOptions = machinesData?.drying || [];
+
+    const loading = recordLoading || assignmentsLoading;
+    const saving = createAssignmentMutation.isPending || updateAssignmentMutation.isPending || deleteAssignmentMutation.isPending || updateCompletionMutation.isPending;
+
+
+    // Early return if no recordId
+    if (!recordId) {
+        return (
+            <div style={{ padding: '20px', textAlign: 'center' }}>
+                <Typography variant="h6" color="error">
+                    Record ID not found
+                </Typography>
+            </div>
+        );
+    }
+
+    // Pagination handlers
+    const handlePageChange = (newPage: number) => {
+        setCurrentPage(newPage);
+    };
+
+    const handlePageSizeChange = (newPageSize: number) => {
+        setPageSize(newPageSize);
+        setCurrentPage(1); // Reset to first page when page size changes
+    };
+
+    const handleOpen = () => {
+        setOpen(true);
+    };
+
+    const handleClose = () => {
+        setOpen(false);
+    };
 
     // Table columns
     const assignmentsColumns: GridColDef[] = [
@@ -229,145 +295,39 @@ export default function RecordAssignmentsPage() {
         },
     ];
 
-
-    // Fetch record details and assignments
-    const fetchRecordDetails = useCallback(async () => {
-        if (!recordId) return;
-
-        try {
-            setLoading(true);
-
-            // Fetch record details
-            const recordData = await recordService.getRecord(recordId);
-            setRecord(recordData);
-
-            // Fetch assignments with pagination
-            const assignmentsResponse = await recordService.getRecordAssignments(recordId, {
-                page: currentPage,
-                limit: pageSize
-            });
-            setAssignments(assignmentsResponse.data.assignments);
-
-            // Update pagination info
-            setPagination({
-                currentPage: assignmentsResponse.data.pagination?.currentPage || 1,
-                totalPages: assignmentsResponse.data.pagination?.totalPages || 1,
-                totalItems: assignmentsResponse.data.pagination?.totalRecords || assignmentsResponse.data.assignments.length,
-                itemsPerPage: assignmentsResponse.data.pagination?.limit || pageSize,
-                hasNextPage: (assignmentsResponse.data.pagination?.currentPage || 1) < (assignmentsResponse.data.pagination?.totalPages || 1),
-                hasPrevPage: (assignmentsResponse.data.pagination?.currentPage || 1) > 1
-            });
-
-        } catch (error) {
-            console.error('Error fetching record details:', error);
-            toast.error('Failed to fetch record details');
-        } finally {
-            setLoading(false);
-        }
-    }, [recordId, currentPage, pageSize]);
-
-    // Fetch dropdown options
-    const fetchDropdownOptions = useCallback(async () => {
-        try {
-            // Fetch employees
-            const employeesResponse = await EmployeeService.getAllEmployees({
-                limit: 100,
-                isActive: true
-            });
-            const employeeOpts = employeesResponse.employees.map((employee: Employee) => ({
-                value: employee.id?.toString() || '',
-                label: `${employee.firstName} ${employee.lastName}`
-            }));
-            setEmployeeOptions(employeeOpts);
-
-            // Fetch washing machines
-            const washingMachines = await machineService.getWashingMachines();
-            const washingMachineOpts = washingMachines.map((machine: Machine) => ({
-                value: machine.id,
-                label: machine.name
-            }));
-            setWashingMachineOptions(washingMachineOpts);
-
-            // Fetch drying machines
-            const dryingMachines = await machineService.getDryingMachines();
-            const dryingMachineOpts = dryingMachines.map((machine: Machine) => ({
-                value: machine.id,
-                label: machine.name
-            }));
-            setDryingMachineOptions(dryingMachineOpts);
-
-        } catch (error) {
-            console.error('Error fetching dropdown options:', error);
-            toast.error('Failed to load options');
-        }
-    }, []);
-
-    // Load data on component mount
-    useEffect(() => {
-        const loadData = async () => {
-            await fetchDropdownOptions();
-            await fetchRecordDetails();
-        };
-        loadData();
-    }, [fetchDropdownOptions, fetchRecordDetails]);
-
-    // Pagination handlers
-    const handlePageChange = (newPage: number) => {
-        setCurrentPage(newPage);
-    };
-
-    const handlePageSizeChange = (newPageSize: number) => {
-        setPageSize(newPageSize);
-        setCurrentPage(1); // Reset to first page when page size changes
-    };
-
-    const handleOpen = () => {
-        setOpen(true);
-    };
-
-    const handleClose = () => {
-        setOpen(false);
-    };
-
     const handleSubmit = async (data: {
         assignedBy: string;
         quantity: number;
         washingMachine?: string;
         dryingMachine?: string;
     }) => {
-        if (!record || !recordId) return;
-
-        try {
-            setSaving(true);
-
-            // Create assignment via API
-            const assignmentData = {
-                assignedById: data.assignedBy,
-                quantity: data.quantity,
-                washingMachine: data.washingMachine || '',
-                dryingMachine: data.dryingMachine || '',
-                orderId: record.orderId,
-                itemId: record.itemId || '',
-                recordId: record.id,
-            };
-
-            const newAssignment = await recordService.createAssignment(recordId, assignmentData);
-
-            // Update local state
-            setAssignments(prev => [...prev, newAssignment]);
-
-            // Refresh record details to get updated remaining quantity
-            const updatedRecord = await recordService.getRecord(recordId);
-            setRecord(updatedRecord);
-
-            toast.success('Assignment created successfully');
-        } catch (error) {
-            console.error('Error creating assignment:', error);
-            toast.error('Failed to create assignment');
-            throw error; // Re-throw to let the modal handle the error state
-        } finally {
-            setSaving(false);
+        if (!record || !recordId) {
+            toast.error('Record not found');
+            return;
         }
+
+        const assignmentData = {
+            assignedById: data.assignedBy,
+            quantity: data.quantity,
+            washingMachine: data.washingMachine || '',
+            dryingMachine: data.dryingMachine || '',
+            orderId: record.orderId,
+            itemId: record.itemId || '',
+            recordId: record.id,
+        };
+
+        createAssignmentMutation.mutate(
+            { recordId, assignmentData },
+            {
+                onSuccess: () => {
+                    setOpen(false);
+                    toast.success('Machine assignment created successfully');
+                },
+                onError: (error: Error) => {
+                    toast.error(error.message || 'Failed to create assignment. Please try again.');
+                }
+            }
+        );
     };
 
     // Menu handlers
@@ -389,29 +349,20 @@ export default function RecordAssignmentsPage() {
             title: 'Delete Assignment',
             message: `Are you sure you want to delete this assignment? This will free up ${selectedAssignment.quantity} units for reassignment.`,
             confirmText: 'Delete',
-            onConfirm: async () => {
-                try {
-                    setSaving(true);
-
-                    // Delete assignment via API
-                    await recordService.deleteAssignment(recordId, selectedAssignment.id);
-
-                    // Remove assignment from local state
-                    setAssignments(prev => prev.filter(a => a.id !== selectedAssignment.id));
-
-                    // Refresh record details to get updated remaining quantity
-                    const updatedRecord = await recordService.getRecord(recordId);
-                    setRecord(updatedRecord);
-
-                    toast.success('Assignment deleted successfully');
-                } catch (error) {
-                    console.error('Error deleting assignment:', error);
-                    toast.error('Failed to delete assignment');
-                } finally {
-                    setSaving(false);
-                    setConfirmDialog(prev => ({ ...prev, open: false }));
-                    handleMenuClose();
-                }
+            onConfirm: () => {
+                deleteAssignmentMutation.mutate(
+                    { recordId, assignmentId: selectedAssignment.id },
+                    {
+                        onSuccess: () => {
+                            setConfirmDialog(prev => ({ ...prev, open: false }));
+                            handleMenuClose();
+                        },
+                        onError: () => {
+                            setConfirmDialog(prev => ({ ...prev, open: false }));
+                            handleMenuClose();
+                        }
+                    }
+                );
             },
         });
         handleMenuClose();
@@ -429,28 +380,23 @@ export default function RecordAssignmentsPage() {
     const handleUpdateCompletion = async (assignmentId: string, isCompleted: boolean, returnQuantity: number) => {
         if (!recordId) return;
 
-        try {
-            setSaving(true);
-            const updatedAssignment = await recordService.updateAssignmentCompletion(
+        updateCompletionMutation.mutate(
+            {
                 recordId,
                 assignmentId,
                 isCompleted,
                 returnQuantity
-            );
-
-            // Update assignment in local state
-            setAssignments(prev => prev.map(a =>
-                a.id === assignmentId ? updatedAssignment : a
-            ));
-
-            toast.success(`Assignment ${isCompleted ? 'marked as completed' : 'marked as incomplete'} successfully`);
-        } catch (error) {
-            console.error('Error updating completion status:', error);
-            toast.error('Failed to update completion status');
-            throw error; // Re-throw to let the modal handle the error
-        } finally {
-            setSaving(false);
-        }
+            },
+            {
+                onSuccess: () => {
+                    toast.success(`Assignment ${isCompleted ? 'marked as completed' : 'marked as incomplete'} successfully`);
+                },
+                onError: (error: Error) => {
+                    toast.error('Failed to update completion status');
+                    throw error; // Re-throw to let the modal handle the error
+                }
+            }
+        );
     };
 
     const handlePrintAssignment = () => {
@@ -641,7 +587,7 @@ export default function RecordAssignmentsPage() {
                         page: pagination.currentPage - 1, // DataGrid uses 0-based indexing
                         pageSize: pageSize
                     }}
-                    rowCount={pagination.totalItems}
+                    rowCount={pagination.totalRecords}
                     onPaginationModelChange={(model) => {
                         if (model.pageSize !== pageSize) {
                             handlePageSizeChange(model.pageSize);

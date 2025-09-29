@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Modal, Box, Menu, MenuItem, IconButton, Fab, Tooltip } from '@mui/material';
 import { MoreVert, Print, Inventory, PrintOutlined, PrintDisabled } from '@mui/icons-material';
@@ -8,9 +8,7 @@ import PrimaryTable from '../components/common/PrimaryTable';
 import SimpleOrderForm from '../components/orders/SimpleOrderForm';
 import ConfirmationDialog from '../components/common/ConfirmationDialog';
 import colors from '../styles/colors';
-import { orderService, type CreateOrderRequest, type ErrorResponse } from '../services/orderService';
-import CustomerService from '../services/customerService';
-import { itemService } from '../services/itemService';
+import { type CreateOrderRequest, type ErrorResponse } from '../services/orderService';
 import { type BagLabelData } from '../utils/pdfUtils';
 import { usePrinter } from '../context/PrinterContext';
 import bagLabelPrinterService from '../services/bagLabelPrinterService';
@@ -20,49 +18,28 @@ import type { OrderRecordReceiptData } from '../services/printerService';
 import { useAuth } from '../hooks/useAuth';
 import { hasPermission } from '../utils/roleUtils';
 import { getStatusColor, getStatusLabel, normalizeStatus } from '../utils/statusUtils';
+import {
+  useOrders,
+  useCustomers,
+  useItems,
+  useCreateOrder,
+  useUpdateOrder,
+  useDeleteOrder,
+  type OrderRow
+} from '../hooks/useOrders';
 import toast from 'react-hot-toast';
 
 // We'll define columns inside the component to access the handler functions
-
-type ProcessRecord = {
-  id: string;
-  itemId: string;
-  quantity: number;
-  washType: string;
-  processTypes: string[];
-};
-
-
-type OrderRow = {
-  id: number;
-  date: string;
-  customerId: string;
-  customerName: string;
-  itemId?: string;
-  quantity: number;
-  gpNo?: string;
-  notes: string;
-  records: ProcessRecord[];
-  recordsCount: number;
-  deliveryDate: string;
-  status: string;
-  complete: boolean;
-  overdue: boolean;
-  createdAt: string;
-  updatedAt: string;
-  actions: number;
-  [key: string]: string | number | boolean | ProcessRecord[] | undefined;
-};
 
 
 export default function OrdersPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { isConnected, isConnecting, connect } = usePrinter();
+
+  // Local state for UI
   const [search, setSearch] = useState('');
-  const [rows, setRows] = useState<OrderRow[]>([]);
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [editingOrder, setEditingOrder] = useState<OrderRow | null>(null);
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
   const [selectedOrder, setSelectedOrder] = useState<OrderRow | null>(null);
@@ -99,16 +76,11 @@ export default function OrdersPage() {
     total: 0,
   });
 
-  // State for dropdown options
-  const [customerOptions, setCustomerOptions] = useState<{ value: string; label: string }[]>([]);
-  const [itemOptions, setItemOptions] = useState<{ value: string; label: string }[]>([]);
-  const [optionsLoading, setOptionsLoading] = useState(true);
-
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0], // Today's date as default
     customerId: '',
     itemId: '',
-    quantity: 1,
+    quantity: '',
     gpNo: '',
     notes: '',
     deliveryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 2 weeks from now
@@ -117,116 +89,45 @@ export default function OrdersPage() {
   const [showAdditional, setShowAdditional] = useState(false);
 
   // Pagination state
-  const [pagination, setPagination] = useState({
-    currentPage: 1,
-    totalPages: 1,
-    totalItems: 0,
-    itemsPerPage: 20, // Match default pageSize
-    hasNextPage: false,
-    hasPrevPage: false
-  });
   const [pageSize, setPageSize] = useState(20); // Default to 20 rows per page
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Fetch orders from API
-  const fetchOrders = useCallback(async () => {
-    try {
-      const response = await orderService.getOrders({
-        page: currentPage,
-        limit: pageSize,
-        search: search || undefined,
-        excludeDelivered: true // Exclude delivered orders from the orders table
-      });
+  // TanStack Query hooks
+  const {
+    data: ordersData
+  } = useOrders({
+    page: currentPage,
+    limit: pageSize,
+    search: search || undefined,
+    excludeDelivered: true
+  });
 
-      if (response.success) {
-        const orderRows: OrderRow[] = response.data.orders.map(order => ({
-          id: order.id,
-          date: order.date,
-          customerId: order.customerId,
-          customerName: order.customerName,
-          itemId: order.itemId || undefined,
-          quantity: order.quantity,
-          notes: order.notes,
-          records: order.records.map(record => ({
-            id: record.id.toString(),
-            itemId: record.itemId,
-            quantity: record.quantity,
-            washType: record.washType,
-            processTypes: record.processTypes
-          })),
-          recordsCount: order.recordsCount,
-          deliveryDate: order.deliveryDate,
-          status: order.status,
-          complete: order.complete,
-          overdue: order.overdue || false,
-          createdAt: order.createdAt,
-          updatedAt: order.updatedAt,
-          actions: order.id,
-        }));
-        setRows(orderRows);
+  const {
+    data: customerOptions = [],
+    isLoading: customersLoading
+  } = useCustomers();
 
-        // Update pagination info
-        setPagination({
-          currentPage: response.data.pagination?.currentPage || 1,
-          totalPages: response.data.pagination?.totalPages || 1,
-          totalItems: response.data.pagination?.totalRecords || orderRows.length,
-          itemsPerPage: response.data.pagination?.limit || pageSize,
-          hasNextPage: (response.data.pagination?.currentPage || 1) < (response.data.pagination?.totalPages || 1),
-          hasPrevPage: (response.data.pagination?.currentPage || 1) > 1
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching orders:', error);
-      toast.error('Failed to fetch orders. Please try again.');
-    }
-  }, [search, currentPage, pageSize]);
+  const {
+    data: itemOptions = [],
+    isLoading: itemsLoading
+  } = useItems();
 
-  // Fetch dropdown options and orders on component mount
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setOptionsLoading(true);
+  // Mutation hooks
+  const createOrderMutation = useCreateOrder();
+  const updateOrderMutation = useUpdateOrder();
+  const deleteOrderMutation = useDeleteOrder();
 
-        // Fetch customers with first name and customer code
-        const customersResponse = await CustomerService.getAllCustomers({
-          limit: 100, // Get all customers for dropdown
-          isActive: true
-        });
-        const customerOpts = customersResponse.customers.map(customer => ({
-          value: customer.id!.toString(),
-          label: `${customer.firstName} - ${customer.customerCode || 'N/A'}`.trim()
-        }));
-        setCustomerOptions(customerOpts);
+  // Derived state
+  const rows = ordersData?.orders || [];
+  const pagination = ordersData?.pagination || {
+    currentPage: 1,
+    totalPages: 1,
+    totalRecords: 0,
+    limit: pageSize,
+  };
 
-        // Fetch items
-        const itemsResponse = await itemService.getItemsList();
-        setItemOptions(itemsResponse.data);
-
-        // Fetch orders
-        await fetchOrders();
-
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        toast.error('Failed to load data. Please refresh the page.');
-      } finally {
-        setOptionsLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [fetchOrders]);
-
-  // Fetch orders when search changes
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (search !== undefined) {
-        setCurrentPage(1); // Reset to first page when search changes
-        fetchOrders();
-      }
-    }, 500);
-
-    return () => clearTimeout(timeoutId);
-  }, [search, fetchOrders]);
+  const optionsLoading = customersLoading || itemsLoading;
+  const loading = createOrderMutation.isPending || updateOrderMutation.isPending || deleteOrderMutation.isPending;
 
   // Pagination handlers
   const handlePageChange = (newPage: number) => {
@@ -238,12 +139,18 @@ export default function OrdersPage() {
     setCurrentPage(1); // Reset to first page when page size changes
   };
 
+  // Search handler with debouncing
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    setCurrentPage(1); // Reset to first page when search changes
+  };
+
   const validate = () => {
     const newErrors: { [key: string]: string } = {};
     if (!form.date) newErrors.date = 'Date is required';
     if (!form.customerId) newErrors.customerId = 'Customer is required';
     if (!form.itemId) newErrors.itemId = 'Item is required';
-    if (!form.quantity || form.quantity <= 0) newErrors.quantity = 'Quantity must be greater than 0';
+    if (!form.quantity || Number(form.quantity) <= 0) newErrors.quantity = 'Quantity must be greater than 0';
     if (!form.deliveryDate) newErrors.deliveryDate = 'Delivery date is required';
 
     return newErrors;
@@ -257,7 +164,7 @@ export default function OrdersPage() {
         date: order.date,
         customerId: order.customerId,
         itemId: order.itemId || '',
-        quantity: order.quantity,
+        quantity: order.quantity.toString(),
         gpNo: order.gpNo || '',
         notes: order.notes,
         deliveryDate: order.deliveryDate,
@@ -269,7 +176,7 @@ export default function OrdersPage() {
         date: new Date().toISOString().split('T')[0],
         customerId: '',
         itemId: '',
-        quantity: 1,
+        quantity: '',
         gpNo: '',
         notes: '',
         deliveryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 2 weeks from now
@@ -328,21 +235,17 @@ export default function OrdersPage() {
       open: true,
       title: 'Delete Order',
       message: `Are you sure you want to delete order "${selectedOrder.id}"? This action cannot be undone and will also delete all associated records.`,
-      onConfirm: async () => {
-        try {
-          setLoading(true);
-          await orderService.deleteOrder(selectedOrder.id);
-          setRows(prev => prev.filter(row => row.id !== selectedOrder.id));
-          toast.success(`Order ${selectedOrder.id} deleted successfully`);
-        } catch (error) {
-          console.error('Error deleting order:', error);
-          const apiError = error as ErrorResponse;
-          toast.error(apiError.message || 'Failed to delete order. Please try again.');
-        } finally {
-          setLoading(false);
-          setConfirmDialog(prev => ({ ...prev, open: false }));
-          handleMenuClose();
-        }
+      onConfirm: () => {
+        deleteOrderMutation.mutate(selectedOrder.id, {
+          onSuccess: () => {
+            setConfirmDialog(prev => ({ ...prev, open: false }));
+            handleMenuClose();
+          },
+          onError: () => {
+            setConfirmDialog(prev => ({ ...prev, open: false }));
+            handleMenuClose();
+          }
+        });
       },
     });
     handleMenuClose();
@@ -760,110 +663,83 @@ export default function OrdersPage() {
       return;
     }
 
-    setLoading(true);
     setErrors({});
 
-    try {
-      if (editingOrder) {
-        // Edit existing order
-        const updateData: Partial<CreateOrderRequest> = {
-          date: form.date,
-          customerId: form.customerId,
-          itemId: form.itemId,
-          quantity: form.quantity,
-          notes: form.notes || undefined,
-          deliveryDate: form.deliveryDate,
-        };
+    if (editingOrder) {
+      // Edit existing order
+      const updateData: Partial<CreateOrderRequest> = {
+        date: form.date,
+        customerId: form.customerId,
+        itemId: form.itemId,
+        quantity: Number(form.quantity),
+        notes: form.notes || undefined,
+        deliveryDate: form.deliveryDate,
+      };
 
-        const response = await orderService.updateOrder(editingOrder.id, updateData);
-
-        if (response.success) {
-          const updatedOrderRow: OrderRow = {
-            ...editingOrder,
-            date: response.data.date,
-            customerId: response.data.customerId,
-            customerName: response.data.customerName,
-            quantity: response.data.quantity,
-            notes: response.data.notes,
-            deliveryDate: response.data.deliveryDate,
-            status: response.data.status,
-            updatedAt: response.data.updatedAt,
-          };
-
-          setRows(prev => prev.map(row => row.id === editingOrder.id ? updatedOrderRow : row));
-          setOpen(false);
-          toast.success(`Order ${response.data.id} updated successfully!`);
+      updateOrderMutation.mutate(
+        { id: editingOrder.id, data: updateData },
+        {
+          onSuccess: () => {
+            setOpen(false);
+            setEditingOrder(null);
+            // Reset form
+            setForm({
+              date: new Date().toISOString().split('T')[0],
+              customerId: '',
+              itemId: '',
+              quantity: '',
+              gpNo: '',
+              notes: '',
+              deliveryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            });
+          },
+          onError: (error: ErrorResponse) => {
+            // Handle API validation errors
+            if (error.errors) {
+              setErrors(error.errors);
+            } else {
+              setErrors({ general: error.message || 'Failed to save order. Please try again.' });
+            }
+          }
         }
-      } else {
-        // Create new order
-        const orderData: CreateOrderRequest = {
-          date: form.date,
-          customerId: form.customerId,
-          itemId: form.itemId,
-          quantity: form.quantity,
-          gpNo: form.gpNo || undefined,
-          notes: form.notes || undefined,
-          deliveryDate: form.deliveryDate,
-          records: [] // Start with empty records
-        };
+      );
+    } else {
+      // Create new order
+      const orderData: CreateOrderRequest = {
+        date: form.date,
+        customerId: form.customerId,
+        itemId: form.itemId,
+        quantity: Number(form.quantity),
+        gpNo: form.gpNo || undefined,
+        notes: form.notes || undefined,
+        deliveryDate: form.deliveryDate,
+        records: [] // Start with empty records
+      };
 
-        const response = await orderService.createOrder(orderData);
-
-        if (response.success) {
-          const newOrderRow: OrderRow = {
-            id: response.data.id,
-            date: response.data.date,
-            customerId: response.data.customerId,
-            customerName: response.data.customerName,
-            quantity: response.data.quantity,
-            notes: response.data.notes,
-            records: response.data.records.map(record => ({
-              id: record.id.toString(),
-              itemId: record.itemId,
-              quantity: record.quantity,
-              washType: record.washType,
-              processTypes: record.processTypes
-            })),
-            recordsCount: response.data.recordsCount,
-            deliveryDate: response.data.deliveryDate,
-            status: response.data.status,
-            complete: response.data.complete,
-            overdue: response.data.overdue || false,
-            createdAt: response.data.createdAt,
-            updatedAt: response.data.updatedAt,
-            actions: response.data.id,
-          };
-
-          setRows(prev => [newOrderRow, ...prev]);
+      createOrderMutation.mutate(orderData, {
+        onSuccess: () => {
           setOpen(false);
-          toast.success(`Order ${response.data.id} created successfully! You can now add process records by clicking on the order.`);
+          setEditingOrder(null);
+          // Reset form
+          setForm({
+            date: new Date().toISOString().split('T')[0],
+            customerId: '',
+            itemId: '',
+            quantity: '',
+            gpNo: '',
+            notes: '',
+            deliveryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          });
+        },
+        onError: (error: ErrorResponse) => {
+          // Handle API validation errors
+          if (error.errors) {
+            setErrors(error.errors);
+          } else {
+            setErrors({ general: error.message || 'Failed to save order. Please try again.' });
+          }
         }
-      }
-
-      // Reset form
-      setForm({
-        date: new Date().toISOString().split('T')[0],
-        customerId: '',
-        itemId: '',
-        quantity: 1,
-        gpNo: '',
-        notes: '',
-        deliveryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       });
-      setEditingOrder(null);
-
-    } catch (error) {
-      console.error('Error saving order:', error);
-
-      // Handle API validation errors
-      const apiError = error as ErrorResponse;
-      if (apiError.errors) {
-        setErrors(apiError.errors);
-      } else {
-        setErrors({ general: apiError.message || 'Failed to save order. Please try again.' });
-      }
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -878,7 +754,7 @@ export default function OrdersPage() {
               type="text"
               placeholder="Search by reference or customer..."
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => handleSearchChange(e.target.value)}
               className="flex-1 px-3 py-2 lg:py-3 border rounded-xl focus:outline-none text-sm sm:text-base lg:text-lg"
               style={{ borderColor: colors.border.light, maxWidth: 400 }}
             />
@@ -933,7 +809,7 @@ export default function OrdersPage() {
             page: pagination.currentPage - 1, // DataGrid uses 0-based indexing
             pageSize: pageSize
           }}
-          rowCount={pagination.totalItems}
+          rowCount={pagination.totalRecords}
           onPaginationModelChange={(model) => {
             if (model.pageSize !== pageSize) {
               handlePageSizeChange(model.pageSize);

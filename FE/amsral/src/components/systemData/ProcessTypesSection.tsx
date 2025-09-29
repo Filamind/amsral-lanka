@@ -1,19 +1,18 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Modal, Box, Typography, IconButton } from '@mui/material';
 import type { GridColDef, GridPaginationModel } from '@mui/x-data-grid';
 import toast from 'react-hot-toast';
 import PrimaryButton from '../common/PrimaryButton';
 import PrimaryTable from '../common/PrimaryTable';
 import colors from '../../styles/colors';
-import { processTypeService, type ProcessType } from '../../services/processTypeService';
+import {
+    useProcessTypes,
+    useCreateProcessType,
+    useUpdateProcessType,
+    useDeleteProcessType
+} from '../../hooks/useSystemData';
+import { type ProcessType } from '../../services/processTypeService';
 
-interface ApiError {
-    response?: {
-        data?: {
-            message?: string;
-        };
-    };
-}
 
 const getColumns = (onEdit: (processType: ProcessType) => void, onDelete: (processType: ProcessType) => void): GridColDef[] => [
     { field: 'id', headerName: 'ID', flex: 0.6, minWidth: 80 },
@@ -57,9 +56,8 @@ const getColumns = (onEdit: (processType: ProcessType) => void, onDelete: (proce
 ];
 
 export default function ProcessTypesSection() {
+    // Local state for UI
     const [search, setSearch] = useState('');
-    const [rows, setRows] = useState<ProcessType[]>([]);
-    const [loading, setLoading] = useState(false);
     const [open, setOpen] = useState(false);
     const [editMode, setEditMode] = useState(false);
     const [selectedProcessType, setSelectedProcessType] = useState<ProcessType | null>(null);
@@ -77,40 +75,30 @@ export default function ProcessTypesSection() {
         page: 0,
         pageSize: 10,
     });
-    const [rowCount, setRowCount] = useState(0);
 
-    const fetchProcessTypes = useCallback(async () => {
-        try {
-            setLoading(true);
-            const response = await processTypeService.getProcessTypes({
-                page: paginationModel.page + 1,
-                limit: paginationModel.pageSize,
-                search: search || undefined,
-            });
+    // TanStack Query hooks
+    const {
+        data: processTypesData,
+        isLoading: loading
+    } = useProcessTypes(paginationModel.page + 1, paginationModel.pageSize, search.trim() || undefined);
 
-            setRows(response.data.processTypes);
-            setRowCount(response.data.pagination.totalRecords);
-        } catch (error) {
-            console.error('Error fetching process types:', error);
-            const errorMessage = (error as ApiError)?.response?.data?.message || 'Failed to fetch process types';
-            toast.error(errorMessage);
-        } finally {
-            setLoading(false);
-        }
-    }, [paginationModel.page, paginationModel.pageSize, search]);
+    // Mutation hooks
+    const createProcessTypeMutation = useCreateProcessType();
+    const updateProcessTypeMutation = useUpdateProcessType();
+    const deleteProcessTypeMutation = useDeleteProcessType();
 
-    // Debounced search - only for search term changes
+    // Derived state
+    const rows = processTypesData?.processTypes || [];
+    const rowCount = processTypesData?.pagination.totalRecords || 0;
+
+    // Debounced search effect
     useEffect(() => {
         const timeoutId = setTimeout(() => {
-            setPaginationModel(prev => ({ ...prev, page: 0 }));
-        }, 300);
+            // TanStack Query will automatically refetch when search changes
+        }, search ? 300 : 0); // 300ms debounce for search
 
         return () => clearTimeout(timeoutId);
     }, [search]);
-
-    useEffect(() => {
-        fetchProcessTypes();
-    }, [paginationModel, fetchProcessTypes]);
 
     const handlePaginationModelChange = (newModel: GridPaginationModel) => {
         setPaginationModel(newModel);
@@ -149,17 +137,15 @@ export default function ProcessTypesSection() {
     const confirmDelete = async () => {
         if (!processTypeToDelete) return;
 
-        try {
-            await processTypeService.deleteProcessType(processTypeToDelete.id);
-            toast.success('Process type deleted successfully');
-            setDeleteConfirmOpen(false);
-            setProcessTypeToDelete(null);
-            await fetchProcessTypes();
-        } catch (error) {
-            console.error('Error deleting process type:', error);
-            const errorMessage = (error as ApiError)?.response?.data?.message || 'Failed to delete process type';
-            toast.error(errorMessage);
-        }
+        deleteProcessTypeMutation.mutate(processTypeToDelete.id.toString(), {
+            onSuccess: () => {
+                setDeleteConfirmOpen(false);
+                setProcessTypeToDelete(null);
+            },
+            onError: (error: Error) => {
+                toast.error(error.message || 'Failed to delete process type');
+            }
+        });
     };
 
     const handleOpen = () => {
@@ -197,30 +183,41 @@ export default function ProcessTypesSection() {
             return;
         }
 
-        try {
-            const processTypeData = {
-                name: form.name,
-                code: form.code,
-                description: form.description || undefined,
-            };
+        const processTypeData = {
+            name: form.name,
+            code: form.code,
+            description: form.description || undefined,
+        };
 
-            if (editMode && selectedProcessType) {
-                // Update existing process type
-                await processTypeService.updateProcessType(selectedProcessType.id, processTypeData);
-                toast.success('Process type updated successfully');
-            } else {
-                // Create new process type
-                await processTypeService.createProcessType(processTypeData);
-                toast.success('Process type created successfully');
-            }
-
-            setOpen(false);
-            await fetchProcessTypes();
-        } catch (error) {
-            console.error('Error saving process type:', error);
-            const errorMessage = (error as ApiError)?.response?.data?.message ||
-                (editMode ? 'Failed to update process type' : 'Failed to create process type');
-            toast.error(errorMessage);
+        if (editMode && selectedProcessType) {
+            // Update existing process type
+            updateProcessTypeMutation.mutate(
+                { id: selectedProcessType.id.toString(), data: processTypeData },
+                {
+                    onSuccess: () => {
+                        setOpen(false);
+                        setForm({ name: '', code: '', description: '' });
+                        setEditMode(false);
+                        setSelectedProcessType(null);
+                    },
+                    onError: (error: Error) => {
+                        toast.error(error.message || 'Failed to update process type');
+                    }
+                }
+            );
+        } else {
+            // Create new process type
+            createProcessTypeMutation.mutate(processTypeData, {
+                onSuccess: () => {
+                    setOpen(false);
+                    setForm({ name: '', code: '', description: '' });
+                    setEditMode(false);
+                    setSelectedProcessType(null);
+                },
+                onError: (error: Error) => {
+                    toast.error(error.message || 'Failed to create process type');
+                }
+            });
         }
     };
 

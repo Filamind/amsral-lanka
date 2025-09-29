@@ -5,15 +5,14 @@ import toast from 'react-hot-toast';
 import PrimaryButton from '../common/PrimaryButton';
 import PrimaryTable from '../common/PrimaryTable';
 import colors from '../../styles/colors';
-import { washingTypeService, type WashingType } from '../../services/washingTypeService';
+import {
+    useWashingTypes,
+    useCreateWashingType,
+    useUpdateWashingType,
+    useDeleteWashingType
+} from '../../hooks/useSystemData';
+import { type WashingType } from '../../services/washingTypeService';
 
-interface ApiError {
-    response?: {
-        data?: {
-            message?: string;
-        };
-    };
-}
 
 const getColumns = (onEdit: (washingType: WashingType) => void, onDelete: (washingType: WashingType) => void): GridColDef[] => [
     { field: 'id', headerName: 'ID', flex: 0.6, minWidth: 80 },
@@ -49,9 +48,8 @@ const getColumns = (onEdit: (washingType: WashingType) => void, onDelete: (washi
 ];
 
 export default function WashingTypesSection() {
+    // Local state for UI
     const [search, setSearch] = useState('');
-    const [rows, setRows] = useState<WashingType[]>([]);
-    const [loading, setLoading] = useState(false);
     const [open, setOpen] = useState(false);
     const [editMode, setEditMode] = useState(false);
     const [selectedWashingType, setSelectedWashingType] = useState<WashingType | null>(null);
@@ -65,40 +63,37 @@ export default function WashingTypesSection() {
     const [washingTypeToDelete, setWashingTypeToDelete] = useState<WashingType | null>(null);
 
     // Pagination state
-    const [pagination, setPagination] = useState({
+    const [pageSize, setPageSize] = useState(10);
+    const [currentPage, setCurrentPage] = useState(1);
+
+    // TanStack Query hooks
+    const {
+        data: washingTypesData,
+        isLoading: loading
+    } = useWashingTypes(currentPage, pageSize, search.trim() || undefined);
+
+    // Mutation hooks
+    const createWashingTypeMutation = useCreateWashingType();
+    const updateWashingTypeMutation = useUpdateWashingType();
+    const deleteWashingTypeMutation = useDeleteWashingType();
+
+    // Derived state
+    const rows = washingTypesData?.washingTypes || [];
+    const pagination = washingTypesData?.pagination || {
         currentPage: 1,
         totalPages: 1,
         totalRecords: 0,
         limit: 10,
-    });
-    const [pageSize, setPageSize] = useState(10);
-    const [currentPage, setCurrentPage] = useState(1);
+    };
 
-    // Load washing types when dependencies change (with debounce for search)
+    // Debounced search effect
     useEffect(() => {
         const timeoutId = setTimeout(() => {
-            const loadData = async () => {
-                try {
-                    setLoading(true);
-                    const response = await washingTypeService.getWashingTypes({
-                        page: currentPage,
-                        limit: pageSize,
-                        search: search.trim() || undefined
-                    });
-                    setRows(response.data.washingTypes);
-                    setPagination(response.data.pagination);
-                } catch (error) {
-                    const errorMessage = (error as ApiError)?.response?.data?.message || 'Failed to load washing types';
-                    toast.error(errorMessage);
-                } finally {
-                    setLoading(false);
-                }
-            };
-            loadData();
-        }, search ? 300 : 0); // 300ms debounce for search, immediate for page/size changes
+            // TanStack Query will automatically refetch when search changes
+        }, search ? 300 : 0); // 300ms debounce for search
 
         return () => clearTimeout(timeoutId);
-    }, [currentPage, pageSize, search]);
+    }, [search]);
 
     const handlePageChange = (newPage: number) => {
         setCurrentPage(newPage);
@@ -154,16 +149,15 @@ export default function WashingTypesSection() {
     const confirmDelete = async () => {
         if (!washingTypeToDelete) return;
 
-        try {
-            await washingTypeService.deleteWashingType(washingTypeToDelete.id);
-            setRows(prev => prev.filter(washingType => washingType.id !== washingTypeToDelete.id));
-            setDeleteConfirmOpen(false);
-            setWashingTypeToDelete(null);
-            toast.success('Washing type deleted successfully');
-        } catch (error) {
-            const errorMessage = (error as ApiError)?.response?.data?.message || 'Failed to delete washing type';
-            toast.error(errorMessage);
-        }
+        deleteWashingTypeMutation.mutate(washingTypeToDelete.id, {
+            onSuccess: () => {
+                setDeleteConfirmOpen(false);
+                setWashingTypeToDelete(null);
+            },
+            onError: (error: Error) => {
+                toast.error(error.message || 'Failed to delete washing type');
+            }
+        });
     };
 
     const handleOpen = () => {
@@ -201,33 +195,49 @@ export default function WashingTypesSection() {
             return;
         }
 
-        try {
-            if (editMode && selectedWashingType) {
-                // Update existing washing type
-                const response = await washingTypeService.updateWashingType(selectedWashingType.id, {
+        if (editMode && selectedWashingType) {
+            // Update existing washing type
+            updateWashingTypeMutation.mutate(
+                {
+                    id: selectedWashingType.id,
+                    data: {
+                        name: form.name,
+                        code: form.code,
+                        description: form.description || undefined,
+                    }
+                },
+                {
+                    onSuccess: () => {
+                        setOpen(false);
+                        setForm({ name: '', code: '', description: '' });
+                        setEditMode(false);
+                        setSelectedWashingType(null);
+                    },
+                    onError: (error: Error) => {
+                        toast.error(error.message || 'Failed to update washing type');
+                    }
+                }
+            );
+        } else {
+            // Create new washing type
+            createWashingTypeMutation.mutate(
+                {
                     name: form.name,
                     code: form.code,
                     description: form.description || undefined,
-                });
-                setRows(prev => prev.map(washingType =>
-                    washingType.id === selectedWashingType.id ? response.data : washingType
-                ));
-                toast.success('Washing type updated successfully');
-            } else {
-                // Create new washing type
-                const response = await washingTypeService.createWashingType({
-                    name: form.name,
-                    code: form.code,
-                    description: form.description || undefined,
-                });
-                setRows(prev => [response.data, ...prev]);
-                toast.success('Washing type created successfully');
-            }
-
-            setOpen(false);
-        } catch (error) {
-            const errorMessage = (error as ApiError)?.response?.data?.message || 'Failed to save washing type';
-            toast.error(errorMessage);
+                },
+                {
+                    onSuccess: () => {
+                        setOpen(false);
+                        setForm({ name: '', code: '', description: '' });
+                        setEditMode(false);
+                        setSelectedWashingType(null);
+                    },
+                    onError: (error: Error) => {
+                        toast.error(error.message || 'Failed to create washing type');
+                    }
+                }
+            );
         }
     };
 

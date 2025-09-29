@@ -9,7 +9,7 @@ interface SimpleOrderFormProps {
     form: {
         customerId: string;
         itemId: string;
-        quantity: number;
+        quantity: string;
         gpNo: string;
         date: string;
         deliveryDate: string;
@@ -57,8 +57,9 @@ const SimpleOrderForm: React.FC<SimpleOrderFormProps> = ({
                             name="quantity"
                             value={form.quantity}
                             onChange={onChange}
-                            placeholder="Enter total quantity"
+                            placeholder="Quantity"
                             min={1}
+                            autoFocus
                             className="w-full px-4 py-4 text-lg border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                             style={{ borderColor: errors.quantity ? '#ef4444' : colors.border.light }}
                         />

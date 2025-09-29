@@ -55,11 +55,12 @@ const OrderForm: React.FC<OrderFormProps> = ({
                         value={form.quantity}
                         onChange={onChange}
                         label=""
-                        placeholder="Enter quantity"
+                        placeholder="Quantity"
                         min={1}
                         error={!!errors.quantity}
                         helperText={errors.quantity}
                         className="text-lg"
+                        autoFocus
                     />
                 </div>
             </div>

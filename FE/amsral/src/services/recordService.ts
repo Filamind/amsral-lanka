@@ -92,10 +92,10 @@ export interface StatsResponse {
 
 class RecordService {
   // Get single record details
-  async getRecord(recordId: string): Promise<ProcessRecord> {
+  async getRecord(recordId: string): Promise<{ success: boolean; data: ProcessRecord; message?: string }> {
     try {
       const response = await apiClient.get(`/records/${recordId}`);
-      return response.data.data;
+      return response.data;
     } catch (error: unknown) {
       const apiError = error as { response?: { data?: { success: false; message: string } } };
       throw apiError.response?.data || { success: false, message: 'Failed to fetch record details' };

@@ -36,7 +36,7 @@ const MachineAssignmentModal: React.FC<MachineAssignmentModalProps> = ({
 }) => {
     const [form, setForm] = useState({
         assignedBy: '',
-        quantity: 1,
+        quantity: '',
         washingMachine: '',
         dryingMachine: ''
     });
@@ -66,9 +66,9 @@ const MachineAssignmentModal: React.FC<MachineAssignmentModalProps> = ({
             newErrors.assignedBy = 'Please select an employee';
         }
 
-        if (!form.quantity || form.quantity <= 0) {
+        if (!form.quantity || Number(form.quantity) <= 0) {
             newErrors.quantity = 'Please enter a valid quantity';
-        } else if (record && form.quantity > record.remainingQuantity) {
+        } else if (record && Number(form.quantity) > record.remainingQuantity) {
             newErrors.quantity = `Quantity cannot exceed remaining quantity (${record.remainingQuantity})`;
         }
 
@@ -95,7 +95,7 @@ const MachineAssignmentModal: React.FC<MachineAssignmentModalProps> = ({
             // Reset form on success
             setForm({
                 assignedBy: '',
-                quantity: 1,
+                quantity: '',
                 washingMachine: '',
                 dryingMachine: ''
             });
@@ -112,7 +112,7 @@ const MachineAssignmentModal: React.FC<MachineAssignmentModalProps> = ({
         if (!saving) {
             setForm({
                 assignedBy: '',
-                quantity: 1,
+                quantity: '',
                 washingMachine: '',
                 dryingMachine: ''
             });
@@ -257,6 +257,8 @@ const MachineAssignmentModal: React.FC<MachineAssignmentModalProps> = ({
                                     max={record?.remainingQuantity || 1}
                                     value={form.quantity}
                                     onChange={handleChange}
+                                    placeholder="Quantity"
+                                    autoFocus
                                     style={{
                                         ...inputStyle,
                                         borderColor: errors.quantity ? '#ef4444' : colors.border.light

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IconButton } from '@mui/material';
 import { LocalShipping } from '@mui/icons-material';
@@ -8,18 +8,18 @@ import PrimaryTable from '../components/common/PrimaryTable';
 import PrimaryButton from '../components/common/PrimaryButton';
 import DeliveryModal from '../components/modals/DeliveryModal';
 import colors from '../styles/colors';
-import { orderService, type ManagementOrder, type UpdateOrderRequest, type ErrorResponse } from '../services/orderService';
+import { useManagementOrders, useUpdateDelivery, type ManagementOrderFilters } from '../hooks/useManagement';
+import { type ManagementOrder } from '../services/orderService';
 import { getStatusColor, getStatusLabel, normalizeStatus } from '../utils/statusUtils';
 import { useAuth } from '../hooks/useAuth';
 import { hasPermission } from '../utils/roleUtils';
-import toast from 'react-hot-toast';
 
 
 export default function ManagementPage() {
     const navigate = useNavigate();
     const { user } = useAuth();
-    const [orders, setOrders] = useState<ManagementOrder[]>([]);
-    const [loading, setLoading] = useState(true);
+
+    // Local state for UI
     const [searchTerm, setSearchTerm] = useState('');
     const [orderIdFilter, setOrderIdFilter] = useState('');
     const [customerNameFilter, setCustomerNameFilter] = useState('');
@@ -28,20 +28,40 @@ export default function ManagementPage() {
         order: null as ManagementOrder | null,
     });
 
+    // Pagination state
+    const [pageSize, setPageSize] = useState(20); // Default to 20 rows per page
+    const [currentPage, setCurrentPage] = useState(1);
+
     // Permission checks
     const canMarkDelivered = hasPermission(user, 'canMarkDelivered');
 
-    // Pagination state
-    const [pagination, setPagination] = useState({
+    // Prepare filters for TanStack Query hooks
+    const orderFilters: ManagementOrderFilters = {
+        page: currentPage,
+        limit: pageSize,
+        orderId: orderIdFilter ? parseInt(orderIdFilter) : undefined,
+        customerName: customerNameFilter || undefined,
+    };
+
+    // TanStack Query hooks
+    const {
+        data: ordersData,
+        isLoading: loading,
+    } = useManagementOrders(orderFilters);
+
+    // Mutation hooks
+    const updateDeliveryMutation = useUpdateDelivery();
+
+    // Derived state
+    const orders = ordersData?.orders || [];
+    const pagination = ordersData?.pagination || {
         currentPage: 1,
         totalPages: 1,
         totalItems: 0,
-        itemsPerPage: 20, // Match default pageSize
+        itemsPerPage: 20,
         hasNextPage: false,
         hasPrevPage: false
-    });
-    const [pageSize, setPageSize] = useState(20); // Default to 20 rows per page
-    const [currentPage, setCurrentPage] = useState(1);
+    };
 
     // Table columns
     const columns: GridColDef[] = [
@@ -144,45 +164,6 @@ export default function ManagementPage() {
         }] : []),
     ];
 
-    // Fetch orders with filters
-    const fetchOrders = useCallback(async () => {
-        try {
-            setLoading(true);
-
-            const params: any = {
-                page: currentPage,
-                limit: pageSize
-            };
-
-            // Apply filters
-            if (orderIdFilter) {
-                params.orderId = parseInt(orderIdFilter);
-            }
-            if (customerNameFilter) {
-                params.customerName = customerNameFilter;
-            }
-
-            const response = await orderService.getManagementOrders(params);
-
-            if (response.success) {
-                setOrders(response.data.orders);
-                setPagination({
-                    currentPage: response.data.pagination.currentPage,
-                    totalPages: response.data.pagination.totalPages,
-                    totalItems: response.data.pagination.totalRecords,
-                    itemsPerPage: response.data.pagination.limit,
-                    hasNextPage: response.data.pagination.currentPage < response.data.pagination.totalPages,
-                    hasPrevPage: response.data.pagination.currentPage > 1
-                });
-            }
-        } catch (error) {
-            console.error('Error fetching orders:', error);
-            toast.error('Failed to fetch orders');
-        } finally {
-            setLoading(false);
-        }
-    }, [currentPage, pageSize, orderIdFilter, customerNameFilter]);
-
     // Handle search with debouncing
     useEffect(() => {
         const timeoutId = setTimeout(() => {
@@ -205,11 +186,6 @@ export default function ManagementPage() {
         return () => clearTimeout(timeoutId);
     }, [searchTerm]);
 
-    // Fetch orders when filters change
-    useEffect(() => {
-        fetchOrders();
-    }, [fetchOrders]);
-
     // Handle row click to navigate to order details
     const handleRowClick = (params: any) => {
         navigate(`/management/orders/${params.id}`);
@@ -225,33 +201,21 @@ export default function ManagementPage() {
     };
 
     const handleUpdateDelivery = async (orderId: number, deliveryCount: number, isDelivered: boolean) => {
-        try {
-            setLoading(true);
-
-            // Update order delivery status via API
-            const updateData: UpdateOrderRequest = {
-                status: isDelivered ? 'Delivered' : 'Completed',
-                deliveryCount: deliveryCount
-            };
-
-            const response = await orderService.updateOrder(orderId, updateData);
-
-            if (response.success) {
-                // Update order in local state
-                setOrders(prev => prev.map(row =>
-                    row.id === orderId ? { ...row, status: response.data.status } : row
-                ));
-
-                toast.success(`Order delivery status updated successfully`);
+        updateDeliveryMutation.mutate(
+            { orderId, deliveryCount, isDelivered },
+            {
+                onSuccess: () => {
+                    setDeliveryModal({
+                        open: false,
+                        order: null
+                    });
+                },
+                onError: (error: Error) => {
+                    console.error('Error updating delivery status:', error);
+                    throw error; // Re-throw to let the modal handle the error
+                }
             }
-        } catch (error) {
-            console.error('Error updating delivery status:', error);
-            const apiError = error as ErrorResponse;
-            toast.error(apiError.message || 'Failed to update delivery status');
-            throw error; // Re-throw to let the modal handle the error
-        } finally {
-            setLoading(false);
-        }
+        );
     };
 
 
@@ -311,7 +275,7 @@ export default function ManagementPage() {
                         page: pagination.currentPage - 1,
                         pageSize: pageSize
                     }}
-                    rowCount={pagination.totalItems}
+                    rowCount={(pagination as any).totalRecords || (pagination as any).totalItems || 0}
                     height="auto" // Dynamic height based on rows
                     onPaginationModelChange={(model) => {
                         // Handle page size change

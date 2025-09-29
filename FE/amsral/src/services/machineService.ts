@@ -3,6 +3,7 @@ import apiClient from '../config/api';
 
 // Types
 export interface Machine {
+  code: any;
   id: string;
   name: string;
   type: 'washing' | 'drying';
