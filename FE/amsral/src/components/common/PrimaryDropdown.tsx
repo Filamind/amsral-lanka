@@ -123,6 +123,22 @@ const PrimaryDropdown: React.FC<PrimaryDropdownProps> = ({
                     value={value}
                     onChange={handleChange}
                     displayEmpty
+                    MenuProps={{
+                        PaperProps: {
+                            style: {
+                                maxHeight: '200px', // Approximately 5 items * 40px height
+                                overflow: 'auto',
+                            },
+                        },
+                        anchorOrigin: {
+                            vertical: 'bottom',
+                            horizontal: 'left',
+                        },
+                        transformOrigin: {
+                            vertical: 'top',
+                            horizontal: 'left',
+                        },
+                    }}
                     renderValue={(selected) => {
                         if (!selected) {
                             return (
