@@ -95,23 +95,8 @@ export const generateOrderReceipt = (orderData: OrderReceiptData): void => {
     yPosition += 8; // Increased spacing between rows
   };
 
-  // Special function for highlighting important fields like Order ID
-  const addHighlightedDetailRow = (label: string, value: string) => {
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(textColor);
-    doc.text(`${label}:`, 10, yPosition);
-    
-    // Highlighted value with larger font
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(16); // Larger than regular fields
-    doc.setTextColor(primaryColor);
-    doc.text(value, 40, yPosition);
-    yPosition += 10; // More spacing for highlighted field
-  };
-
-  // Order details - Order ID gets special highlighting
-  addHighlightedDetailRow('Order ID', orderData.orderId.toString());
+  // Order details
+  addDetailRow('Order ID', orderData.orderId.toString());
   addDetailRow('Customer', orderData.customerName);
   addDetailRow('Quantity', orderData.totalQuantity.toString());
   
@@ -315,42 +300,22 @@ export const generateAssignmentReceipt = (assignmentData: AssignmentReceiptData)
     const safeValue = value !== null && value !== undefined ? String(value) : 'N/A';
     
     // Label with readable font
-    doc.setFontSize(14);
+    doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(textColor);
     doc.text(`${label}:`, 10, yPosition);
     
-    // Value with LARGE font - reduced height, increased width proportion
+    // Value with LARGE font
     doc.setFont('helvetica', isBold ? 'bold' : 'bold');
-    doc.setFontSize(18); // Reduced from 20 to make less tall
-    doc.setTextColor(primaryColor);
-    // Center the value text
-    doc.text(safeValue, pageWidth / 2, yPosition + 6, { align: 'center' });
-    yPosition += 22; // Reduced spacing to match smaller font
-  };
-
-  // Special function for highlighting important fields like Tracking ID
-  const addHighlightedDetailRow = (label: string, value: string | number | undefined | null) => {
-    // Ensure value is a valid string
-    const safeValue = value !== null && value !== undefined ? String(value) : 'N/A';
-    
-    // Label with readable font
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(textColor);
-    doc.text(`${label}:`, 10, yPosition);
-    
-    // Value with EXTRA LARGE font for highlighting
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(22); // Larger than regular fields
+    doc.setFontSize(20);
     doc.setTextColor(primaryColor);
     // Center the value text
     doc.text(safeValue, pageWidth / 2, yPosition + 8, { align: 'center' });
-    yPosition += 26; // More spacing for highlighted field
+    yPosition += 25; // Increased spacing
   };
 
-  // Assignment details with safe data handling - Tracking ID gets special highlighting
-  addHighlightedDetailRow('Tracking ID', assignmentData.trackingNumber);
+  // Assignment details with safe data handling
+  addDetailRow('Tracking ID', assignmentData.trackingNumber, true);
   addDetailRow('Item Name', assignmentData.itemName, true);
   addDetailRow('Wash Type', assignmentData.washType, true);
   

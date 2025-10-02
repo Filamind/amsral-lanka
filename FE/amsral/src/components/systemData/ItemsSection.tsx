@@ -111,20 +111,27 @@ export default function ItemsSection() {
 
     const validate = () => {
         const newErrors: { [key: string]: string } = {};
-        if (!form.name.trim()) newErrors.name = 'Item name is required';
-        if (!form.code.trim()) newErrors.code = 'Code is required';
-        if (form.name.length > 100) newErrors.name = 'Item name must be 100 characters or less';
-        if (form.code.length > 20) newErrors.code = 'Code must be 20 characters or less';
+
+        // Basic validation
+        if (!form.name || !form.name.trim()) newErrors.name = 'Item name is required';
+        if (!form.code || !form.code.trim()) newErrors.code = 'Code is required';
+
+        // Length validation
+        if (form.name && form.name.length > 100) newErrors.name = 'Item name must be 100 characters or less';
+        if (form.code && form.code.length > 20) newErrors.code = 'Code must be 20 characters or less';
         if (form.description && form.description.length > 500) {
             newErrors.description = 'Description must be 500 characters or less';
         }
 
-        // Check for unique code
-        const isCodeUnique = !rows.some(row =>
-            row.code.toLowerCase() === form.code.toLowerCase() &&
-            (!editMode || row.id !== selectedItem?.id)
-        );
-        if (!isCodeUnique) newErrors.code = 'Code must be unique';
+        // Check for unique code (only if we have valid data)
+        if (form.code && form.code.trim()) {
+            const isCodeUnique = !rows.some(row =>
+                row.code &&
+                row.code.toLowerCase() === form.code.toLowerCase() &&
+                (!editMode || row.id !== selectedItem?.id)
+            );
+            if (!isCodeUnique) newErrors.code = 'Code must be unique';
+        }
 
         return newErrors;
     };
@@ -183,19 +190,28 @@ export default function ItemsSection() {
         const { name, value } = e.target;
         setForm(prev => ({
             ...prev,
-            [name]: value,
+            [name]: value || '', // Ensure value is never null/undefined
         }));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        console.log('🔧 Form submission started');
+        console.log('🔧 Form data:', form);
+        console.log('🔧 Edit mode:', editMode);
+        console.log('🔧 Selected item:', selectedItem);
+
         const validation = validate();
+        console.log('🔧 Validation result:', validation);
+
         if (Object.keys(validation).length > 0) {
+            console.log('❌ Validation failed:', validation);
             setErrors(validation);
             return;
         }
 
         if (editMode && selectedItem) {
+            console.log('🔧 Updating existing item');
             // Update existing item
             updateItemMutation.mutate(
                 {
@@ -208,17 +224,20 @@ export default function ItemsSection() {
                 },
                 {
                     onSuccess: () => {
+                        console.log('✅ Item updated successfully');
                         setOpen(false);
                         setForm({ name: '', code: '', description: '' });
                         setEditMode(false);
                         setSelectedItem(null);
                     },
                     onError: (error: Error) => {
+                        console.error('❌ Error updating item:', error);
                         toast.error(error.message || 'Failed to update item');
                     }
                 }
             );
         } else {
+            console.log('🔧 Creating new item');
             // Create new item
             createItemMutation.mutate(
                 {
@@ -228,12 +247,14 @@ export default function ItemsSection() {
                 },
                 {
                     onSuccess: () => {
+                        console.log('✅ Item created successfully');
                         setOpen(false);
                         setForm({ name: '', code: '', description: '' });
                         setEditMode(false);
                         setSelectedItem(null);
                     },
                     onError: (error: Error) => {
+                        console.error('❌ Error creating item:', error);
                         toast.error(error.message || 'Failed to create item');
                     }
                 }

@@ -262,11 +262,10 @@ class PrintService {
           @media print {
             body { margin: 0; padding: 10px; font-family: monospace; }
             .label { width: 80mm; height: 50mm; border: 1px solid #000; padding: 5px; }
-            .header { text-align: center; font-weight: bold; font-size: 12px; margin-bottom: 8px; }
-            .content { font-size: 11px; line-height: 1.1; }
+            .header { text-align: center; font-weight: bold; font-size: 14px; margin-bottom: 10px; }
+            .content { font-size: 12px; line-height: 1.2; }
             .field { margin-bottom: 3px; }
-            .field-label { font-weight: bold; font-size: 10px; }
-            .field-value { font-size: 11px; }
+            .field-label { font-weight: bold; }
           }
         </style>
       </head>
@@ -274,11 +273,11 @@ class PrintService {
         <div class="label">
           <div class="header">BAG LABEL</div>
           <div class="content">
-            <div class="field"><span class="field-label">Reference No:</span> <span class="field-value">${bagData.orderId}</span></div>
-            <div class="field"><span class="field-label">Customer:</span> <span class="field-value">${bagData.customerName}</span></div>
-            <div class="field"><span class="field-label">Number of Bags:</span> <span class="field-value">${bagData.numberOfBags || ''}</span></div>
-            <div class="field"><span class="field-label">Quantity:</span> <span class="field-value">${bagData.quantity || ''}</span></div>
-            <div class="field" style="margin-top: 8px; font-size: 9px; text-align: center;">
+            <div class="field"><span class="field-label">Reference No:</span> ${bagData.orderId}</div>
+            <div class="field"><span class="field-label">Customer:</span> ${bagData.customerName}</div>
+            <div class="field"><span class="field-label">Number of Bags:</span> ${bagData.numberOfBags || ''}</div>
+            <div class="field"><span class="field-label">Quantity:</span> ${bagData.quantity || ''}</div>
+            <div class="field" style="margin-top: 10px; font-size: 10px; text-align: center;">
               Generated: ${new Date().toLocaleString()}
             </div>
           </div>
@@ -301,13 +300,11 @@ class PrintService {
           @media print {
             body { margin: 0; padding: 10px; font-family: monospace; }
             .receipt { width: 80mm; border: 1px solid #000; padding: 5px; }
-            .header { text-align: center; font-weight: bold; font-size: 14px; margin-bottom: 8px; }
-            .content { font-size: 11px; line-height: 1.2; }
-            .field { margin-bottom: 4px; }
-            .field-label { font-weight: bold; font-size: 10px; }
-            .field-value { font-size: 11px; }
-            .highlight-value { font-size: 14px; font-weight: bold; color: #000; }
-            .separator { border-top: 1px solid #000; margin: 8px 0; }
+            .header { text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 10px; }
+            .content { font-size: 12px; line-height: 1.3; }
+            .field { margin-bottom: 5px; }
+            .field-label { font-weight: bold; }
+            .separator { border-top: 1px solid #000; margin: 10px 0; }
           }
         </style>
       </head>
@@ -316,14 +313,14 @@ class PrintService {
           <div class="header">MACHINE ASSIGNMENT</div>
           <div class="separator"></div>
           <div class="content">
-            <div class="field"><span class="field-label">Tracking ID:</span> <span class="highlight-value">${assignmentData.trackingNumber}</span></div>
-            <div class="field"><span class="field-label">Item:</span> <span class="field-value">${assignmentData.itemName}</span></div>
-            <div class="field"><span class="field-label">Wash Type:</span> <span class="field-value">${assignmentData.washType}</span></div>
-            <div class="field"><span class="field-label">Process:</span> <span class="field-value">${assignmentData.processTypes ? assignmentData.processTypes.join(', ') : 'None'}</span></div>
-            <div class="field"><span class="field-label">Assigned To:</span> <span class="field-value">${assignmentData.assignedTo}</span></div>
-            <div class="field"><span class="field-label">Quantity:</span> <span class="field-value">${assignmentData.quantity}</span></div>
+            <div class="field"><span class="field-label">Tracking ID:</span> ${assignmentData.trackingNumber}</div>
+            <div class="field"><span class="field-label">Item:</span> ${assignmentData.itemName}</div>
+            <div class="field"><span class="field-label">Wash Type:</span> ${assignmentData.washType}</div>
+            <div class="field"><span class="field-label">Process:</span> ${assignmentData.processTypes ? assignmentData.processTypes.join(', ') : 'None'}</div>
+            <div class="field"><span class="field-label">Assigned To:</span> ${assignmentData.assignedTo}</div>
+            <div class="field"><span class="field-label">Quantity:</span> ${assignmentData.quantity}</div>
             <div class="separator"></div>
-            <div class="field" style="text-align: center; font-size: 9px;">
+            <div class="field" style="text-align: center; font-size: 10px;">
               Generated: ${new Date().toLocaleString()}
             </div>
           </div>
@@ -346,13 +343,11 @@ class PrintService {
           @media print {
             body { margin: 0; padding: 10px; font-family: monospace; }
             .receipt { width: 80mm; border: 1px solid #000; padding: 5px; }
-            .header { text-align: center; font-weight: bold; font-size: 14px; margin-bottom: 8px; }
-            .content { font-size: 11px; line-height: 1.2; }
-            .field { margin-bottom: 4px; }
-            .field-label { font-weight: bold; font-size: 10px; }
-            .field-value { font-size: 11px; }
-            .highlight-value { font-size: 14px; font-weight: bold; color: #000; }
-            .separator { border-top: 1px solid #000; margin: 8px 0; }
+            .header { text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 10px; }
+            .content { font-size: 12px; line-height: 1.3; }
+            .field { margin-bottom: 5px; }
+            .field-label { font-weight: bold; }
+            .separator { border-top: 1px solid #000; margin: 10px 0; }
           }
         </style>
       </head>
@@ -361,18 +356,18 @@ class PrintService {
           <div class="header">ORDER RECORD</div>
           <div class="separator"></div>
           <div class="content">
-            <div class="field"><span class="field-label">Order ID:</span> <span class="highlight-value">${receiptData.orderId}</span></div>
-            <div class="field"><span class="field-label">Customer:</span> <span class="field-value">${receiptData.customerName}</span></div>
-            <div class="field"><span class="field-label">Item:</span> <span class="field-value">${receiptData.itemName}</span></div>
-            <div class="field"><span class="field-label">Quantity:</span> <span class="field-value">${receiptData.quantity}</span></div>
-            ${receiptData.trackingNumber ? `<div class="field"><span class="field-label">Tracking:</span> <span class="field-value">${receiptData.trackingNumber}</span></div>` : ''}
+            <div class="field"><span class="field-label">Order ID:</span> ${receiptData.orderId}</div>
+            <div class="field"><span class="field-label">Customer:</span> ${receiptData.customerName}</div>
+            <div class="field"><span class="field-label">Item:</span> ${receiptData.itemName}</div>
+            <div class="field"><span class="field-label">Quantity:</span> ${receiptData.quantity}</div>
+            ${receiptData.trackingNumber ? `<div class="field"><span class="field-label">Tracking:</span> ${receiptData.trackingNumber}</div>` : ''}
             ${receiptData.isRemaining ? 
-              `<div class="field"><span class="field-label">Status:</span> <span class="field-value">Remaining Quantity</span></div>` :
-              `<div class="field"><span class="field-label">Wash Type:</span> <span class="field-value">${receiptData.washType}</span></div>
-               <div class="field"><span class="field-label">Process:</span> <span class="field-value">${receiptData.processTypes ? receiptData.processTypes.join(', ') : 'None'}</span></div>`
+              `<div class="field"><span class="field-label">Status:</span> Remaining Quantity</div>` :
+              `<div class="field"><span class="field-label">Wash Type:</span> ${receiptData.washType}</div>
+               <div class="field"><span class="field-label">Process:</span> ${receiptData.processTypes ? receiptData.processTypes.join(', ') : 'None'}</div>`
             }
             <div class="separator"></div>
-            <div class="field" style="text-align: center; font-size: 9px;">
+            <div class="field" style="text-align: center; font-size: 10px;">
               Generated: ${new Date().toLocaleString()}
             </div>
           </div>
