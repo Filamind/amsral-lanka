@@ -1,32 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { GridColDef, GridRowParams } from '@mui/x-data-grid';
 import PrimaryTable from '../components/common/PrimaryTable';
 import colors from '../styles/colors';
-import { orderService } from '../services/orderService';
-import { itemService } from '../services/itemService';
-import { washingTypeService } from '../services/washingTypeService';
-import { processTypeService } from '../services/processTypeService';
 import { getStatusColor, getStatusLabel, normalizeStatus } from '../utils/statusUtils';
-import toast from 'react-hot-toast';
+import {
+    useProductionRecords,
+} from '../hooks/useProduction';
 
-// Types
-type ProcessRecord = {
-    id: string;
-    orderId: number;
-    orderRef: string;
-    trackingNumber?: string; // Add tracking number field
-    customerName: string;
-    item: string;
-    itemId?: string;
-    quantity: number;
-    remainingQuantity: number;
-    washType: string;
-    processTypes: string[];
-    status: string;
-    createdAt: string;
-    complete: boolean;
-};
+// ProcessRecord type is now imported from useProduction hook
 
 
 // MachineAssignment type removed - will be handled in separate page
@@ -94,8 +76,8 @@ const recordsColumns: GridColDef[] = [
 export default function WorkFlowPage() {
     const navigate = useNavigate();
     const [recordsSearch, setRecordsSearch] = useState('');
-    const [records, setRecords] = useState<ProcessRecord[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [pageSize, setPageSize] = useState(10);
+    const [currentPage, setCurrentPage] = useState(1);
 
     // Add CSS styles for row coloring
     const rowStyles = `
@@ -117,209 +99,31 @@ export default function WorkFlowPage() {
         }
     `;
 
-    // Pagination state
-    const [pagination, setPagination] = useState({
+    // TanStack Query hooks
+    const {
+        data: productionData,
+        isLoading: loading
+    } = useProductionRecords({
+        page: currentPage,
+        limit: pageSize,
+        search: recordsSearch || undefined
+    });
+
+
+    // Derived state
+    const records = productionData?.records || [];
+    const pagination = productionData?.pagination || {
         currentPage: 1,
         totalPages: 1,
-        totalItems: 0,
-        itemsPerPage: 10,
-        hasNextPage: false,
-        hasPrevPage: false
-    });
-    const [pageSize, setPageSize] = useState(10);
-    const [currentPage, setCurrentPage] = useState(1);
+        totalRecords: 0,
+        limit: pageSize,
+    };
 
-    // Dropdown options
-    const [itemOptions, setItemOptions] = useState<{ value: string; label: string }[]>([]);
-    const [washTypeOptions, setWashTypeOptions] = useState<{ value: string; label: string }[]>([]);
-    const [processTypeOptions, setProcessTypeOptions] = useState<{ value: string; label: string }[]>([]);
-
-    // Fetch production records
-    // const fetchProductionRecords = useCallback(async () => {
-    //     try {
-    //         setLoading(true);
-    //         const response = await orderService.getAllProductionRecords({
-    //             page: currentPage,
-    //             limit: pageSize,
-    //             search: recordsSearch || undefined
-    //         });
-
-    //         if (response.success) {
-    //             // Transform records into production records
-    //             const productionRecords: ProcessRecord[] = [];
-
-    //             // The /orders/records endpoint returns records directly
-    //             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    //             const records = (response.data as any).records || [];
-
-    //             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    //             records.forEach((record: any) => {
-    //                 // Find item name
-    //                 const itemName = itemOptions.find(item => item.value === record.itemId)?.label || 'Unknown Item';
-
-    //                 // Find wash type name
-    //                 const washTypeName = washTypeOptions.find(wash => wash.value === record.washType)?.label || record.washType;
-
-    //                 // Find process type names
-    //                 const processTypeNames = record.processTypes.map((pt: string) =>
-    //                     processTypeOptions.find(p => p.value === pt)?.label || pt
-    //                 );
-
-    //                 productionRecords.push({
-    //                     id: record.id.toString(),
-    //                     orderId: record.orderId,
-    //                     orderRef: `${record.orderId}`,
-    //                     trackingNumber: record.trackingNumber || 'N/A', // Include tracking number from API
-    //                     customerName: record.customerName || 'Unknown Customer',
-    //                     item: itemName,
-    //                     itemId: record.itemId,
-    //                     quantity: record.quantity,
-    //                     remainingQuantity: record.remainingQuantity || 0,
-    //                     washType: washTypeName,
-    //                     processTypes: processTypeNames,
-    //                     status: 'pending',
-    //                     createdAt: record.createdAt ? new Date(record.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-    //                     complete: record.complete || false
-    //                 });
-    //             });
-
-    //             setRecords(productionRecords);
-
-    //             // Update pagination info
-    //             setPagination({
-    //                 currentPage: response.data.pagination?.currentPage || 1,
-    //                 totalPages: response.data.pagination?.totalPages || 1,
-    //                 totalItems: response.data.pagination?.totalRecords || productionRecords.length,
-    //                 itemsPerPage: response.data.pagination?.limit || pageSize,
-    //                 hasNextPage: (response.data.pagination?.currentPage || 1) < (response.data.pagination?.totalPages || 1),
-    //                 hasPrevPage: (response.data.pagination?.currentPage || 1) > 1
-    //             });
-    //         }
-    //     } catch (error) {
-    //         console.error('Error fetching production records:', error);
-    //         toast.error('Failed to fetch production records');
-    //     } finally {
-    //         setLoading(false);
-    //     }
-    // }, [itemOptions, washTypeOptions, processTypeOptions, recordsSearch]);
-
-    // Fetch dropdown options
-    const fetchDropdownOptions = useCallback(async () => {
-        try {
-            // Fetch items
-            const itemsResponse = await itemService.getItemsList();
-            setItemOptions(itemsResponse.data);
-
-            // Fetch washing types
-            const washingTypesResponse = await washingTypeService.getWashingTypes({
-                limit: 100
-            });
-            const washTypeOpts = washingTypesResponse.data.washingTypes.map(washType => ({
-                value: washType.id,
-                label: `${washType.name} (${washType.code})`
-            }));
-            setWashTypeOptions(washTypeOpts);
-
-            // Fetch process types
-            const processTypesResponse = await processTypeService.getProcessTypesList();
-            const processTypeOpts = processTypesResponse.data.map(item => ({
-                value: item.value.toString(),
-                label: item.label
-            }));
-            setProcessTypeOptions(processTypeOpts);
-
-            // Employee fetching moved to separate record assignments page
-
-        } catch (error) {
-            console.error('Error fetching dropdown options:', error);
-            toast.error('Failed to load options');
-        }
-    }, []);
-
-    // Load data on component mount
-    useEffect(() => {
-        const loadData = async () => {
-            await fetchDropdownOptions();
-        };
-        loadData();
-    }, [fetchDropdownOptions]);
-
-    // Fetch production records when dropdown options are loaded
-    useEffect(() => {
-        if (itemOptions.length > 0 && washTypeOptions.length > 0 && processTypeOptions.length > 0) {
-            // Inline fetch to avoid circular dependency
-            const fetchData = async () => {
-                try {
-                    setLoading(true);
-                    const response = await orderService.getAllProductionRecords({
-                        page: currentPage,
-                        limit: pageSize,
-                        search: recordsSearch || undefined
-                    });
-
-                    if (response.success) {
-                        // Transform records into production records
-                        const productionRecords: ProcessRecord[] = [];
-
-                        // The /orders/records endpoint returns records directly
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        const records = (response.data as any).records || [];
-
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        records.forEach((record: any) => {
-                            // Find item name
-                            const itemName = itemOptions.find(item => item.value === record.itemId)?.label || 'Unknown Item';
-
-                            // Find wash type name
-                            const washTypeName = washTypeOptions.find(wash => wash.value === record.washType)?.label || record.washType;
-
-                            // Find process type names - handle null processTypes
-                            const processTypeNames = record.processTypes ?
-                                record.processTypes.map((pt: string) =>
-                                    processTypeOptions.find(p => p.value === pt)?.label || pt
-                                ) : [];
-
-                            productionRecords.push({
-                                id: record.id.toString(),
-                                orderId: record.orderId,
-                                orderRef: `${record.orderId}`,
-                                trackingNumber: record.trackingNumber || 'N/A', // Include tracking number from API
-                                customerName: record.customerName || 'Unknown Customer',
-                                item: itemName,
-                                itemId: record.itemId,
-                                quantity: record.quantity,
-                                remainingQuantity: record.remainingQuantity || 0,
-                                washType: washTypeName,
-                                processTypes: processTypeNames,
-                                status: 'pending',
-                                createdAt: record.createdAt ? new Date(record.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-                                complete: record.complete || false
-                            });
-                        });
-
-                        setRecords(productionRecords);
-
-                        // Update pagination info
-                        setPagination({
-                            currentPage: response.data.pagination?.currentPage || 1,
-                            totalPages: response.data.pagination?.totalPages || 1,
-                            totalItems: response.data.pagination?.totalRecords || productionRecords.length,
-                            itemsPerPage: response.data.pagination?.limit || pageSize,
-                            hasNextPage: (response.data.pagination?.currentPage || 1) < (response.data.pagination?.totalPages || 1),
-                            hasPrevPage: (response.data.pagination?.currentPage || 1) > 1
-                        });
-                    }
-                } catch (error) {
-                    console.error('Error fetching production records:', error);
-                    toast.error('Failed to fetch production records');
-                } finally {
-                    setLoading(false);
-                }
-            };
-            fetchData();
-        }
-    }, [itemOptions, washTypeOptions, processTypeOptions, currentPage, pageSize, recordsSearch]);
-
+    // Search handler with debouncing
+    const handleSearchChange = (value: string) => {
+        setRecordsSearch(value);
+        setCurrentPage(1); // Reset to first page when search changes
+    };
 
     // Pagination handlers
     const handlePageChange = (newPage: number) => {
@@ -330,87 +134,6 @@ export default function WorkFlowPage() {
         setPageSize(newPageSize);
         setCurrentPage(1); // Reset to first page when page size changes
     };
-
-    // Debounced search effect
-    useEffect(() => {
-        const timeoutId = setTimeout(() => {
-            if (recordsSearch !== undefined && itemOptions.length > 0 && washTypeOptions.length > 0 && processTypeOptions.length > 0) {
-                setCurrentPage(1); // Reset to first page when search changes
-                // Inline fetch to avoid circular dependency
-                const fetchData = async () => {
-                    try {
-                        setLoading(true);
-                        const response = await orderService.getAllProductionRecords({
-                            page: 1, // Reset to first page for search
-                            limit: pageSize,
-                            search: recordsSearch || undefined
-                        });
-
-                        if (response.success) {
-                            // Transform records into production records
-                            const productionRecords: ProcessRecord[] = [];
-
-                            // The /orders/records endpoint returns records directly
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            const records = (response.data as any).records || [];
-
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            records.forEach((record: any) => {
-                                // Find item name
-                                const itemName = itemOptions.find(item => item.value === record.itemId)?.label || 'Unknown Item';
-
-                                // Find wash type name
-                                const washTypeName = washTypeOptions.find(wash => wash.value === record.washType)?.label || record.washType;
-
-                                // Find process type names - handle null processTypes
-                                const processTypeNames = record.processTypes ?
-                                    record.processTypes.map((pt: string) =>
-                                        processTypeOptions.find(p => p.value === pt)?.label || pt
-                                    ) : [];
-
-                                productionRecords.push({
-                                    id: record.id.toString(),
-                                    orderId: record.orderId,
-                                    orderRef: `${record.orderId}`,
-                                    trackingNumber: record.trackingNumber || 'N/A', // Include tracking number from API
-                                    customerName: record.customerName || 'Unknown Customer',
-                                    item: itemName,
-                                    itemId: record.itemId,
-                                    quantity: record.quantity,
-                                    remainingQuantity: record.remainingQuantity || 0,
-                                    washType: washTypeName,
-                                    processTypes: processTypeNames,
-                                    status: 'pending',
-                                    createdAt: record.createdAt ? new Date(record.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-                                    complete: record.complete || false
-                                });
-                            });
-
-                            setRecords(productionRecords);
-
-                            // Update pagination info
-                            setPagination({
-                                currentPage: response.data.pagination?.currentPage || 1,
-                                totalPages: response.data.pagination?.totalPages || 1,
-                                totalItems: response.data.pagination?.totalRecords || productionRecords.length,
-                                itemsPerPage: response.data.pagination?.limit || pageSize,
-                                hasNextPage: (response.data.pagination?.currentPage || 1) < (response.data.pagination?.totalPages || 1),
-                                hasPrevPage: (response.data.pagination?.currentPage || 1) > 1
-                            });
-                        }
-                    } catch (error) {
-                        console.error('Error fetching production records:', error);
-                        toast.error('Failed to fetch production records');
-                    } finally {
-                        setLoading(false);
-                    }
-                };
-                fetchData();
-            }
-        }, 500);
-
-        return () => clearTimeout(timeoutId);
-    }, [recordsSearch, itemOptions, washTypeOptions, processTypeOptions, pageSize]);
 
     // Handle row click to navigate to record assignments page
     const handleRowClick = (params: GridRowParams) => {
@@ -449,7 +172,7 @@ export default function WorkFlowPage() {
                             type="text"
                             placeholder="Search records by order ID or item..."
                             value={recordsSearch}
-                            onChange={e => setRecordsSearch(e.target.value)}
+                            onChange={e => handleSearchChange(e.target.value)}
                             className="flex-1 px-3 py-2 border rounded-xl focus:outline-none text-sm sm:text-base"
                             style={{ borderColor: colors.border.light, maxWidth: 400 }}
                         />
@@ -476,7 +199,7 @@ export default function WorkFlowPage() {
                             page: pagination.currentPage - 1, // DataGrid uses 0-based indexing
                             pageSize: pageSize
                         }}
-                        rowCount={pagination.totalItems}
+                        rowCount={pagination.totalRecords}
                         onPaginationModelChange={(model) => {
                             if (model.pageSize !== pageSize) {
                                 handlePageSizeChange(model.pageSize);

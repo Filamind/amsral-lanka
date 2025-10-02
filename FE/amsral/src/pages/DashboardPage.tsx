@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { Box, Typography, CircularProgress, Alert } from '@mui/material';
 import {
   ShoppingCart,
@@ -11,40 +11,18 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../hooks/useAuth';
 import { hasPermission } from '../utils/roleUtils';
-import DashboardService from '../services/dashboardService';
-import IncomeService, { type IncomeSummaryData, type IncomeByPeriod, type TopCustomer } from '../services/incomeService';
-
-// Local type definitions to avoid import issues
-interface DashboardSummary {
-  totalOrders: number;
-  completedOrders: number;
-  pendingOrders: number;
-  inProgressOrders: number;
-  totalRevenue: number;
-  averageOrderValue: number;
-}
-
-interface DailyOrderData {
-  date: string;
-  orders: number;
-  revenue: number;
-}
-
-interface OrderStatusDistribution {
-  status: string;
-  count: number;
-  percentage: number;
-}
-
-interface RecentOrder {
-  id: number;
-  referenceNo: string;
-  customerName: string;
-  status: string;
-  quantity: number;
-  totalAmount: number;
-  orderDate: string;
-}
+import {
+  useQuickStats,
+  useOrdersTrend,
+  useOrderStatusDistribution,
+  useRecentOrders,
+  useIncomeSummary,
+  useIncomeTrends,
+  useTopCustomers,
+  type DashboardFilters,
+  type IncomeTrendsFilters,
+  type TopCustomersFilters
+} from '../hooks/useDashboard';
 
 interface DateRange {
   startDate: Date | null;
@@ -59,25 +37,10 @@ import RecentOrdersTable from '../components/dashboard/RecentOrdersTable';
 import TopCustomersWidget from '../components/dashboard/TopCustomersWidget';
 import PaymentStatusPieChart from '../components/dashboard/PaymentStatusPieChart';
 import colors from '../styles/colors';
-import toast from 'react-hot-toast';
 
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Separate state for each component to prevent unnecessary re-renders
-  const [quickStats, setQuickStats] = useState<DashboardSummary | null>(null);
-  const [ordersTrend, setOrdersTrend] = useState<DailyOrderData[]>([]);
-  const [orderStatusDistribution, setOrderStatusDistribution] = useState<OrderStatusDistribution[]>([]);
-  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
-
-  // Income-related state
-  const [incomeSummary, setIncomeSummary] = useState<IncomeSummaryData | null>(null);
-  const [, setIncomeTrends] = useState<IncomeByPeriod[]>([]);
-  const [topCustomers, setTopCustomers] = useState<TopCustomer[]>([]);
-
   const [dateRange, setDateRange] = useState<DateRange>({
     startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Last 30 days
     endDate: new Date(),
@@ -87,103 +50,76 @@ export default function DashboardPage() {
   // Check if user has permission to view dashboard
   const canViewDashboard = hasPermission(user, 'canViewDashboard');
 
-  const fetchAnalytics = useCallback(async () => {
-    if (!canViewDashboard) return;
+  // Prepare filters for TanStack Query hooks
+  const dashboardFilters: DashboardFilters = {
+    startDate: dateRange.startDate?.toISOString().split('T')[0] || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    endDate: dateRange.endDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
+    period: dateRange.period,
+  };
 
-    try {
-      setLoading(true);
-      setError(null);
+  const incomeTrendsFilters: IncomeTrendsFilters = {
+    startDate: dashboardFilters.startDate,
+    endDate: dashboardFilters.endDate,
+    groupBy: 'day',
+    limit: 30
+  };
 
-      const filters = {
-        startDate: dateRange.startDate?.toISOString().split('T')[0] || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        endDate: dateRange.endDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
-        period: dateRange.period,
-      };
+  const topCustomersFilters: TopCustomersFilters = {
+    startDate: dashboardFilters.startDate,
+    endDate: dashboardFilters.endDate,
+    limit: 10
+  };
 
-      console.log('Dashboard filters being sent:', filters);
+  // TanStack Query hooks
+  const {
+    data: quickStats,
+    isLoading: quickStatsLoading,
+    error: quickStatsError
+  } = useQuickStats(dashboardFilters);
 
-      // Fetch all data in parallel for better performance
-      const [quickStatsData, ordersTrendData, statusDistributionData, recentOrdersData, incomeSummaryData, incomeTrendsData, topCustomersData] = await Promise.allSettled([
-        DashboardService.getQuickStats(filters),
-        DashboardService.getOrdersTrend(filters),
-        DashboardService.getOrderStatusDistribution(filters),
-        DashboardService.getRecentOrders(10),
-        IncomeService.getIncomeSummaryWithFilters(filters),
-        IncomeService.getIncomeTrends({
-          startDate: filters.startDate,
-          endDate: filters.endDate,
-          groupBy: 'day',
-          limit: 30
-        }),
-        IncomeService.getTopCustomers({
-          startDate: filters.startDate,
-          endDate: filters.endDate,
-          limit: 10
-        })
-      ]);
+  const {
+    data: ordersTrend = [],
+    isLoading: ordersTrendLoading,
+    error: ordersTrendError
+  } = useOrdersTrend(dashboardFilters);
 
-      // Handle quick stats
-      if (quickStatsData.status === 'fulfilled') {
-        setQuickStats(quickStatsData.value);
-      } else {
-        console.error('Error fetching quick stats:', quickStatsData.reason);
-      }
+  const {
+    data: orderStatusDistribution = [],
+    isLoading: orderStatusDistributionLoading,
+    error: orderStatusDistributionError
+  } = useOrderStatusDistribution(dashboardFilters);
 
-      // Handle orders trend
-      if (ordersTrendData.status === 'fulfilled') {
-        setOrdersTrend(ordersTrendData.value);
-      } else {
-        console.error('Error fetching orders trend:', ordersTrendData.reason);
-        setOrdersTrend([]);
-      }
+  const {
+    data: recentOrders = [],
+    isLoading: recentOrdersLoading,
+    error: recentOrdersError
+  } = useRecentOrders(10);
 
-      // Handle order status distribution
-      if (statusDistributionData.status === 'fulfilled') {
-        setOrderStatusDistribution(statusDistributionData.value);
-      } else {
-        console.error('Error fetching order status distribution:', statusDistributionData.reason);
-      }
+  const {
+    data: incomeSummary,
+    isLoading: incomeSummaryLoading,
+    error: incomeSummaryError
+  } = useIncomeSummary(dashboardFilters);
 
-      // Handle recent orders
-      if (recentOrdersData.status === 'fulfilled') {
-        setRecentOrders(recentOrdersData.value);
-      } else {
-        console.error('Error fetching recent orders:', recentOrdersData.reason);
-      }
+  const {
+    data: _incomeTrends = [],
+    isLoading: incomeTrendsLoading,
+    error: incomeTrendsError
+  } = useIncomeTrends(incomeTrendsFilters);
 
-      // Handle income summary
-      if (incomeSummaryData.status === 'fulfilled') {
-        setIncomeSummary(incomeSummaryData.value);
-      } else {
-        console.error('Error fetching income summary:', incomeSummaryData.reason);
-      }
+  const {
+    data: topCustomers = [],
+    isLoading: topCustomersLoading,
+    error: topCustomersError
+  } = useTopCustomers(topCustomersFilters);
 
-      // Handle income trends
-      if (incomeTrendsData.status === 'fulfilled') {
-        setIncomeTrends(incomeTrendsData.value.trends);
-      } else {
-        console.error('Error fetching income trends:', incomeTrendsData.reason);
-      }
+  // Derived loading and error states
+  const loading = quickStatsLoading || ordersTrendLoading || orderStatusDistributionLoading ||
+    recentOrdersLoading || incomeSummaryLoading || incomeTrendsLoading || topCustomersLoading;
 
-      // Handle top customers
-      if (topCustomersData.status === 'fulfilled') {
-        setTopCustomers(topCustomersData.value);
-      } else {
-        console.error('Error fetching top customers:', topCustomersData.reason);
-      }
+  const error = quickStatsError || ordersTrendError || orderStatusDistributionError ||
+    recentOrdersError || incomeSummaryError || incomeTrendsError || topCustomersError;
 
-    } catch (err) {
-      console.error('Error fetching dashboard data:', err);
-      setError('Failed to load dashboard data. Please try again.');
-      toast.error('Failed to load dashboard data');
-    } finally {
-      setLoading(false);
-    }
-  }, [canViewDashboard, dateRange]);
-
-  useEffect(() => {
-    fetchAnalytics();
-  }, [fetchAnalytics]);
 
   const handleDateRangeChange = (newRange: DateRange) => {
     setDateRange(newRange);
@@ -203,7 +139,7 @@ export default function DashboardPage() {
     return (
       <Box sx={{ p: 4 }}>
         <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
+          {error.message || 'An error occurred'}
         </Alert>
       </Box>
     );

@@ -36,7 +36,7 @@ const MachineAssignmentModal: React.FC<MachineAssignmentModalProps> = ({
 }) => {
     const [form, setForm] = useState({
         assignedBy: '',
-        quantity: 1,
+        quantity: '',
         washingMachine: '',
         dryingMachine: ''
     });
@@ -66,9 +66,9 @@ const MachineAssignmentModal: React.FC<MachineAssignmentModalProps> = ({
             newErrors.assignedBy = 'Please select an employee';
         }
 
-        if (!form.quantity || form.quantity <= 0) {
+        if (!form.quantity || Number(form.quantity) <= 0) {
             newErrors.quantity = 'Please enter a valid quantity';
-        } else if (record && form.quantity > record.remainingQuantity) {
+        } else if (record && Number(form.quantity) > record.remainingQuantity) {
             newErrors.quantity = `Quantity cannot exceed remaining quantity (${record.remainingQuantity})`;
         }
 
@@ -95,7 +95,7 @@ const MachineAssignmentModal: React.FC<MachineAssignmentModalProps> = ({
             // Reset form on success
             setForm({
                 assignedBy: '',
-                quantity: 1,
+                quantity: '',
                 washingMachine: '',
                 dryingMachine: ''
             });
@@ -112,7 +112,7 @@ const MachineAssignmentModal: React.FC<MachineAssignmentModalProps> = ({
         if (!saving) {
             setForm({
                 assignedBy: '',
-                quantity: 1,
+                quantity: '',
                 washingMachine: '',
                 dryingMachine: ''
             });
@@ -130,16 +130,6 @@ const MachineAssignmentModal: React.FC<MachineAssignmentModalProps> = ({
         minHeight: '90px' // Consistent height to account for error messages
     };
 
-    const labelStyle = {
-        display: 'block',
-        fontSize: '14px',
-        fontWeight: 500,
-        marginBottom: '8px',
-        color: colors.text.primary,
-        lineHeight: '20px',
-        margin: '0 0 8px 0',
-        padding: 0
-    };
 
     const inputStyle = {
         width: '100%',
@@ -226,16 +216,13 @@ const MachineAssignmentModal: React.FC<MachineAssignmentModalProps> = ({
                             alignItems: 'start'
                         }}>
                             <div style={fieldContainerStyle}>
-                                <label style={labelStyle}>
-                                    Assign To <span style={{ color: '#ef4444' }}>*</span>
-                                </label>
                                 <div style={{ position: 'relative', margin: 0, padding: 0 }}>
                                     <PrimaryDropdown
                                         name="assignedBy"
                                         value={form.assignedBy}
                                         onChange={handleChange}
                                         options={employeeOptions}
-                                        placeholder="Select employee"
+                                        placeholder="Assign To"
                                         error={!!errors.assignedBy}
                                         style={dropdownOverrideStyle}
                                         className=""
@@ -247,9 +234,6 @@ const MachineAssignmentModal: React.FC<MachineAssignmentModalProps> = ({
                             </div>
 
                             <div style={fieldContainerStyle}>
-                                <label style={labelStyle}>
-                                    Quantity <span style={{ color: '#ef4444' }}>*</span>
-                                </label>
                                 <input
                                     name="quantity"
                                     type="number"
@@ -257,6 +241,8 @@ const MachineAssignmentModal: React.FC<MachineAssignmentModalProps> = ({
                                     max={record?.remainingQuantity || 1}
                                     value={form.quantity}
                                     onChange={handleChange}
+                                    placeholder="Quantity"
+                                    autoFocus
                                     style={{
                                         ...inputStyle,
                                         borderColor: errors.quantity ? '#ef4444' : colors.border.light
@@ -276,16 +262,13 @@ const MachineAssignmentModal: React.FC<MachineAssignmentModalProps> = ({
                             alignItems: 'start'
                         }}>
                             <div style={fieldContainerStyle}>
-                                <label style={labelStyle}>
-                                    Washing Machine <span style={{ color: '#6b7280' }}>(Optional)</span>
-                                </label>
                                 <div style={{ position: 'relative', margin: 0, padding: 0 }}>
                                     <PrimaryDropdown
                                         name="washingMachine"
                                         value={form.washingMachine}
                                         onChange={handleChange}
                                         options={washingMachineOptions}
-                                        placeholder="Select washing machine (optional)"
+                                        placeholder="Washing Machine (Optional)"
                                         error={!!errors.washingMachine}
                                         style={dropdownOverrideStyle}
                                         className=""
@@ -297,16 +280,13 @@ const MachineAssignmentModal: React.FC<MachineAssignmentModalProps> = ({
                             </div>
 
                             <div style={fieldContainerStyle}>
-                                <label style={labelStyle}>
-                                    Drying Machine <span style={{ color: '#6b7280' }}>(Optional)</span>
-                                </label>
                                 <div style={{ position: 'relative', margin: 0, padding: 0 }}>
                                     <PrimaryDropdown
                                         name="dryingMachine"
                                         value={form.dryingMachine}
                                         onChange={handleChange}
                                         options={dryingMachineOptions}
-                                        placeholder="Select drying machine (optional)"
+                                        placeholder="Drying Machine (Optional)"
                                         error={!!errors.dryingMachine}
                                         style={dropdownOverrideStyle}
                                         className=""

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import React from "react";
 import { CircularProgress } from "@mui/material";
 import colors from "../../styles/colors";

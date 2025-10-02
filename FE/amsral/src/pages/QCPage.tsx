@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
     Box,
     Chip,
@@ -10,54 +10,20 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import colors from '../styles/colors';
 import PrimaryTable from '../components/common/PrimaryTable';
 import QCModal from '../components/modals/QCModal';
-import { orderService, type OrderStatus } from '../services/orderService';
-
-// QCModal will be implemented later
-
-interface CompletedOrder {
-    id: number;
-    customerName: string;
-    quantity: number;
-    returnQuantity?: number;
-    deliveryQuantity?: number;
-    date: string;
-    deliveryDate: string;
-    status: string;
-    billingStatus?: string;
-    createdAt: string;
-    updatedAt: string;
-}
+import { useCompletedOrders, useSaveDamageRecords, type CompletedOrder, type DamageCounts } from '../hooks/useQC';
 
 export default function QCPage() {
-    const [orders, setOrders] = useState<CompletedOrder[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
     const [selectedOrder, setSelectedOrder] = useState<CompletedOrder | null>(null);
     const [qcModalOpen, setQcModalOpen] = useState(false);
 
-    useEffect(() => {
-        fetchCompletedOrders();
-    }, []);
+    // TanStack Query hooks
+    const {
+        data: orders = [],
+        isLoading: loading,
+        error
+    } = useCompletedOrders({ status: 'Complete' });
 
-    const fetchCompletedOrders = async () => {
-        try {
-            setLoading(true);
-            setError(null);
-
-            // Fetch orders with completed status filter using URL parameters
-            // This will call: GET /api/orders?status=Complete
-            const response = await orderService.getManagementOrders({
-                status: 'Complete' as OrderStatus
-            });
-
-            setOrders(response.data?.orders || []);
-        } catch (err) {
-            console.error('Error fetching completed orders:', err);
-            setError('Failed to fetch completed orders');
-        } finally {
-            setLoading(false);
-        }
-    };
+    const saveDamageRecordsMutation = useSaveDamageRecords();
 
     const handleRowClick = (params: { row: CompletedOrder }) => {
         setSelectedOrder(params.row);
@@ -69,25 +35,24 @@ export default function QCPage() {
         setSelectedOrder(null);
     };
 
-    const handleSaveDamageCounts = async (damageCounts: { [recordId: number]: number }) => {
-        try {
-            if (!selectedOrder) {
-                console.error('No selected order');
-                return;
-            }
-
-            // Call the API to save damage records
-            await orderService.saveDamageRecords(selectedOrder.id, damageCounts);
-
-            console.log('Damage records saved successfully:', damageCounts);
-
-            // Refresh the orders list
-            await fetchCompletedOrders();
-            setQcModalOpen(false);
-            setSelectedOrder(null);
-        } catch (err) {
-            console.error('Error saving damage counts:', err);
+    const handleSaveDamageCounts = async (damageCounts: DamageCounts) => {
+        if (!selectedOrder) {
+            console.error('No selected order');
+            return;
         }
+
+        saveDamageRecordsMutation.mutate(
+            { orderId: selectedOrder.id, damageCounts },
+            {
+                onSuccess: () => {
+                    setQcModalOpen(false);
+                    setSelectedOrder(null);
+                },
+                onError: (error: Error) => {
+                    console.error('Error saving damage counts:', error);
+                }
+            }
+        );
     };
 
 
@@ -144,7 +109,7 @@ export default function QCPage() {
     if (error) {
         return (
             <Box sx={{ p: 3 }}>
-                <Alert severity="error">{error}</Alert>
+                <Alert severity="error">{error.message || 'Failed to fetch completed orders'}</Alert>
             </Box>
         );
     }

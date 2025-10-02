@@ -4,7 +4,7 @@
  */
 
 // Standardized status types
-export type OrderStatus = 'Pending' | 'In Progress' | 'Completed' | 'Confirmed' | 'Processing' | 'Delivered' | 'QC';
+export type OrderStatus = 'Pending' | 'In Progress' | 'Complete' | 'Confirmed' | 'Processing' | 'Delivered' | 'QC';
 export type BillingStatus = 'pending' | 'invoiced' | 'paid';
 export type AssignmentStatus = 'Pending' | 'In Progress' | 'Completed';
 
@@ -13,7 +13,7 @@ export const STATUS_COLORS = {
   // Order Status Colors
   'Pending': 'bg-yellow-100 text-yellow-800',        // Yellow/orange for pending
   'In Progress': 'bg-yellow-100 text-yellow-800',    // Yellow for in progress
-  'Completed': 'bg-green-100 text-green-800',        // Green for completed
+  'Complete': 'bg-green-100 text-green-800',        // Green for complete
   'Confirmed': 'bg-purple-100 text-purple-800',      // Purple for confirmed
   'Processing': 'bg-orange-100 text-orange-800',     // Orange for processing
   'Delivered': 'bg-blue-100 text-blue-800',          // Blue for delivered
@@ -28,7 +28,6 @@ export const STATUS_COLORS = {
   
   // Special statuses
   'Assigned': 'bg-cyan-100 text-cyan-800',           // Cyan for assigned (different from Pending and Delivered)
-  'Complete': 'bg-green-100 text-green-800',         // For backward compatibility
 } as const;
 
 // Status label mapping - ensures consistent case sensitivity
@@ -36,12 +35,12 @@ export const STATUS_LABELS = {
   // Order Status Labels
   'pending': 'Pending',
   'in_progress': 'In Progress',
-  'completed': 'Completed',
+  'completed': 'Complete',
   'confirmed': 'Confirmed',
   'processing': 'Processing',
   'delivered': 'Delivered',
   'assigned': 'Assigned',
-  'complete': 'Completed', // Map 'complete' to 'Completed' for consistency
+  'complete': 'Complete', // Map 'complete' to 'Complete' for consistency
   'qc': 'QC',              // Quality Control status
   
   // Billing Status Labels - now using sentence case (removed duplicate 'pending')
@@ -83,7 +82,7 @@ export const normalizeStatus = (status: string, type: 'order' | 'billing' | 'ass
         return 'In Progress';
       case 'completed':
       case 'complete':
-        return 'Completed';
+        return 'Complete';
       case 'confirmed':
         return 'Confirmed';
       case 'processing':
@@ -123,7 +122,7 @@ export const normalizeStatus = (status: string, type: 'order' | 'billing' | 'ass
         return 'In Progress';
       case 'completed':
       case 'complete':
-        return 'Completed';
+        return 'Complete';
       default:
         return 'Pending';
     }
@@ -137,7 +136,7 @@ export const normalizeStatus = (status: string, type: 'order' | 'billing' | 'ass
  */
 export const isCompletedStatus = (status: string): boolean => {
   const normalized = normalizeStatus(status, 'order');
-  return normalized === 'Completed' || normalized === 'Delivered';
+  return normalized === 'Complete' || normalized === 'Delivered';
 };
 
 /**

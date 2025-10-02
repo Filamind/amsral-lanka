@@ -8,8 +8,14 @@ import PrimaryDropdown from '../components/common/PrimaryDropdown';
 import PrimaryDatePicker from '../components/common/PrimaryDatePicker';
 import colors from '../styles/colors';
 import toast from 'react-hot-toast';
-import UserService, { type User, type PaginationInfo, type UserFetchOptions, type CreateUserRequest, type UpdateUserRequest } from '../services/userService';
-import RoleService, { type RoleOption } from '../services/roleService';
+import {
+    useUsers,
+    useRoles,
+    useCreateUser,
+    useUpdateUser,
+    useDeleteUser,
+} from '../hooks/useUsers';
+import { type User, type CreateUserRequest, type UpdateUserRequest, type UserFetchOptions } from '../services/userService';
 import { formatDisplayText } from '../utils';
 import { useAuth } from '../hooks/useAuth';
 import { hasPermission } from '../utils/roleUtils';
@@ -66,9 +72,9 @@ const getColumns = (onEdit: (user: User) => void, onDelete: (user: User) => void
 
 export default function UserPage() {
     const { user } = useAuth();
+
+    // Local state for UI
     const [search, setSearch] = useState('');
-    const [rows, setRows] = useState<User[]>([]);
-    const [loading, setLoading] = useState(false);
     const [open, setOpen] = useState(false);
     const [editMode, setEditMode] = useState(false);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -86,43 +92,8 @@ export default function UserPage() {
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [userToDelete, setUserToDelete] = useState<User | null>(null);
-    const [roleOptions, setRoleOptions] = useState<RoleOption[]>([]);
-    const [loadingRoles, setLoadingRoles] = useState(false);
-    const [rolesLoaded, setRolesLoaded] = useState(false);
-
-    // Memoized role fetching function
-    const fetchRoles = useMemo(() => async () => {
-        if (rolesLoaded) return; // Don't fetch if already loaded
-
-        setLoadingRoles(true);
-        try {
-            const roles = await RoleService.getRoleMap();
-            setRoleOptions(roles);
-            setRolesLoaded(true);
-        } catch (error) {
-            console.error('Error fetching roles:', error);
-            toast.error('Failed to load roles');
-            // Fallback to default roles if API fails
-            setRoleOptions([
-                { value: '1', label: 'Admin' },
-                { value: '2', label: 'Manager' },
-                { value: '3', label: 'User' }
-            ]);
-            setRolesLoaded(true);
-        } finally {
-            setLoadingRoles(false);
-        }
-    }, [rolesLoaded]);
 
     // Pagination state
-    const [pagination, setPagination] = useState<PaginationInfo>({
-        currentPage: 1,
-        totalPages: 1,
-        totalItems: 0,
-        itemsPerPage: 10,
-        hasNextPage: false,
-        hasPrevPage: false
-    });
     const [pageSize, setPageSize] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
 
@@ -137,70 +108,40 @@ export default function UserPage() {
     // Memoize filters object to prevent unnecessary re-renders
     const filters = useMemo(() => filterState, [filterState]);
 
-    // Load users effect - runs when dependencies change
-    useEffect(() => {
-        const loadUsers = async () => {
-            try {
-                setLoading(true);
-                const options: UserFetchOptions = {
-                    ...filters,
-                    page: currentPage,
-                    limit: pageSize
-                };
-
-                const response = await UserService.getAllUsers(options);
-                console.log('Loaded users:', response); // Debug log
-
-                setRows(response.users);
-                setPagination(response.pagination);
-            } catch (error) {
-                console.error('Failed to load users:', error);
-                // Set empty array on error
-                setRows([]);
-                setPagination({
-                    currentPage: 1,
-                    totalPages: 1,
-                    totalItems: 0,
-                    itemsPerPage: pageSize,
-                    hasNextPage: false,
-                    hasPrevPage: false
-                });
-                toast.error('Failed to load users. Please try again.');
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadUsers();
-    }, [filters, currentPage, pageSize]);
-
-    // Manual reload function for after create/delete operations
-    const reloadUsers = async () => {
-        try {
-            setLoading(true);
-            const options: UserFetchOptions = {
-                ...filters,
-                page: currentPage,
-                limit: pageSize
-            };
-
-            const response = await UserService.getAllUsers(options);
-            setRows(response.users);
-            setPagination(response.pagination);
-        } catch (error) {
-            console.error('Failed to reload users:', error);
-            toast.error('Failed to reload users. Please try again.');
-        } finally {
-            setLoading(false);
-        }
+    // Prepare filters for TanStack Query hooks
+    const userFilters: UserFetchOptions = {
+        ...filters,
+        page: currentPage,
+        limit: pageSize
     };
 
-    // Fetch roles on component mount - only once
-    useEffect(() => {
-        if (!rolesLoaded) {
-            fetchRoles();
-        }
-    }, [fetchRoles, rolesLoaded]);
+    // TanStack Query hooks
+    const {
+        data: usersData,
+        isLoading: loading,
+    } = useUsers(userFilters);
+
+    const {
+        data: roleOptions = [],
+        isLoading: loadingRoles,
+    } = useRoles();
+
+    // Mutation hooks
+    const createUserMutation = useCreateUser();
+    const updateUserMutation = useUpdateUser();
+    const deleteUserMutation = useDeleteUser();
+
+    // Derived state
+    const rows = usersData?.users || [];
+    const pagination = usersData?.pagination || {
+        currentPage: 1,
+        totalPages: 1,
+        totalItems: 0,
+        itemsPerPage: 10,
+        hasNextPage: false,
+        hasPrevPage: false
+    };
+
 
     // Debounced search effect
     useEffect(() => {
@@ -221,7 +162,7 @@ export default function UserPage() {
     };
 
     const handleFilterChange = (newFilters: Partial<UserFetchOptions>) => {
-        setFilterState(prev => ({ ...prev, ...newFilters }));
+        setFilterState((prev: any) => ({ ...prev, ...newFilters }));
         setCurrentPage(1); // Reset to first page when filters change
     };
 
@@ -291,19 +232,16 @@ export default function UserPage() {
     const confirmDelete = async () => {
         if (!userToDelete) return;
 
-        try {
-            setLoading(true);
-            await UserService.deleteUser(userToDelete.id!);
-            toast.success(`User ${userToDelete.username} deleted successfully!`);
-            setDeleteConfirmOpen(false);
-            setUserToDelete(null);
-            reloadUsers();
-        } catch (error) {
-            console.error('Failed to delete user:', error);
-            toast.error('Failed to delete user. Please try again.');
-        } finally {
-            setLoading(false);
-        }
+        deleteUserMutation.mutate(userToDelete.id!, {
+            onSuccess: () => {
+                setDeleteConfirmOpen(false);
+                setUserToDelete(null);
+            },
+            onError: (error: Error) => {
+                console.error('Failed to delete user:', error);
+                toast.error(error.message || 'Failed to delete user. Please try again.');
+            }
+        });
     };
 
     const handleOpen = () => {
@@ -358,105 +296,81 @@ export default function UserPage() {
             return;
         }
 
-        try {
-            setLoading(true);
-            setErrors({}); // Clear any previous errors
+        setErrors({}); // Clear any previous errors
 
-            if (editMode && selectedUser) {
-                // Update existing user
-                console.log('Updating user with data:', form); // Debug log
-                console.log('Form roleId type:', typeof form.roleId, 'value:', form.roleId); // Debug roleId
-                const updateData: UpdateUserRequest = {
-                    username: form.username,
-                    firstName: form.firstName,
-                    lastName: form.lastName,
-                    phone: form.phone,
-                    dateOfBirth: form.dateOfBirth,
-                    roleId: form.roleId,
-                    isActive: form.isActive,
-                };
-                console.log('Sending update request with:', updateData); // Debug request data
-                // Email is not changeable in edit mode
-                // Password is not changeable in edit mode
+        if (editMode && selectedUser) {
+            // Update existing user
+            const updateData: UpdateUserRequest = {
+                username: form.username,
+                firstName: form.firstName,
+                lastName: form.lastName,
+                phone: form.phone,
+                dateOfBirth: form.dateOfBirth,
+                roleId: form.roleId,
+                isActive: form.isActive,
+            };
 
-                const updatedUser = await UserService.updateUser(selectedUser.id!, updateData);
-                console.log('User updated successfully:', updatedUser);
-
-                // Simple success - just show toast and close modal first
-                setOpen(false);
-
-                // Use form data as fallback if updatedUser doesn't have the data
-                const username = updatedUser.username || form.username;
-                toast.success(`User ${username} updated successfully!`);
-            } else {
-                // Create new user
-                console.log('Creating user with data:', form); // Debug log
-                console.log('Form roleId type:', typeof form.roleId, 'value:', form.roleId); // Debug roleId
-                const createData: CreateUserRequest = {
-                    username: form.username,
-                    email: form.email,
-                    firstName: form.firstName,
-                    lastName: form.lastName,
-                    passwordHash: form.password,
-                    phone: form.phone,
-                    dateOfBirth: form.dateOfBirth,
-                    roleId: form.roleId,
-                    isActive: form.isActive,
-                };
-                console.log('Sending create request with:', createData); // Debug request data
-
-                const newUser = await UserService.createUser(createData);
-                console.log('User created successfully:', newUser);
-
-                // Simple success - just show toast and close modal first
-                setOpen(false);
-
-                // Use form data as fallback if newUser doesn't have the data
-                const username = newUser.username || form.username;
-                toast.success(`User ${username} created successfully!`);
-            }
-
-            // Reset form and state
-            setForm({
-                username: '',
-                email: '',
-                firstName: '',
-                lastName: '',
-                password: 'default123',
-                phone: '',
-                dateOfBirth: '',
-                roleId: 1, // Default to Admin role (ID: 1)
-                isActive: true,
-            });
-            setEditMode(false);
-            setSelectedUser(null);
-
-            // Reload data after a short delay to prevent any race conditions
-            setTimeout(() => {
-                reloadUsers();
-            }, 500);
-
-        } catch (error: unknown) {
-            console.error(`Failed to ${editMode ? 'update' : 'create'} user:`, error);
-            // Handle validation errors from backend
-            if (error && typeof error === 'object' && 'response' in error) {
-                const axiosError = error as { response?: { data?: { errors?: Array<{ field: string; message: string }> } } };
-                if (axiosError.response?.data?.errors) {
-                    const backendErrors: { [key: string]: string } = {};
-                    axiosError.response.data.errors.forEach((err: { field: string; message: string }) => {
-                        backendErrors[err.field] = err.message;
-                    });
-                    setErrors(backendErrors);
-                    toast.error('Please fix the validation errors and try again.');
-                } else {
-                    toast.error(`Failed to ${editMode ? 'update' : 'create'} user. Please try again.`);
+            updateUserMutation.mutate(
+                { id: selectedUser.id!, data: updateData },
+                {
+                    onSuccess: () => {
+                        setOpen(false);
+                        setForm({
+                            username: '',
+                            email: '',
+                            firstName: '',
+                            lastName: '',
+                            password: 'default123',
+                            phone: '',
+                            dateOfBirth: '',
+                            roleId: 1,
+                            isActive: true,
+                        });
+                        setEditMode(false);
+                        setSelectedUser(null);
+                    },
+                    onError: (error: Error) => {
+                        console.error('Failed to update user:', error);
+                        toast.error(error.message || 'Failed to update user. Please try again.');
+                    }
                 }
-            } else {
-                toast.error('Network error. Please check your connection and try again.');
-            }
-        } finally {
-            setLoading(false);
-            console.log('Form submission completed'); // Debug log
+            );
+        } else {
+            // Create new user
+            const createData: CreateUserRequest = {
+                username: form.username,
+                email: form.email,
+                firstName: form.firstName,
+                lastName: form.lastName,
+                passwordHash: form.password,
+                phone: form.phone,
+                dateOfBirth: form.dateOfBirth,
+                roleId: form.roleId,
+                isActive: form.isActive,
+            };
+
+            createUserMutation.mutate(createData, {
+                onSuccess: () => {
+                    setOpen(false);
+                    setForm({
+                        username: '',
+                        email: '',
+                        firstName: '',
+                        lastName: '',
+                        password: 'default123',
+                        phone: '',
+                        dateOfBirth: '',
+                        roleId: 1,
+                        isActive: true,
+                    });
+                    setEditMode(false);
+                    setSelectedUser(null);
+                },
+                onError: (error: Error) => {
+                    console.error('Failed to create user:', error);
+                    toast.error(error.message || 'Failed to create user. Please try again.');
+                }
+            });
         }
     };
 

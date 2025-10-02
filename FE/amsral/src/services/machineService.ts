@@ -3,11 +3,12 @@ import apiClient from '../config/api';
 
 // Types
 export interface Machine {
-  id: string;
+  id: number;
   name: string;
-  type: 'washing' | 'drying';
-  status: 'available' | 'in_use' | 'maintenance';
-  capacity: number;
+  type: 'Washing' | 'Drying';
+  description: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface MachinesResponse {
@@ -19,7 +20,7 @@ export interface MachinesResponse {
 
 class MachineService {
   // Get all machines
-  async getAllMachines(type?: 'washing' | 'drying'): Promise<Machine[]> {
+  async getAllMachines(type?: 'Washing' | 'Drying'): Promise<Machine[]> {
     try {
       const queryParams = new URLSearchParams();
       if (type) queryParams.append('type', type);
@@ -34,12 +35,12 @@ class MachineService {
 
   // Get washing machines
   async getWashingMachines(): Promise<Machine[]> {
-    return this.getAllMachines('washing');
+    return this.getAllMachines('Washing');
   }
 
   // Get drying machines
   async getDryingMachines(): Promise<Machine[]> {
-    return this.getAllMachines('drying');
+    return this.getAllMachines('Drying');
   }
 }
 

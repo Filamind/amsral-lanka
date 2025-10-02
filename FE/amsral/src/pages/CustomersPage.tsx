@@ -6,7 +6,14 @@ import PrimaryButton from '../components/common/PrimaryButton';
 import PrimaryTable from '../components/common/PrimaryTable';
 import colors from '../styles/colors';
 import toast from 'react-hot-toast';
-import CustomerService, { type Customer, type PaginationInfo, type CustomerFetchOptions } from '../services/customerService';
+import {
+    useCustomers,
+    useCreateCustomer,
+    useUpdateCustomer,
+    useDeleteCustomer,
+    type CustomerFetchOptions,
+} from '../hooks/useCustomers';
+import { type Customer } from '../services/customerService';
 import { useAuth } from '../hooks/useAuth';
 import { hasPermission } from '../utils/roleUtils';
 
@@ -54,9 +61,9 @@ const getColumns = (onEdit: (customer: Customer) => void, onDelete: (customer: C
 
 export default function CustomersPage() {
     const { user } = useAuth();
+
+    // Local state for UI
     const [search, setSearch] = useState('');
-    const [rows, setRows] = useState<Customer[]>([]);
-    const [loading, setLoading] = useState(false);
     const [open, setOpen] = useState(false);
     const [editMode, setEditMode] = useState(false);
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -76,14 +83,6 @@ export default function CustomersPage() {
     const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
 
     // Pagination state
-    const [pagination, setPagination] = useState<PaginationInfo>({
-        currentPage: 1,
-        totalPages: 1,
-        totalItems: 0,
-        itemsPerPage: 10,
-        hasNextPage: false,
-        hasPrevPage: false
-    });
     const [pageSize, setPageSize] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
 
@@ -97,63 +96,35 @@ export default function CustomersPage() {
     // Memoize filters object to prevent unnecessary re-renders
     const filters = useMemo(() => filterState, [filterState]);
 
-    // Load customers effect - runs when dependencies change
-    useEffect(() => {
-        const loadCustomers = async () => {
-            try {
-                setLoading(true);
-                const options: CustomerFetchOptions = {
-                    ...filters,
-                    page: currentPage,
-                    limit: pageSize
-                };
-
-                const response = await CustomerService.getAllCustomers(options);
-                console.log('Loaded customers:', response); // Debug log
-
-                setRows(response.customers);
-                setPagination(response.pagination);
-            } catch (error) {
-                console.error('Failed to load customers:', error);
-                // Set empty array on error
-                setRows([]);
-                setPagination({
-                    currentPage: 1,
-                    totalPages: 1,
-                    totalItems: 0,
-                    itemsPerPage: pageSize,
-                    hasNextPage: false,
-                    hasPrevPage: false
-                });
-                toast.error('Failed to load customers. Please try again.');
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadCustomers();
-    }, [filters, currentPage, pageSize]);
-
-    // Manual reload function for after create/delete operations
-    const reloadCustomers = async () => {
-        try {
-            setLoading(true);
-            const options: CustomerFetchOptions = {
-                ...filters,
-                page: currentPage,
-                limit: pageSize
-            };
-
-            const response = await CustomerService.getAllCustomers(options);
-            setRows(response.customers);
-            setPagination(response.pagination);
-        } catch (error) {
-            console.error('Failed to reload customers:', error);
-            toast.error('Failed to reload customers. Please try again.');
-        } finally {
-            setLoading(false);
-        }
+    // Prepare filters for TanStack Query hooks
+    const customerFilters: CustomerFetchOptions = {
+        ...filters,
+        page: currentPage,
+        limit: pageSize
     };
+
+    // TanStack Query hooks
+    const {
+        data: customersData,
+        isLoading: loading
+    } = useCustomers(customerFilters);
+
+    // Mutation hooks
+    const createCustomerMutation = useCreateCustomer();
+    const updateCustomerMutation = useUpdateCustomer();
+    const deleteCustomerMutation = useDeleteCustomer();
+
+    // Derived state
+    const rows = customersData?.customers || [];
+    const pagination = customersData?.pagination || {
+        currentPage: 1,
+        totalPages: 1,
+        totalItems: 0,
+        itemsPerPage: 10,
+        hasNextPage: false,
+        hasPrevPage: false
+    };
+
 
     // Debounced search effect
     useEffect(() => {
@@ -231,19 +202,16 @@ export default function CustomersPage() {
     const confirmDelete = async () => {
         if (!customerToDelete) return;
 
-        try {
-            setLoading(true);
-            await CustomerService.deleteCustomer(customerToDelete.id!);
-            toast.success(`Customer ${customerToDelete.firstName} ${customerToDelete.lastName} deleted successfully!`);
-            setDeleteConfirmOpen(false);
-            setCustomerToDelete(null);
-            reloadCustomers();
-        } catch (error) {
-            console.error('Failed to delete customer:', error);
-            toast.error('Failed to delete customer. Please try again.');
-        } finally {
-            setLoading(false);
-        }
+        deleteCustomerMutation.mutate(customerToDelete.id!, {
+            onSuccess: () => {
+                setDeleteConfirmOpen(false);
+                setCustomerToDelete(null);
+            },
+            onError: (error: Error) => {
+                console.error('Failed to delete customer:', error);
+                toast.error(error.message || 'Failed to delete customer. Please try again.');
+            }
+        });
     };
 
     const handleOpen = () => {
@@ -293,79 +261,59 @@ export default function CustomersPage() {
             return;
         }
 
-        try {
-            setLoading(true);
-            setErrors({}); // Clear any previous errors
+        setErrors({}); // Clear any previous errors
 
-            if (editMode && selectedCustomer) {
-                // Update existing customer
-                console.log('Updating customer with data:', form); // Debug log
-                const updatedCustomer = await CustomerService.updateCustomer(selectedCustomer.id!, form);
-                console.log('Customer updated successfully:', updatedCustomer);
-
-                // Simple success - just show toast and close modal first
-                setOpen(false);
-
-                // Use form data as fallback if updatedCustomer doesn't have the data
-                const firstName = updatedCustomer.firstName || form.firstName;
-                const lastName = updatedCustomer.lastName || form.lastName;
-                toast.success(`Customer ${firstName} ${lastName} updated successfully!`);
-            } else {
-                // Create new customer
-                console.log('Creating customer with data:', form); // Debug log
-                const newCustomer = await CustomerService.createCustomer(form);
-                console.log('Customer created successfully:', newCustomer);
-
-                // Simple success - just show toast and close modal first
-                setOpen(false);
-
-                // Use form data as fallback if newCustomer doesn't have the data
-                const firstName = newCustomer.firstName || form.firstName;
-                const lastName = newCustomer.lastName || form.lastName;
-                toast.success(`Customer ${firstName} ${lastName} created successfully!`);
-            }
-
-            // Reset form and state
-            setForm({
-                customerCode: '',
-                firstName: '',
-                lastName: '',
-                phone: '',
-                email: '',
-                address: '',
-                mapLink: '',
-                notes: '',
-                isActive: true,
-            });
-            setEditMode(false);
-            setSelectedCustomer(null);
-
-            // Reload data after a short delay to prevent any race conditions
-            setTimeout(() => {
-                reloadCustomers();
-            }, 500);
-
-        } catch (error: unknown) {
-            console.error(`Failed to ${editMode ? 'update' : 'create'} customer:`, error);
-            // Handle validation errors from backend
-            if (error && typeof error === 'object' && 'response' in error) {
-                const axiosError = error as { response?: { data?: { errors?: Array<{ field: string; message: string }> } } };
-                if (axiosError.response?.data?.errors) {
-                    const backendErrors: { [key: string]: string } = {};
-                    axiosError.response.data.errors.forEach((err: { field: string; message: string }) => {
-                        backendErrors[err.field] = err.message;
-                    });
-                    setErrors(backendErrors);
-                    toast.error('Please fix the validation errors and try again.');
-                } else {
-                    toast.error(`Failed to ${editMode ? 'update' : 'create'} customer. Please try again.`);
+        if (editMode && selectedCustomer) {
+            // Update existing customer
+            updateCustomerMutation.mutate(
+                { id: selectedCustomer.id!, data: form },
+                {
+                    onSuccess: () => {
+                        setOpen(false);
+                        setForm({
+                            customerCode: '',
+                            firstName: '',
+                            lastName: '',
+                            phone: '',
+                            email: '',
+                            address: '',
+                            mapLink: '',
+                            notes: '',
+                            isActive: true,
+                        });
+                        setEditMode(false);
+                        setSelectedCustomer(null);
+                    },
+                    onError: (error: Error) => {
+                        console.error('Failed to update customer:', error);
+                        toast.error(error.message || 'Failed to update customer. Please try again.');
+                    }
                 }
-            } else {
-                toast.error('Network error. Please check your connection and try again.');
-            }
-        } finally {
-            setLoading(false);
-            console.log('Form submission completed'); // Debug log
+            );
+        } else {
+            // Create new customer
+            createCustomerMutation.mutate(form, {
+                onSuccess: () => {
+                    setOpen(false);
+                    setForm({
+                        customerCode: '',
+                        firstName: '',
+                        lastName: '',
+                        phone: '',
+                        email: '',
+                        address: '',
+                        mapLink: '',
+                        notes: '',
+                        isActive: true,
+                    });
+                    setEditMode(false);
+                    setSelectedCustomer(null);
+                },
+                onError: (error: Error) => {
+                    console.error('Failed to create customer:', error);
+                    toast.error(error.message || 'Failed to create customer. Please try again.');
+                }
+            });
         }
     };
 

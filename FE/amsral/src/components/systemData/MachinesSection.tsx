@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Modal, Box, Typography, IconButton } from '@mui/material';
 import type { GridColDef, GridPaginationModel } from '@mui/x-data-grid';
 import toast from 'react-hot-toast';
@@ -6,15 +6,14 @@ import PrimaryButton from '../common/PrimaryButton';
 import PrimaryTable from '../common/PrimaryTable';
 import PrimaryDropdown from '../common/PrimaryDropdown';
 import colors from '../../styles/colors';
-import { machineTypeService, type MachineType } from '../../services/machineTypeService';
+import {
+    useMachines,
+    useCreateMachine,
+    useUpdateMachine,
+    useDeleteMachine
+} from '../../hooks/useSystemData';
+import { type MachineType } from '../../services/machineTypeService';
 
-interface ApiError {
-    response?: {
-        data?: {
-            message?: string;
-        };
-    };
-}
 
 const machineTypeOptions = [
     { value: 'Washing', label: 'Washing' },
@@ -63,9 +62,8 @@ const getColumns = (onEdit: (machine: MachineType) => void, onDelete: (machine: 
 ];
 
 export default function MachinesSection() {
+    // Local state for UI
     const [search, setSearch] = useState('');
-    const [rows, setRows] = useState<MachineType[]>([]);
-    const [loading, setLoading] = useState(false);
     const [open, setOpen] = useState(false);
     const [editMode, setEditMode] = useState(false);
     const [selectedMachine, setSelectedMachine] = useState<MachineType | null>(null);
@@ -83,40 +81,30 @@ export default function MachinesSection() {
         page: 0,
         pageSize: 10,
     });
-    const [rowCount, setRowCount] = useState(0);
 
-    const fetchMachines = useCallback(async () => {
-        try {
-            setLoading(true);
-            const response = await machineTypeService.getMachineTypes({
-                page: paginationModel.page + 1,
-                limit: paginationModel.pageSize,
-                search: search || undefined,
-            });
+    // TanStack Query hooks
+    const {
+        data: machinesData,
+        isLoading: loading
+    } = useMachines(paginationModel.page + 1, paginationModel.pageSize, search.trim() || undefined);
 
-            setRows(response.data.machineTypes);
-            setRowCount(response.data.pagination.totalRecords);
-        } catch (error) {
-            console.error('Error fetching machines:', error);
-            const errorMessage = (error as ApiError)?.response?.data?.message || 'Failed to fetch machines';
-            toast.error(errorMessage);
-        } finally {
-            setLoading(false);
-        }
-    }, [paginationModel.page, paginationModel.pageSize, search]);
+    // Mutation hooks
+    const createMachineMutation = useCreateMachine();
+    const updateMachineMutation = useUpdateMachine();
+    const deleteMachineMutation = useDeleteMachine();
 
-    // Debounced search - only for search term changes
+    // Derived state
+    const rows = machinesData?.machines || [];
+    const rowCount = machinesData?.pagination.totalRecords || 0;
+
+    // Debounced search effect
     useEffect(() => {
         const timeoutId = setTimeout(() => {
-            setPaginationModel(prev => ({ ...prev, page: 0 }));
-        }, 300);
+            // TanStack Query will automatically refetch when search changes
+        }, search ? 300 : 0); // 300ms debounce for search
 
         return () => clearTimeout(timeoutId);
     }, [search]);
-
-    useEffect(() => {
-        fetchMachines();
-    }, [paginationModel, fetchMachines]);
 
     const handlePaginationModelChange = (newModel: GridPaginationModel) => {
         setPaginationModel(newModel);
@@ -154,17 +142,15 @@ export default function MachinesSection() {
     const confirmDelete = async () => {
         if (!machineToDelete) return;
 
-        try {
-            await machineTypeService.deleteMachineType(machineToDelete.id);
-            toast.success('Machine deleted successfully');
-            setDeleteConfirmOpen(false);
-            setMachineToDelete(null);
-            await fetchMachines();
-        } catch (error) {
-            console.error('Error deleting machine:', error);
-            const errorMessage = (error as ApiError)?.response?.data?.message || 'Failed to delete machine';
-            toast.error(errorMessage);
-        }
+        deleteMachineMutation.mutate(machineToDelete.id, {
+            onSuccess: () => {
+                setDeleteConfirmOpen(false);
+                setMachineToDelete(null);
+            },
+            onError: (error: Error) => {
+                toast.error(error.message || 'Failed to delete machine');
+            }
+        });
     };
 
     const handleOpen = () => {
@@ -202,30 +188,41 @@ export default function MachinesSection() {
             return;
         }
 
-        try {
-            const machineData = {
-                name: form.name,
-                type: form.type,
-                description: form.description || undefined,
-            };
+        const machineData = {
+            name: form.name,
+            type: form.type,
+            description: form.description || undefined,
+        };
 
-            if (editMode && selectedMachine) {
-                // Update existing machine
-                await machineTypeService.updateMachineType(selectedMachine.id, machineData);
-                toast.success('Machine updated successfully');
-            } else {
-                // Create new machine
-                await machineTypeService.createMachineType(machineData);
-                toast.success('Machine created successfully');
-            }
-
-            setOpen(false);
-            await fetchMachines();
-        } catch (error) {
-            console.error('Error saving machine:', error);
-            const errorMessage = (error as ApiError)?.response?.data?.message ||
-                (editMode ? 'Failed to update machine' : 'Failed to create machine');
-            toast.error(errorMessage);
+        if (editMode && selectedMachine) {
+            // Update existing machine
+            updateMachineMutation.mutate(
+                { id: selectedMachine.id, data: machineData },
+                {
+                    onSuccess: () => {
+                        setOpen(false);
+                        setForm({ name: '', type: '', description: '' });
+                        setEditMode(false);
+                        setSelectedMachine(null);
+                    },
+                    onError: (error: Error) => {
+                        toast.error(error.message || 'Failed to update machine');
+                    }
+                }
+            );
+        } else {
+            // Create new machine
+            createMachineMutation.mutate(machineData, {
+                onSuccess: () => {
+                    setOpen(false);
+                    setForm({ name: '', type: '', description: '' });
+                    setEditMode(false);
+                    setSelectedMachine(null);
+                },
+                onError: (error: Error) => {
+                    toast.error(error.message || 'Failed to create machine');
+                }
+            });
         }
     };
 

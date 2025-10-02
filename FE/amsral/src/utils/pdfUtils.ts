@@ -95,8 +95,23 @@ export const generateOrderReceipt = (orderData: OrderReceiptData): void => {
     yPosition += 8; // Increased spacing between rows
   };
 
-  // Order details
-  addDetailRow('Order ID', orderData.orderId.toString());
+  // Special function for highlighting important fields like Order ID
+  const addHighlightedDetailRow = (label: string, value: string) => {
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(textColor);
+    doc.text(`${label}:`, 10, yPosition);
+    
+    // Highlighted value with larger font
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16); // Larger than regular fields
+    doc.setTextColor(primaryColor);
+    doc.text(value, 40, yPosition);
+    yPosition += 10; // More spacing for highlighted field
+  };
+
+  // Order details - Order ID gets special highlighting
+  addHighlightedDetailRow('Order ID', orderData.orderId.toString());
   addDetailRow('Customer', orderData.customerName);
   addDetailRow('Quantity', orderData.totalQuantity.toString());
   
@@ -300,22 +315,42 @@ export const generateAssignmentReceipt = (assignmentData: AssignmentReceiptData)
     const safeValue = value !== null && value !== undefined ? String(value) : 'N/A';
     
     // Label with readable font
-    doc.setFontSize(12);
+    doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(textColor);
     doc.text(`${label}:`, 10, yPosition);
     
-    // Value with LARGE font
+    // Value with LARGE font - reduced height, increased width proportion
     doc.setFont('helvetica', isBold ? 'bold' : 'bold');
-    doc.setFontSize(20);
+    doc.setFontSize(18); // Reduced from 20 to make less tall
+    doc.setTextColor(primaryColor);
+    // Center the value text
+    doc.text(safeValue, pageWidth / 2, yPosition + 6, { align: 'center' });
+    yPosition += 22; // Reduced spacing to match smaller font
+  };
+
+  // Special function for highlighting important fields like Tracking ID
+  const addHighlightedDetailRow = (label: string, value: string | number | undefined | null) => {
+    // Ensure value is a valid string
+    const safeValue = value !== null && value !== undefined ? String(value) : 'N/A';
+    
+    // Label with readable font
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(textColor);
+    doc.text(`${label}:`, 10, yPosition);
+    
+    // Value with EXTRA LARGE font for highlighting
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22); // Larger than regular fields
     doc.setTextColor(primaryColor);
     // Center the value text
     doc.text(safeValue, pageWidth / 2, yPosition + 8, { align: 'center' });
-    yPosition += 25; // Increased spacing
+    yPosition += 26; // More spacing for highlighted field
   };
 
-  // Assignment details with safe data handling
-  addDetailRow('Tracking ID', assignmentData.trackingNumber, true);
+  // Assignment details with safe data handling - Tracking ID gets special highlighting
+  addHighlightedDetailRow('Tracking ID', assignmentData.trackingNumber);
   addDetailRow('Item Name', assignmentData.itemName, true);
   addDetailRow('Wash Type', assignmentData.washType, true);
   
@@ -571,18 +606,18 @@ export const generateBagLabel = (bagData: BagLabelData): void => {
 
   // Helper function with EXTREME font size differences
   const addDetailRow = (label: string, value: string) => {
-    // Label - very small
-    doc.setFontSize(8);
+    // Label - slightly larger for better readability
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(textColor);
     doc.text(`${label}:`, pageWidth / 2, yPosition, { align: 'center' });
     
-    // Value - MASSIVE
-    doc.setFontSize(16); // Much larger relative to page
+    // Value - reduced height, better proportion
+    doc.setFontSize(14); // Reduced from 16 to make less tall
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(primaryColor);
-    doc.text(value, pageWidth / 2, yPosition + 6, { align: 'center' });
-    yPosition += 18; // Tighter spacing for smaller page
+    doc.text(value, pageWidth / 2, yPosition + 5, { align: 'center' });
+    yPosition += 16; // Reduced spacing to match smaller font
   };
 
   // Bag details - always show Reference No and Customer Name
@@ -661,12 +696,12 @@ export const generateBagLabelThermal = (bagData: BagLabelData): void => {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.text(label, pageWidth / 2, yPosition, { align: 'center' });
-    yPosition += 8;
+    yPosition += 6;
     
-    doc.setFontSize(16);
+    doc.setFontSize(14); // Reduced from 16 to make less tall
     doc.setFont('helvetica', 'bold');
     doc.text(value, pageWidth / 2, yPosition, { align: 'center' });
-    yPosition += 15;
+    yPosition += 12; // Reduced spacing
   };
 
   addThermalRow('Reference No:', bagData.orderId.toString());

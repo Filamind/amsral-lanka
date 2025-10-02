@@ -5,15 +5,14 @@ import toast from 'react-hot-toast';
 import PrimaryButton from '../common/PrimaryButton';
 import PrimaryTable from '../common/PrimaryTable';
 import colors from '../../styles/colors';
-import { itemService, type Item } from '../../services/itemService';
+import {
+    useItems,
+    useCreateItem,
+    useUpdateItem,
+    useDeleteItem
+} from '../../hooks/useSystemData';
+import { type Item } from '../../services/itemService';
 
-interface ApiError {
-    response?: {
-        data?: {
-            message?: string;
-        };
-    };
-}
 
 const getColumns = (onEdit: (item: Item) => void, onDelete: (item: Item) => void): GridColDef[] => [
     { field: 'id', headerName: 'ID', flex: 0.6, minWidth: 80 },
@@ -49,9 +48,8 @@ const getColumns = (onEdit: (item: Item) => void, onDelete: (item: Item) => void
 ];
 
 export default function ItemsSection() {
+    // Local state for UI
     const [search, setSearch] = useState('');
-    const [rows, setRows] = useState<Item[]>([]);
-    const [loading, setLoading] = useState(false);
     const [open, setOpen] = useState(false);
     const [editMode, setEditMode] = useState(false);
     const [selectedItem, setSelectedItem] = useState<Item | null>(null);
@@ -65,36 +63,37 @@ export default function ItemsSection() {
     const [itemToDelete, setItemToDelete] = useState<Item | null>(null);
 
     // Pagination state
-    const [pagination, setPagination] = useState({
+    const [pageSize, setPageSize] = useState(10);
+    const [currentPage, setCurrentPage] = useState(1);
+
+    // TanStack Query hooks
+    const {
+        data: itemsData,
+        isLoading: loading
+    } = useItems(currentPage, pageSize, search.trim() || undefined);
+
+    // Mutation hooks
+    const createItemMutation = useCreateItem();
+    const updateItemMutation = useUpdateItem();
+    const deleteItemMutation = useDeleteItem();
+
+    // Derived state
+    const rows = itemsData?.items || [];
+    const pagination = itemsData?.pagination || {
         currentPage: 1,
         totalPages: 1,
         totalRecords: 0,
         limit: 10,
-    });
-    const [pageSize, setPageSize] = useState(10);
-    const [currentPage, setCurrentPage] = useState(1);
+    };
 
-    // Load items when dependencies change (with debounce for search)
+    // Debounced search effect
     useEffect(() => {
         const timeoutId = setTimeout(() => {
-            const loadData = async () => {
-                try {
-                    setLoading(true);
-                    const response = await itemService.getItems(currentPage, pageSize, search.trim() || undefined);
-                    setRows(response.data.items);
-                    setPagination(response.data.pagination);
-                } catch (error) {
-                    const errorMessage = (error as ApiError)?.response?.data?.message || 'Failed to load items';
-                    toast.error(errorMessage);
-                } finally {
-                    setLoading(false);
-                }
-            };
-            loadData();
-        }, search ? 300 : 0); // 300ms debounce for search, immediate for page/size changes
+            // TanStack Query will automatically refetch when search changes
+        }, search ? 300 : 0); // 300ms debounce for search
 
         return () => clearTimeout(timeoutId);
-    }, [currentPage, pageSize, search]);
+    }, [search]);
 
     const handlePageChange = (newPage: number) => {
         setCurrentPage(newPage);
@@ -150,16 +149,15 @@ export default function ItemsSection() {
     const confirmDelete = async () => {
         if (!itemToDelete) return;
 
-        try {
-            await itemService.deleteItem(itemToDelete.id);
-            setRows(prev => prev.filter(item => item.id !== itemToDelete.id));
-            setDeleteConfirmOpen(false);
-            setItemToDelete(null);
-            toast.success('Item deleted successfully');
-        } catch (error) {
-            const errorMessage = (error as ApiError)?.response?.data?.message || 'Failed to delete item';
-            toast.error(errorMessage);
-        }
+        deleteItemMutation.mutate(itemToDelete.id.toString(), {
+            onSuccess: () => {
+                setDeleteConfirmOpen(false);
+                setItemToDelete(null);
+            },
+            onError: (error: Error) => {
+                toast.error(error.message || 'Failed to delete item');
+            }
+        });
     };
 
     const handleOpen = () => {
@@ -197,33 +195,49 @@ export default function ItemsSection() {
             return;
         }
 
-        try {
-            if (editMode && selectedItem) {
-                // Update existing item
-                const response = await itemService.updateItem(selectedItem.id, {
+        if (editMode && selectedItem) {
+            // Update existing item
+            updateItemMutation.mutate(
+                {
+                    id: selectedItem.id.toString(),
+                    data: {
+                        name: form.name,
+                        code: form.code,
+                        description: form.description || undefined,
+                    }
+                },
+                {
+                    onSuccess: () => {
+                        setOpen(false);
+                        setForm({ name: '', code: '', description: '' });
+                        setEditMode(false);
+                        setSelectedItem(null);
+                    },
+                    onError: (error: Error) => {
+                        toast.error(error.message || 'Failed to update item');
+                    }
+                }
+            );
+        } else {
+            // Create new item
+            createItemMutation.mutate(
+                {
                     name: form.name,
                     code: form.code,
                     description: form.description || undefined,
-                });
-                setRows(prev => prev.map(item =>
-                    item.id === selectedItem.id ? response.data : item
-                ));
-                toast.success('Item updated successfully');
-            } else {
-                // Create new item
-                const response = await itemService.createItem({
-                    name: form.name,
-                    code: form.code,
-                    description: form.description || undefined,
-                });
-                setRows(prev => [response.data, ...prev]);
-                toast.success('Item created successfully');
-            }
-
-            setOpen(false);
-        } catch (error) {
-            const errorMessage = (error as ApiError)?.response?.data?.message || 'Failed to save item';
-            toast.error(errorMessage);
+                },
+                {
+                    onSuccess: () => {
+                        setOpen(false);
+                        setForm({ name: '', code: '', description: '' });
+                        setEditMode(false);
+                        setSelectedItem(null);
+                    },
+                    onError: (error: Error) => {
+                        toast.error(error.message || 'Failed to create item');
+                    }
+                }
+            );
         }
     };
 

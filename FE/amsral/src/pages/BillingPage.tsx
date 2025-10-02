@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
     IconButton,
     Tooltip,
@@ -18,207 +18,88 @@ import { hasPermission } from '../utils/roleUtils';
 import PrimaryButton from '../components/common/PrimaryButton';
 import PrimaryTable from '../components/common/PrimaryTable';
 import PrimaryDropdown from '../components/common/PrimaryDropdown';
-import { CustomerService, type Customer } from '../services/customerService';
-import { BillingService, type Invoice, type InvoiceFilters } from '../services/billingService';
+import {
+    useBillingOrders,
+    useInvoices,
+    useBillingCustomers,
+    useUpdatePaymentStatus,
+    type BillingOrderFilters
+} from '../hooks/useBilling';
+import { type Invoice, type InvoiceFilters } from '../services/billingService';
 import toast from 'react-hot-toast';
 import InvoiceCreationModal from '../components/modals/InvoiceCreationModal';
 import PaymentStatusModal from '../components/modals/PaymentStatusModal';
 import colors from '../styles/colors';
 
-interface BillingOrder {
-    id: number;
-    date: string;
-    referenceNo: string;
-    customerId: string;
-    customerName: string;
-    quantity: number;
-    notes: string | null;
-    deliveryDate: string;
-    status: 'Pending' | 'Invoiced' | 'Complete' | 'Paid' | 'In Progress' | 'Completed' | 'Confirmed' | 'Processing' | 'Delivered' | 'QC';
-    billingStatus: 'pending' | 'invoiced' | 'paid';
-    recordsCount: number;
-    complete: boolean;
-    createdAt: string;
-    updatedAt: string;
-    records: unknown[];
-    amount?: number;
-    paymentAmount?: number; // Actual payment amount received (may be less than invoice amount)
-    balance?: number; // Customer balance amount
-}
-
 const BillingPage: React.FC = () => {
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState(0);
 
-    // Orders tab state
-    const [orders, setOrders] = useState<BillingOrder[]>([]);
+    // Local state for UI
     const [selectedOrders, setSelectedOrders] = useState<number[]>([]);
     const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
-
-    // Invoices tab state
-    const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [paymentModal, setPaymentModal] = useState({
         open: false,
         invoice: null as Invoice | null,
     });
 
-    // Common state
-    const [customers, setCustomers] = useState<Customer[]>([]);
-    const [loading, setLoading] = useState(true);
-
     // Filter states
     const [search, setSearch] = useState('');
     const [customerFilter, setCustomerFilter] = useState('');
-
-    // Invoice filter states
     const [invoiceStatusFilter, setInvoiceStatusFilter] = useState('');
     const [invoiceCustomerFilter, setInvoiceCustomerFilter] = useState('');
 
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
-    const [pagination, setPagination] = useState({
+
+    // Prepare filters for TanStack Query hooks
+    const ordersFilters: BillingOrderFilters = {
+        page: currentPage,
+        limit: pageSize,
+        customerId: customerFilter || undefined,
+        search: search || undefined,
+    };
+
+    const invoicesFilters: InvoiceFilters = {
+        page: currentPage,
+        limit: pageSize,
+        status: (invoiceStatusFilter as 'draft' | 'sent' | 'paid' | 'overdue') || undefined,
+        customerName: invoiceCustomerFilter || undefined,
+    };
+
+    // TanStack Query hooks
+    const {
+        data: ordersData,
+        isLoading: ordersLoading
+    } = useBillingOrders(ordersFilters);
+
+    const {
+        data: invoicesData,
+        isLoading: invoicesLoading
+    } = useInvoices(invoicesFilters);
+
+    const {
+        data: customers = [],
+        isLoading: customersLoading
+    } = useBillingCustomers();
+
+    // Mutation hooks
+    const updatePaymentStatusMutation = useUpdatePaymentStatus();
+
+    // Derived state
+    const orders = ordersData?.orders || [];
+    const invoices = (invoicesData as { invoices: Invoice[] } | undefined)?.invoices || [];
+    const pagination = ordersData?.pagination || (invoicesData as { pagination: { currentPage: number; totalPages: number; totalItems: number; itemsPerPage: number; hasNextPage: boolean; hasPrevPage: boolean } } | undefined)?.pagination || {
         currentPage: 1,
         totalPages: 1,
         totalItems: 0,
         itemsPerPage: 10,
         hasNextPage: false,
         hasPrevPage: false
-    });
+    };
 
-    // Fetch orders with billing status
-    const fetchOrdersData = useCallback(async () => {
-        try {
-            setLoading(true);
-            // Make two API calls to get both QC and Complete orders
-            const [qcResponse, completeResponse] = await Promise.all([
-                BillingService.getBillingOrders({
-                    page: currentPage,
-                    limit: pageSize,
-                    customerId: customerFilter || undefined,
-                    status: 'QC',
-                    billingStatus: 'pending',
-                }),
-                BillingService.getBillingOrders({
-                    page: currentPage,
-                    limit: pageSize,
-                    customerId: customerFilter || undefined,
-                    status: 'Complete',
-                    billingStatus: 'pending',
-                })
-            ]);
-
-            if (qcResponse.success && completeResponse.success) {
-                // Combine orders from both responses
-                const qcOrders = qcResponse.data.orders as BillingOrder[];
-                const completeOrders = completeResponse.data.orders as BillingOrder[];
-                let filteredOrders = [...qcOrders, ...completeOrders];
-
-                // Apply search filter - search by Order ID (displayed as Reference No) and customer name
-                if (search && search.trim()) {
-                    const searchTerm = search.toLowerCase().trim();
-                    console.log('Searching for:', searchTerm);
-                    console.log('Orders before search filter:', filteredOrders.length);
-                    filteredOrders = filteredOrders.filter(order =>
-                        order.id.toString().includes(searchTerm) || // Search by Order ID (Reference No)
-                        order.customerName.toLowerCase().includes(searchTerm) // Search by customer name
-                    );
-                    console.log('Orders after search filter:', filteredOrders.length);
-                }
-
-                setOrders(filteredOrders);
-
-                // Update pagination info - use combined totals
-                const totalItems = (qcResponse.data.pagination?.totalItems || 0) + (completeResponse.data.pagination?.totalItems || 0);
-                setPagination({
-                    currentPage: currentPage,
-                    totalPages: Math.ceil(totalItems / pageSize),
-                    totalItems: totalItems,
-                    itemsPerPage: pageSize,
-                    hasNextPage: currentPage < Math.ceil(totalItems / pageSize),
-                    hasPrevPage: currentPage > 1
-                });
-            } else {
-                toast.error('Failed to fetch orders');
-            }
-        } catch (error) {
-            console.error('Error fetching orders:', error);
-            toast.error('Error fetching orders');
-        } finally {
-            setLoading(false);
-        }
-    }, [currentPage, pageSize, customerFilter, search]);
-
-    // Fetch invoices (for Invoices tab)
-    const fetchInvoices = useCallback(async () => {
-        try {
-            setLoading(true);
-            const filters: InvoiceFilters = {
-                page: currentPage,
-                limit: pageSize,
-                status: (invoiceStatusFilter as 'draft' | 'sent' | 'paid' | 'overdue') || undefined,
-                customerName: invoiceCustomerFilter || undefined,
-            };
-
-            const response = await BillingService.getInvoices(filters);
-
-            if (response.success) {
-                setInvoices(response.data.invoices);
-                setPagination({
-                    currentPage: response.data.pagination?.currentPage || 1,
-                    totalPages: response.data.pagination?.totalPages || 1,
-                    totalItems: response.data.pagination?.totalItems || response.data.invoices.length,
-                    itemsPerPage: response.data.pagination?.itemsPerPage || pageSize,
-                    hasNextPage: (response.data.pagination?.currentPage || 1) < (response.data.pagination?.totalPages || 1),
-                    hasPrevPage: (response.data.pagination?.currentPage || 1) > 1
-                });
-            }
-        } catch (error) {
-            console.error('Error fetching invoices:', error);
-            toast.error('Failed to fetch invoices');
-        } finally {
-            setLoading(false);
-        }
-    }, [currentPage, pageSize, invoiceStatusFilter, invoiceCustomerFilter]);
-
-    // Fetch customers for filter dropdown
-    const fetchCustomers = useCallback(async () => {
-        try {
-            const response = await CustomerService.getAllCustomers({
-                limit: 100, // Get all customers for dropdown
-                isActive: true
-            });
-            setCustomers(response.customers);
-        } catch (error) {
-            console.error('Error fetching customers:', error);
-        }
-    }, []);
-
-    // Consolidated data fetching - handles all triggers in one useEffect
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                // Fetch customers
-                await fetchCustomers();
-                // Fetch data based on active tab
-                if (activeTab === 0) {
-                    await fetchOrdersData();
-                } else {
-                    await fetchInvoices();
-                }
-            } catch (error) {
-                console.error('Error fetching data:', error);
-                toast.error('Failed to load data. Please refresh the page.');
-            }
-        };
-
-        // Debounce search changes
-        const timeoutId = setTimeout(() => {
-            fetchData();
-        }, search !== undefined ? 500 : 0);
-
-        return () => clearTimeout(timeoutId);
-    }, [activeTab, search, customerFilter, invoiceStatusFilter, invoiceCustomerFilter, fetchOrdersData, fetchInvoices, fetchCustomers]);
+    const loading = ordersLoading || invoicesLoading || customersLoading;
 
     // Handle order selection
     const handleOrderSelect = (orderId: number, selected: boolean) => {
@@ -232,9 +113,9 @@ const BillingPage: React.FC = () => {
     // Handle select all
     const handleSelectAll = (selected: boolean) => {
         if (selected) {
-            // Select all QC orders with pending billing status (can be invoiced)
+            // Select all QC or Complete orders with pending billing status (can be invoiced)
             const selectableOrders = orders.filter(order =>
-                order.status === 'QC' && order.billingStatus === 'pending'
+                (order.status === 'QC' || order.status === 'Complete') && order.billingStatus === 'pending'
             );
             setSelectedOrders(selectableOrders.map(order => order.id));
         } else {
@@ -289,28 +170,26 @@ const BillingPage: React.FC = () => {
     };
 
     const handleUpdatePayment = async (invoiceId: number, paymentAmount: number) => {
-        try {
-            const response = await BillingService.updateInvoicePaymentStatus(invoiceId, true, paymentAmount);
-            if (response.success) {
-                toast.success('Payment updated successfully');
-                fetchInvoices(); // Refresh the invoices list
-            } else {
-                toast.error('Failed to update payment');
+        updatePaymentStatusMutation.mutate(
+            {
+                invoiceId: invoiceId.toString(),
+                paymentAmount,
+                paymentDate: new Date().toISOString().split('T')[0],
+                paymentMethod: 'Cash'
+            },
+            {
+                onError: (error: Error) => {
+                    console.error('Error updating payment:', error);
+                    throw error; // Re-throw to let the modal handle the error
+                }
             }
-        } catch (error) {
-            console.error('Error updating payment:', error);
-            toast.error('Error updating payment');
-            throw error; // Re-throw to let the modal handle the error
-        }
+        );
     };
 
     const handleInvoiceCreated = () => {
         setInvoiceModalOpen(false);
         setSelectedOrders([]);
-        // Refresh orders to update billing status
-        setTimeout(() => {
-            fetchOrdersData();
-        }, 1000); // Small delay to ensure backend has processed the update
+        // TanStack Query will automatically refetch data due to cache invalidation
     };
 
     // Orders table columns definition
@@ -322,7 +201,7 @@ const BillingPage: React.FC = () => {
             sortable: false,
             renderHeader: () => {
                 const selectableOrders = orders.filter(order =>
-                    order.status === 'QC' && order.billingStatus === 'pending'
+                    (order.status === 'QC' || order.status === 'Complete' || order.status === 'Delivered') && order.billingStatus === 'pending'
                 );
                 const allSelected = selectableOrders.length > 0 && selectableOrders.every(order => selectedOrders.includes(order.id));
                 const someSelected = selectedOrders.length > 0 && selectedOrders.length < selectableOrders.length;
@@ -344,7 +223,7 @@ const BillingPage: React.FC = () => {
                     type="checkbox"
                     checked={selectedOrders.includes(params.row.id)}
                     onChange={(e) => handleOrderSelect(params.row.id, e.target.checked)}
-                    disabled={params.row.status !== 'QC' || params.row.billingStatus !== 'pending'}
+                    disabled={(params.row.status !== 'QC' && params.row.status !== 'Complete' && params.row.status !== 'Delivered') || params.row.billingStatus !== 'pending'}
                     style={{ transform: 'scale(1.2)' }}
                 />
             ),

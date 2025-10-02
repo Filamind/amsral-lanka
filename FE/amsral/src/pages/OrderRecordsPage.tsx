@@ -1,6 +1,4 @@
-/* eslint-disable react-hooks/exhaustive-deps */
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Typography, IconButton, Menu, MenuItem } from '@mui/material';
 import { ArrowBack, MoreVert } from '@mui/icons-material';
@@ -12,35 +10,28 @@ import PrimaryNumberInput from '../components/common/PrimaryNumberInput';
 import PrimaryMultiSelect from '../components/common/PrimaryMultiSelect';
 import ConfirmationDialog from '../components/common/ConfirmationDialog';
 import colors from '../styles/colors';
-import { orderService, type Order, type CreateOrderRecordRequest, type UpdateOrderRecordRequest, type ErrorResponse } from '../services/orderService';
-import { washingTypeService } from '../services/washingTypeService';
-import { processTypeService } from '../services/processTypeService';
+import { type CreateOrderRecordRequest, type UpdateOrderRecordRequest, type ErrorResponse, type WashType, type ProcessType } from '../services/orderService';
 import { useAuth } from '../hooks/useAuth';
 import { hasPermission } from '../utils/roleUtils';
 import { getStatusColor, getStatusLabel, normalizeStatus } from '../utils/statusUtils';
-import toast from 'react-hot-toast';
+import {
+    useOrder,
+    useWashingTypes,
+    useProcessTypes,
+    useAddOrderRecord,
+    useUpdateOrderRecord,
+    useDeleteOrderRecord,
+    type ProcessRecord
+} from '../hooks/useOrderRecords';
 
-interface ProcessRecord {
-    id: string;
-    orderId?: number;
-    quantity: number;
-    washType: string;
-    processTypes: string[];
-    trackingNumber?: string; // Optional, will be included when available
-    status?: string;
-    isCompleted?: boolean;
-    createdAt?: string;
-    updatedAt?: string;
-}
+// ProcessRecord interface is now imported from useOrderRecords hook
 
 export default function OrderRecordsPage() {
     const { orderId } = useParams<{ orderId: string }>();
     const navigate = useNavigate();
     const { user } = useAuth();
-    const [order, setOrder] = useState<Order | null>(null);
-    const [records, setRecords] = useState<ProcessRecord[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
+
+    // Local state for UI
     const [showAddForm, setShowAddForm] = useState(false);
     const [editingRecord, setEditingRecord] = useState<string | null>(null);
     const [confirmDialog, setConfirmDialog] = useState({
@@ -50,127 +41,74 @@ export default function OrderRecordsPage() {
         onConfirm: () => { },
     });
     const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
+    const [selectedRecord, setSelectedRecord] = useState<ProcessRecord | null>(null);
 
     // Permission checks
     const canEdit = hasPermission(user, 'canEdit');
     const canDelete = hasPermission(user, 'canDelete');
-    const [selectedRecord, setSelectedRecord] = useState<ProcessRecord | null>(null);
 
     // New record form
     const [newRecord, setNewRecord] = useState<ProcessRecord>({
         id: '',
-        quantity: 1,
+        quantity: '',
         washType: '',
         processTypes: [],
     });
 
-    // Dropdown options
-    const [washTypeOptions, setWashTypeOptions] = useState<{ value: string; label: string; name: string; code: string }[]>([]);
-    const [processTypeOptions, setProcessTypeOptions] = useState<{ value: string; label: string }[]>([]);
-    const [optionsLoading, setOptionsLoading] = useState(true);
-
-    // Pagination state
-    const [pagination, setPagination] = useState({
-        currentPage: 1,
-        totalPages: 1,
-        totalItems: 0,
-        itemsPerPage: 20, // Match default pageSize
-        hasNextPage: false,
-        hasPrevPage: false
-    });
+    // Pagination state (removed unused pagination state)
     const [pageSize, setPageSize] = useState(20); // Default to 20 rows per page
 
     // Errors
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
-    const fetchOrderAndRecords = useCallback(async () => {
-        try {
-            setLoading(true);
-            const response = await orderService.getOrder(parseInt(orderId!));
-            if (response.success) {
-                setOrder(response.data);
-                // Convert API records to our format
-                const convertedRecords: ProcessRecord[] = response.data.records.map(record => ({
-                    id: record.id.toString(),
-                    quantity: record.quantity,
-                    washType: record.washType,
-                    processTypes: record.processTypes,
-                    trackingNumber: record.trackingNumber, // Include tracking number from API
-                }));
-                setRecords(convertedRecords);
+    // TanStack Query hooks
+    const {
+        data: order,
+        isLoading: orderLoading
+    } = useOrder(parseInt(orderId!));
 
-                // Update pagination info for client-side pagination
-                setPagination({
-                    currentPage: 1,
-                    totalPages: Math.ceil(convertedRecords.length / pageSize),
-                    totalItems: convertedRecords.length,
-                    itemsPerPage: pageSize,
-                    hasNextPage: convertedRecords.length > pageSize,
-                    hasPrevPage: false
-                });
-            }
-        } catch (error) {
-            console.error('Error fetching order:', error);
-            toast.error('Failed to load order details');
-            navigate('/orders');
-        } finally {
-            setLoading(false);
-        }
-    }, [orderId, navigate]);
+    const {
+        data: washTypeOptions = [],
+        isLoading: washingTypesLoading
+    } = useWashingTypes();
 
-    useEffect(() => {
-        if (orderId) {
-            fetchOrderAndRecords();
-            fetchDropdownOptions();
-        }
-    }, [orderId, fetchOrderAndRecords]);
+    const {
+        data: processTypeOptions = [],
+        isLoading: processTypesLoading
+    } = useProcessTypes();
 
-    const fetchDropdownOptions = async () => {
-        try {
-            setOptionsLoading(true);
+    // Mutation hooks
+    const addRecordMutation = useAddOrderRecord();
+    const updateRecordMutation = useUpdateOrderRecord();
+    const deleteRecordMutation = useDeleteOrderRecord();
 
-            // Fetch washing types
-            const washingTypesResponse = await washingTypeService.getWashingTypes({
-                limit: 100
-            });
-            const washTypeOpts = washingTypesResponse.data.washingTypes.map(washType => ({
-                value: washType.id, // Use ID as value for API calls
-                label: `${washType.name} (${washType.code})`,
-                name: washType.name, // Store the name for API calls
-                code: washType.code
-            }));
-            setWashTypeOptions(washTypeOpts);
+    // Derived state
+    const records = order?.records?.map(record => ({
+        id: record.id.toString(),
+        quantity: record.quantity.toString(),
+        washType: record.washType,
+        processTypes: record.processTypes,
+        trackingNumber: record.trackingNumber,
+    })) || [];
 
-            // Fetch process types
-            const processTypesResponse = await processTypeService.getProcessTypesList();
-            const processTypeOpts = processTypesResponse.data.map(item => ({
-                value: item.value.toString(),
-                label: item.label
-            }));
-            setProcessTypeOptions(processTypeOpts);
-
-        } catch (error) {
-            console.error('Error fetching dropdown options:', error);
-            toast.error('Failed to load options');
-        } finally {
-            setOptionsLoading(false);
-        }
-    };
+    const loading = orderLoading;
+    const optionsLoading = washingTypesLoading || processTypesLoading;
+    const saving = addRecordMutation.isPending || updateRecordMutation.isPending || deleteRecordMutation.isPending;
 
     const validateRecord = (record: ProcessRecord): { [key: string]: string } => {
         const newErrors: { [key: string]: string } = {};
 
         if (!record.washType) newErrors.washType = 'Wash type is required';
-        if (!record.quantity || record.quantity <= 0) newErrors.quantity = 'Quantity must be greater than 0';
+        if (!record.quantity || Number(record.quantity) <= 0) newErrors.quantity = 'Quantity must be greater than 0';
         // Process types are now optional - no validation required
 
         // Check if total quantity exceeds order quantity
         const otherRecordsTotal = records
             .filter(r => r.id !== record.id)
-            .reduce((total, r) => total + r.quantity, 0);
+            .reduce((total, r) => total + Number(r.quantity), 0);
 
-        if (otherRecordsTotal + record.quantity > (order?.quantity || 0)) {
-            newErrors.quantity = `Total records quantity (${otherRecordsTotal + record.quantity}) cannot exceed order quantity (${order?.quantity})`;
+        if (otherRecordsTotal + Number(record.quantity) > (order?.quantity || 0)) {
+            newErrors.quantity = `Total records quantity (${otherRecordsTotal + Number(record.quantity)}) cannot exceed order quantity (${order?.quantity})`;
         }
 
         return newErrors;
@@ -185,46 +123,36 @@ export default function OrderRecordsPage() {
 
         if (!orderId) return;
 
-        try {
-            setSaving(true);
+        const recordData: CreateOrderRecordRequest = {
+            orderId: parseInt(orderId),
+            quantity: Number(newRecord.quantity),
+            washType: newRecord.washType as WashType, // Type assertion for API compatibility
+            processTypes: newRecord.processTypes as ProcessType[], // Type assertion for API compatibility
+            // Let the backend generate the tracking number to avoid conflicts
+        };
 
-            const recordData: CreateOrderRecordRequest = {
-                orderId: parseInt(orderId),
-                quantity: newRecord.quantity,
-                washType: newRecord.washType as any, // Send the ID directly
-                processTypes: newRecord.processTypes as any,
-                // Let the backend generate the tracking number to avoid conflicts
-            };
-
-            const response = await orderService.addOrderRecord(parseInt(orderId), recordData);
-
-            if (response.success) {
-                const newProcessRecord: ProcessRecord = {
-                    id: response.data.id.toString(),
-                    quantity: response.data.quantity,
-                    washType: response.data.washType,
-                    processTypes: response.data.processTypes,
-                    trackingNumber: response.data.trackingNumber, // Include tracking number from response
-                };
-
-                setRecords(prev => [...prev, newProcessRecord]);
-                setNewRecord({
-                    id: '',
-                    quantity: 1,
-                    washType: '',
-                    processTypes: [],
-                });
-                setShowAddForm(false);
-                setErrors({});
-                toast.success(`Record added successfully with tracking number: ${response.data.trackingNumber}`);
+        addRecordMutation.mutate(
+            { orderId: parseInt(orderId), recordData },
+            {
+                onSuccess: () => {
+                    setNewRecord({
+                        id: '',
+                        quantity: '',
+                        washType: '',
+                        processTypes: [],
+                    });
+                    setShowAddForm(false);
+                    setErrors({});
+                },
+                onError: (error: ErrorResponse) => {
+                    if (error.errors) {
+                        setErrors(error.errors);
+                    } else {
+                        setErrors({ general: error.message || 'Failed to add record. Please try again.' });
+                    }
+                }
             }
-        } catch (error) {
-            console.error('Error adding record:', error);
-            const apiError = error as ErrorResponse;
-            toast.error(apiError.message || 'Failed to add record. Please try again.');
-        } finally {
-            setSaving(false);
-        }
+        );
     };
 
     const handleEditRecord = (recordId: string) => {
@@ -252,51 +180,40 @@ export default function OrderRecordsPage() {
             return;
         }
 
-        try {
-            setSaving(true);
-            const recordData: UpdateOrderRecordRequest = {
+        const recordData: UpdateOrderRecordRequest = {
+            orderId: parseInt(orderId),
+            quantity: Number(newRecord.quantity),
+            washType: newRecord.washType as WashType, // Type assertion for API compatibility
+            processTypes: newRecord.processTypes as ProcessType[], // Type assertion for API compatibility
+        };
+
+        updateRecordMutation.mutate(
+            {
                 orderId: parseInt(orderId),
-                quantity: newRecord.quantity,
-                washType: newRecord.washType as any, // Send the ID directly
-                processTypes: newRecord.processTypes as any,
-            };
-
-            const response = await orderService.updateOrderRecord(
-                parseInt(orderId),
-                parseInt(editingRecord),
+                recordId: parseInt(editingRecord),
                 recordData
-            );
-
-            if (response.success) {
-                const updatedProcessRecord: ProcessRecord = {
-                    id: response.data.id.toString(),
-                    quantity: response.data.quantity,
-                    washType: response.data.washType,
-                    processTypes: response.data.processTypes,
-                };
-
-                setRecords(prev => prev.map(record =>
-                    record.id === editingRecord ? updatedProcessRecord : record
-                ));
-
-                setNewRecord({
-                    id: '',
-                    quantity: 1,
-                    washType: '',
-                    processTypes: [],
-                });
-                setEditingRecord(null);
-                setShowAddForm(false);
-                setErrors({});
-                toast.success('Record updated successfully');
+            },
+            {
+                onSuccess: () => {
+                    setNewRecord({
+                        id: '',
+                        quantity: '',
+                        washType: '',
+                        processTypes: [],
+                    });
+                    setEditingRecord(null);
+                    setShowAddForm(false);
+                    setErrors({});
+                },
+                onError: (error: ErrorResponse) => {
+                    if (error.errors) {
+                        setErrors(error.errors);
+                    } else {
+                        setErrors({ general: error.message || 'Failed to update record. Please try again.' });
+                    }
+                }
             }
-        } catch (error) {
-            console.error('Error updating record:', error);
-            const apiError = error as ErrorResponse;
-            toast.error(apiError.message || 'Failed to update record. Please try again.');
-        } finally {
-            setSaving(false);
-        }
+        );
     };
 
     const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, record: ProcessRecord) => {
@@ -324,21 +241,20 @@ export default function OrderRecordsPage() {
             open: true,
             title: 'Delete Record',
             message: `Are you sure you want to delete this record? This action cannot be undone.`,
-            onConfirm: async () => {
-                try {
-                    setSaving(true);
-                    await orderService.deleteOrderRecord(parseInt(orderId), parseInt(selectedRecord.id));
-                    setRecords(prev => prev.filter(r => r.id !== selectedRecord.id));
-                    toast.success('Record deleted successfully');
-                } catch (error) {
-                    console.error('Error deleting record:', error);
-                    const apiError = error as ErrorResponse;
-                    toast.error(apiError.message || 'Failed to delete record. Please try again.');
-                } finally {
-                    setSaving(false);
-                    setConfirmDialog(prev => ({ ...prev, open: false }));
-                    handleMenuClose();
-                }
+            onConfirm: () => {
+                deleteRecordMutation.mutate(
+                    { orderId: parseInt(orderId), recordId: parseInt(selectedRecord.id) },
+                    {
+                        onSuccess: () => {
+                            setConfirmDialog(prev => ({ ...prev, open: false }));
+                            handleMenuClose();
+                        },
+                        onError: () => {
+                            setConfirmDialog(prev => ({ ...prev, open: false }));
+                            handleMenuClose();
+                        }
+                    }
+                );
             },
         });
         handleMenuClose();
@@ -347,7 +263,7 @@ export default function OrderRecordsPage() {
     const handleCancelEdit = () => {
         setNewRecord({
             id: '',
-            quantity: 1,
+            quantity: '',
             washType: '',
             processTypes: [],
         });
@@ -356,7 +272,7 @@ export default function OrderRecordsPage() {
         setErrors({});
     };
 
-    const handleRecordChange = (field: string, value: any) => {
+    const handleRecordChange = (field: string, value: string | string[]) => {
         setNewRecord(prev => ({ ...prev, [field]: value }));
         // Clear related error
         if (errors[field]) {
@@ -373,35 +289,30 @@ export default function OrderRecordsPage() {
     };
 
     const getTotalRecordsQuantity = () => {
-        return records.reduce((total, record) => total + record.quantity, 0);
+        return records.reduce((total, record) => total + Number(record.quantity), 0);
     };
 
     const getRemainingQuantity = () => {
         return (order?.quantity || 0) - getTotalRecordsQuantity();
     };
 
-    // Pagination handlers
-    const handlePageChange = (newPage: number) => {
-        // Update pagination state for client-side pagination
-        setPagination(prev => ({
-            ...prev,
-            currentPage: newPage,
-            hasNextPage: newPage < prev.totalPages,
-            hasPrevPage: newPage > 1
-        }));
+    // Update pagination when records change
+    const updatedPagination = {
+        currentPage: 1,
+        totalPages: Math.ceil(records.length / pageSize),
+        totalItems: records.length,
+        itemsPerPage: pageSize,
+        hasNextPage: records.length > pageSize,
+        hasPrevPage: false
+    };
+
+    // Pagination handlers (simplified since pagination state was removed)
+    const handlePageChange = () => {
+        // Page change logic can be added here if needed
     };
 
     const handlePageSizeChange = (newPageSize: number) => {
         setPageSize(newPageSize);
-        // Update pagination state for client-side pagination
-        setPagination(prev => ({
-            ...prev,
-            currentPage: 1,
-            itemsPerPage: newPageSize,
-            totalPages: Math.ceil(prev.totalItems / newPageSize),
-            hasNextPage: prev.totalItems > newPageSize,
-            hasPrevPage: false
-        }));
     };
 
 
@@ -489,8 +400,8 @@ export default function OrderRecordsPage() {
             quantity: record.quantity,
             washTypeName,
             processTypes: processTypesText,
-            status: record.status || 'pending',
-            isCompleted: record.isCompleted || false,
+            status: 'pending', // Default status since it's not in the API
+            isCompleted: false, // Default completion status
             print: record.id, // Add print field for the print button
             actions: record.id,
         };
@@ -756,30 +667,29 @@ export default function OrderRecordsPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4 items-start">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Quantity *</label>
                             <div className="uniform-height-number-input">
                                 <PrimaryNumberInput
-                                    value={newRecord.quantity}
-                                    onChange={(e) => handleRecordChange('quantity', Number(e.target.value))}
+                                    value={newRecord.quantity ? Number(newRecord.quantity) : undefined}
+                                    onChange={(e) => handleRecordChange('quantity', e.target.value)}
                                     label=""
-                                    placeholder="Enter quantity"
+                                    placeholder="Quantity"
                                     min={1}
                                     error={!!errors.quantity}
                                     helperText={errors.quantity}
                                     className="px-4 py-4 text-base"
+                                    autoFocus
                                 />
                             </div>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Wash Type *</label>
                             <div className="uniform-height-dropdown">
                                 <PrimaryDropdown
                                     name="washType"
                                     value={newRecord.washType}
                                     onChange={(e) => handleRecordChange('washType', e.target.value)}
                                     options={washTypeOptions}
-                                    placeholder={optionsLoading ? "Loading wash types..." : "Select wash type"}
+                                    placeholder={optionsLoading ? "Loading wash types..." : "Wash Type"}
                                     error={!!errors.washType}
                                     disabled={optionsLoading}
                                     className="px-4 py-4 text-base"
@@ -790,14 +700,13 @@ export default function OrderRecordsPage() {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Process Types </label>
                             <div className="uniform-height-multiselect">
                                 <PrimaryMultiSelect
                                     name="processTypes"
                                     value={newRecord.processTypes}
                                     onChange={handleMultiSelectChange('processTypes')}
                                     options={processTypeOptions}
-                                    placeholder={optionsLoading ? "Loading process types..." : "Select process types"}
+                                    placeholder={optionsLoading ? "Loading process types..." : "Process Types"}
                                     className="px-4 py-4 text-base"
                                     style={{ borderColor: errors.processTypes ? '#ef4444' : colors.border.light }}
                                 />
@@ -849,15 +758,15 @@ export default function OrderRecordsPage() {
                         pageSizeOptions={[10, 20, 50, 100]}
                         pagination
                         paginationModel={{
-                            page: pagination.currentPage - 1, // DataGrid uses 0-based indexing
+                            page: updatedPagination.currentPage - 1, // DataGrid uses 0-based indexing
                             pageSize: pageSize
                         }}
                         onPaginationModelChange={(model) => {
                             if (model.pageSize !== pageSize) {
                                 handlePageSizeChange(model.pageSize);
                             }
-                            if (model.page !== pagination.currentPage - 1) {
-                                handlePageChange(model.page + 1); // Convert back to 1-based
+                            if (model.page !== updatedPagination.currentPage - 1) {
+                                handlePageChange(); // Page change handler
                             }
                         }}
                         onRowClick={() => {

@@ -7,7 +7,14 @@ import PrimaryButton from '../components/common/PrimaryButton';
 import PrimaryTable from '../components/common/PrimaryTable';
 import PrimaryDatePicker from '../components/common/PrimaryDatePicker';
 import colors from '../styles/colors';
-import EmployeeService, { type Employee, type PaginationInfo, type EmployeeFetchOptions } from '../services/employeeService';
+import {
+    useEmployees,
+    useCreateEmployee,
+    useUpdateEmployee,
+    useDeleteEmployee,
+    type EmployeeFetchOptions
+} from '../hooks/useEmployees';
+import { type Employee } from '../services/employeeService';
 import { useAuth } from '../hooks/useAuth';
 import { hasPermission } from '../utils/roleUtils';
 
@@ -54,9 +61,9 @@ const getColumns = (onEdit: (employee: Employee) => void, onDelete: (employee: E
 
 export default function EmployeesPage() {
     const { user } = useAuth();
+
+    // Local state for UI
     const [search, setSearch] = useState('');
-    const [rows, setRows] = useState<Employee[]>([]);
-    const [loading, setLoading] = useState(false);
     const [open, setOpen] = useState(false);
     const [editMode, setEditMode] = useState(false);
     const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -76,14 +83,6 @@ export default function EmployeesPage() {
     const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
 
     // Pagination state
-    const [pagination, setPagination] = useState<PaginationInfo>({
-        currentPage: 1,
-        totalPages: 1,
-        totalItems: 0,
-        itemsPerPage: 10,
-        hasNextPage: false,
-        hasPrevPage: false
-    });
     const [pageSize, setPageSize] = useState(10);
     const [currentPage, setCurrentPage] = useState(1);
 
@@ -97,68 +96,40 @@ export default function EmployeesPage() {
     // Memoize filters object to prevent unnecessary re-renders
     const filters = useMemo(() => filterState, [filterState]);
 
-    // Load employees effect - runs when dependencies change
-    useEffect(() => {
-        const loadEmployees = async () => {
-            try {
-                setLoading(true);
-                const options: EmployeeFetchOptions = {
-                    ...filters,
-                    page: currentPage,
-                    limit: pageSize
-                };
-
-                const response = await EmployeeService.getAllEmployees(options);
-                console.log('Loaded employees:', response); // Debug log
-
-                setRows(response.employees);
-                setPagination(response.pagination);
-            } catch (error) {
-                console.error('Failed to load employees:', error);
-                // Set empty array on error
-                setRows([]);
-                setPagination({
-                    currentPage: 1,
-                    totalPages: 1,
-                    totalItems: 0,
-                    itemsPerPage: pageSize,
-                    hasNextPage: false,
-                    hasPrevPage: false
-                });
-                toast.error('Failed to load employees. Please try again.');
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadEmployees();
-    }, [filters, currentPage, pageSize]);
-
-    // Manual reload function for after create/delete operations
-    const reloadEmployees = async () => {
-        try {
-            setLoading(true);
-            const options: EmployeeFetchOptions = {
-                ...filters,
-                page: currentPage,
-                limit: pageSize
-            };
-
-            const response = await EmployeeService.getAllEmployees(options);
-            setRows(response.employees);
-            setPagination(response.pagination);
-        } catch (error) {
-            console.error('Failed to reload employees:', error);
-            toast.error('Failed to reload employees. Please try again.');
-        } finally {
-            setLoading(false);
-        }
+    // Prepare filters for TanStack Query hooks
+    const employeeFilters: EmployeeFetchOptions = {
+        ...filters,
+        page: currentPage,
+        limit: pageSize
     };
+
+    // TanStack Query hooks
+    const {
+        data: employeesData,
+        isLoading: loading
+    } = useEmployees(employeeFilters);
+
+    // Mutation hooks
+    const createEmployeeMutation = useCreateEmployee();
+    const updateEmployeeMutation = useUpdateEmployee();
+    const deleteEmployeeMutation = useDeleteEmployee();
+
+    // Derived state
+    const rows = employeesData?.employees || [];
+    const pagination = employeesData?.pagination || {
+        currentPage: 1,
+        totalPages: 1,
+        totalItems: 0,
+        itemsPerPage: 10,
+        hasNextPage: false,
+        hasPrevPage: false
+    };
+
 
     // Debounced search effect - directly update filterState
     useEffect(() => {
         const timeoutId = setTimeout(() => {
-            setFilterState(prev => ({ ...prev, search: search }));
+            setFilterState((prev: EmployeeFetchOptions) => ({ ...prev, search: search }));
             setCurrentPage(1); // Reset to first page when search changes
         }, 500); // 500ms debounce
 
@@ -175,7 +146,7 @@ export default function EmployeesPage() {
     };
 
     const handleFilterChange = (newFilters: Partial<EmployeeFetchOptions>) => {
-        setFilterState(prev => ({ ...prev, ...newFilters }));
+        setFilterState((prev: EmployeeFetchOptions) => ({ ...prev, ...newFilters }));
         setCurrentPage(1); // Reset to first page when filters change
     };
 
@@ -197,6 +168,7 @@ export default function EmployeesPage() {
         if (!form.firstName) newErrors.firstName = 'Required';
         if (!form.lastName) newErrors.lastName = 'Required';
         if (!form.phone) newErrors.phone = 'Required';
+        if (!form.email) newErrors.email = 'Required';
         if (form.email && !isUnique('email', form.email)) newErrors.email = 'Email must be unique';
         return newErrors;
     };
@@ -228,19 +200,16 @@ export default function EmployeesPage() {
     const confirmDelete = async () => {
         if (!employeeToDelete) return;
 
-        try {
-            setLoading(true);
-            await EmployeeService.deleteEmployee(employeeToDelete.id!);
-            toast.success(`Employee ${employeeToDelete.firstName} ${employeeToDelete.lastName} deleted successfully!`);
-            setDeleteConfirmOpen(false);
-            setEmployeeToDelete(null);
-            reloadEmployees();
-        } catch (error) {
-            console.error('Failed to delete employee:', error);
-            toast.error('Failed to delete employee. Please try again.');
-        } finally {
-            setLoading(false);
-        }
+        deleteEmployeeMutation.mutate(employeeToDelete.id!, {
+            onSuccess: () => {
+                setDeleteConfirmOpen(false);
+                setEmployeeToDelete(null);
+            },
+            onError: (error: Error) => {
+                console.error('Failed to delete employee:', error);
+                toast.error(error.message || 'Failed to delete employee. Please try again.');
+            }
+        });
     };
 
     const handleOpen = () => {
@@ -290,81 +259,59 @@ export default function EmployeesPage() {
             return;
         }
 
-        try {
-            setLoading(true);
-            setErrors({}); // Clear any previous errors
+        setErrors({}); // Clear any previous errors
 
-            if (editMode && selectedEmployee) {
-                // Update existing employee
-                console.log('Updating employee with data:', form); // Debug log
-                const updatedEmployee = await EmployeeService.updateEmployee(selectedEmployee.id!, form);
-                console.log('Employee updated successfully:', updatedEmployee);
-
-                // Simple success - just show toast and close modal first
-                setOpen(false);
-
-                // Use form data as fallback if updatedEmployee doesn't have the data
-                const firstName = updatedEmployee.firstName || form.firstName;
-                const lastName = updatedEmployee.lastName || form.lastName;
-                toast.success(`Employee ${firstName} ${lastName} updated successfully!`);
-            } else {
-                // Create new employee
-                console.log('Creating employee with data:', form); // Debug log
-                const newEmployee = await EmployeeService.createEmployee(form);
-                console.log('Employee created successfully:', newEmployee);
-                console.log('Employee firstName:', newEmployee.firstName);
-                console.log('Employee lastName:', newEmployee.lastName);
-
-                // Simple success - just show toast and close modal first
-                setOpen(false);
-
-                // Use form data as fallback if newEmployee doesn't have the data
-                const firstName = newEmployee.firstName || form.firstName;
-                const lastName = newEmployee.lastName || form.lastName;
-                toast.success(`Employee ${firstName} ${lastName} created successfully!`);
-            }
-
-            // Reset form and state
-            setForm({
-                firstName: '',
-                lastName: '',
-                phone: '',
-                email: '',
-                hireDate: '',
-                dateOfBirth: '',
-                address: '',
-                emergencyContact: '',
-                isActive: true,
-            });
-            setEditMode(false);
-            setSelectedEmployee(null);
-
-            // Reload data after a short delay to prevent any race conditions
-            setTimeout(() => {
-                reloadEmployees();
-            }, 500);
-
-        } catch (error: unknown) {
-            console.error(`Failed to ${editMode ? 'update' : 'create'} employee:`, error);
-            // Handle validation errors from backend
-            if (error && typeof error === 'object' && 'response' in error) {
-                const axiosError = error as { response?: { data?: { errors?: Array<{ field: string; message: string }> } } };
-                if (axiosError.response?.data?.errors) {
-                    const backendErrors: { [key: string]: string } = {};
-                    axiosError.response.data.errors.forEach((err: { field: string; message: string }) => {
-                        backendErrors[err.field] = err.message;
-                    });
-                    setErrors(backendErrors);
-                    toast.error('Please fix the validation errors and try again.');
-                } else {
-                    toast.error(`Failed to ${editMode ? 'update' : 'create'} employee. Please try again.`);
+        if (editMode && selectedEmployee) {
+            // Update existing employee
+            updateEmployeeMutation.mutate(
+                { id: selectedEmployee.id!, data: form },
+                {
+                    onSuccess: () => {
+                        setOpen(false);
+                        setForm({
+                            firstName: '',
+                            lastName: '',
+                            phone: '',
+                            email: '',
+                            hireDate: '',
+                            dateOfBirth: '',
+                            address: '',
+                            emergencyContact: '',
+                            isActive: true,
+                        });
+                        setEditMode(false);
+                        setSelectedEmployee(null);
+                    },
+                    onError: (error: Error) => {
+                        console.error('Failed to update employee:', error);
+                        toast.error(error.message || 'Failed to update employee. Please try again.');
+                    }
                 }
-            } else {
-                toast.error('Network error. Please check your connection and try again.');
-            }
-        } finally {
-            setLoading(false);
-            console.log('Form submission completed'); // Debug log
+            );
+        } else {
+            // Create new employee
+            createEmployeeMutation.mutate(form, {
+                onSuccess: () => {
+                    setOpen(false);
+                    setForm({
+                        firstName: '',
+                        lastName: '',
+                        phone: '',
+                        email: '',
+                        hireDate: '',
+                        dateOfBirth: '',
+                        address: '',
+                        emergencyContact: '',
+                        isActive: true,
+                    });
+                    setEditMode(false);
+                    setSelectedEmployee(null);
+                },
+                onError: (error: Error) => {
+                    console.error('Failed to create employee:', error);
+                    toast.error(error.message || 'Failed to create employee. Please try again.');
+                }
+            });
         }
     };
 
@@ -473,6 +420,7 @@ export default function EmployeesPage() {
                                     name="firstName"
                                     value={form.firstName}
                                     onChange={handleChange}
+                                    required
                                     className={`w-full px-4 py-3 border rounded-xl focus:outline-none text-base ${errors.firstName ? 'border-red-500' : ''}`}
                                     style={{ borderColor: colors.border.light }}
                                 />
@@ -484,6 +432,7 @@ export default function EmployeesPage() {
                                     name="lastName"
                                     value={form.lastName}
                                     onChange={handleChange}
+                                    required
                                     className={`w-full px-4 py-3 border rounded-xl focus:outline-none text-base ${errors.lastName ? 'border-red-500' : ''}`}
                                     style={{ borderColor: colors.border.light }}
                                 />
@@ -505,18 +454,20 @@ export default function EmployeesPage() {
                                     name="phone"
                                     value={form.phone}
                                     onChange={handleChange}
+                                    required
                                     className={`w-full px-4 py-3 border rounded-xl focus:outline-none text-base ${errors.phone ? 'border-red-500' : ''}`}
                                     style={{ borderColor: colors.border.light }}
                                 />
                                 {errors.phone && <span className="text-xs text-red-500 mt-1">{errors.phone}</span>}
                             </div>
                             <div className="flex flex-col">
-                                <label className="block text-sm font-medium mb-2">Email</label>
+                                <label className="block text-sm font-medium mb-2">Email <span className="text-red-500">*</span></label>
                                 <input
                                     name="email"
                                     type="email"
                                     value={form.email}
                                     onChange={handleChange}
+                                    required
                                     className={`w-full px-4 py-3 border rounded-xl focus:outline-none text-base ${errors.email ? 'border-red-500' : ''}`}
                                     style={{ borderColor: colors.border.light }}
                                 />

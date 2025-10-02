@@ -64,13 +64,18 @@ const QCModal: React.FC<QCModalProps> = ({
 
             // Fetch order details which includes records
             const response = await orderService.getOrderDetails(order.id);
+
+            if (!response.success || !response.data) {
+                throw new Error('Failed to fetch order details');
+            }
+
             const orderRecords = response.data.records || [];
             setRecords(orderRecords);
 
-            // Initialize damage counts
+            // Initialize damage counts (start with 0 for all records)
             const initialDamageCounts: { [recordId: number]: number } = {};
             orderRecords.forEach((record: OrderRecord) => {
-                initialDamageCounts[record.id] = record.damageCount || 0;
+                initialDamageCounts[record.id] = 0; // Initialize with 0 since damageCount is not in OrderDetailsRecord
             });
             setDamageCounts(initialDamageCounts);
         } catch (err) {
@@ -220,7 +225,7 @@ const QCModal: React.FC<QCModalProps> = ({
                                                 </Box>
                                                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                                                     <Chip
-                                                        label={`Qty: ${record.returnQuantity || 0}`}
+                                                        label={`Qty: ${record.quantity || 0}`}
                                                         size="small"
                                                         variant="outlined"
                                                         sx={{ fontSize: '0.75rem' }}
@@ -239,7 +244,7 @@ const QCModal: React.FC<QCModalProps> = ({
                                                     onChange={(e) => handleDamageCountChange(record.id, e.target.value)}
                                                     inputProps={{
                                                         min: 0,
-                                                        max: record.returnQuantity || 0,
+                                                        max: record.quantity || 0,
                                                         step: 1,
                                                         pattern: '[0-9]*'
                                                     }}
@@ -254,7 +259,7 @@ const QCModal: React.FC<QCModalProps> = ({
                                                     }}
                                                 />
                                                 <Typography variant="caption" color={colors.text.secondary}>
-                                                    Max: {record.returnQuantity}
+                                                    Max: {record.quantity}
                                                 </Typography>
                                             </Box>
                                         </Box>
