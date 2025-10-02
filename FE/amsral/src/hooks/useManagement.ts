@@ -65,7 +65,7 @@ export function useUpdateDelivery() {
   return useMutation({
     mutationFn: async ({ orderId, deliveryCount, isDelivered }: UpdateDeliveryRequest) => {
       const updateData: UpdateOrderRequest = {
-        status: isDelivered ? 'Delivered' : 'Completed',
+        status: isDelivered ? 'Delivered' : 'Complete',
         deliveryCount: deliveryCount
       };
 

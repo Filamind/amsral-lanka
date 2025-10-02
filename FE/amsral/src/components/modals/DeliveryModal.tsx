@@ -38,17 +38,24 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({
     loading = false
 }) => {
     const [deliveryCount, setDeliveryCount] = useState<number | null>(null);
-    const [isDelivered, setIsDelivered] = useState(false);
+    const [isDelivered, setIsDelivered] = useState(true);
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
     // Initialize form when order changes
     useEffect(() => {
         if (order) {
             setDeliveryCount(null);
-            setIsDelivered(order.status?.toLowerCase() === 'delivered');
+            setIsDelivered(true); // Default to true (checked)
             setErrors({});
         }
     }, [order]);
+
+    // Ensure isDelivered is always true when modal opens
+    useEffect(() => {
+        if (open) {
+            setIsDelivered(true);
+        }
+    }, [open]);
 
     const handleSubmit = async () => {
         if (!order) return;

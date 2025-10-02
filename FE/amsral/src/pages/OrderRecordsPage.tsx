@@ -667,7 +667,6 @@ export default function OrderRecordsPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4 items-start">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Quantity *</label>
                             <div className="uniform-height-number-input">
                                 <PrimaryNumberInput
                                     value={newRecord.quantity ? Number(newRecord.quantity) : undefined}
@@ -684,14 +683,13 @@ export default function OrderRecordsPage() {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Wash Type *</label>
                             <div className="uniform-height-dropdown">
                                 <PrimaryDropdown
                                     name="washType"
                                     value={newRecord.washType}
                                     onChange={(e) => handleRecordChange('washType', e.target.value)}
                                     options={washTypeOptions}
-                                    placeholder={optionsLoading ? "Loading wash types..." : "Select wash type"}
+                                    placeholder={optionsLoading ? "Loading wash types..." : "Wash Type"}
                                     error={!!errors.washType}
                                     disabled={optionsLoading}
                                     className="px-4 py-4 text-base"
@@ -702,14 +700,13 @@ export default function OrderRecordsPage() {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Process Types </label>
                             <div className="uniform-height-multiselect">
                                 <PrimaryMultiSelect
                                     name="processTypes"
                                     value={newRecord.processTypes}
                                     onChange={handleMultiSelectChange('processTypes')}
                                     options={processTypeOptions}
-                                    placeholder={optionsLoading ? "Loading process types..." : "Select process types"}
+                                    placeholder={optionsLoading ? "Loading process types..." : "Process Types"}
                                     className="px-4 py-4 text-base"
                                     style={{ borderColor: errors.processTypes ? '#ef4444' : colors.border.light }}
                                 />

@@ -30,7 +30,7 @@ export interface BillingOrder {
   quantity: number;
   notes: string | null;
   deliveryDate: string;
-  status: 'Pending' | 'Invoiced' | 'Complete' | 'Paid' | 'In Progress' | 'Completed' | 'Confirmed' | 'Processing' | 'Delivered' | 'QC';
+  status: 'Pending' | 'Invoiced' | 'Complete' | 'Paid' | 'In Progress' | 'Confirmed' | 'Processing' | 'Delivered' | 'QC';
   billingStatus: 'pending' | 'invoiced' | 'paid';
   recordsCount: number;
   complete: boolean;
@@ -76,8 +76,8 @@ export function useBillingOrders(filters: BillingOrderFilters) {
   }>({
     queryKey: billingKeys.orders(filters),
     queryFn: async () => {
-      // Make two API calls to get both QC and Complete orders
-      const [qcResponse, completeResponse] = await Promise.all([
+      // Make three API calls to get QC, Complete, and Delivered orders
+      const [qcResponse, completeResponse, deliveredResponse] = await Promise.all([
         BillingService.getBillingOrders({
           page: filters.page,
           limit: filters.limit,
@@ -91,17 +91,25 @@ export function useBillingOrders(filters: BillingOrderFilters) {
           customerId: filters.customerId,
           status: 'Complete',
           billingStatus: 'pending',
+        }),
+        BillingService.getBillingOrders({
+          page: filters.page,
+          limit: filters.limit,
+          customerId: filters.customerId,
+          status: 'Delivered',
+          billingStatus: 'pending',
         })
       ]);
 
-      if (!qcResponse.success || !completeResponse.success) {
+      if (!qcResponse.success || !completeResponse.success || !deliveredResponse.success) {
         throw new Error('Failed to fetch billing orders');
       }
 
-      // Combine orders from both responses
+      // Combine orders from all three responses
       const qcOrders = qcResponse.data.orders as BillingOrder[];
       const completeOrders = completeResponse.data.orders as BillingOrder[];
-      let filteredOrders = [...qcOrders, ...completeOrders];
+      const deliveredOrders = deliveredResponse.data.orders as BillingOrder[];
+      let filteredOrders = [...qcOrders, ...completeOrders, ...deliveredOrders];
 
       // Apply search filter
       if (filters.search && filters.search.trim()) {
@@ -113,7 +121,7 @@ export function useBillingOrders(filters: BillingOrderFilters) {
       }
 
       // Calculate combined pagination
-      const totalItems = (qcResponse.data.pagination?.totalItems || 0) + (completeResponse.data.pagination?.totalItems || 0);
+      const totalItems = (qcResponse.data.pagination?.totalItems || 0) + (completeResponse.data.pagination?.totalItems || 0) + (deliveredResponse.data.pagination?.totalItems || 0);
       
       return {
         orders: filteredOrders,

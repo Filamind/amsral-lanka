@@ -106,17 +106,17 @@ export function useMachines() {
       const machines = await machineService.getAllMachines();
 
       const washingMachines = machines
-        .filter(machine => machine.type === 'washing')
+        .filter(machine => machine.type === 'Washing')
         .map(machine => ({
           value: machine.id.toString(),
-          label: `${machine.name} (${machine.code})`
+          label: machine.name
         }));
 
       const dryingMachines = machines
-        .filter((machine: any) => machine.type === 'drying')
+        .filter((machine: any) => machine.type === 'Drying')
         .map((machine: any) => ({
           value: machine.id.toString(),
-          label: `${machine.name} (${machine.code})`
+          label: machine.name
         }));
 
       return {

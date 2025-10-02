@@ -113,9 +113,9 @@ const BillingPage: React.FC = () => {
     // Handle select all
     const handleSelectAll = (selected: boolean) => {
         if (selected) {
-            // Select all QC orders with pending billing status (can be invoiced)
+            // Select all QC or Complete orders with pending billing status (can be invoiced)
             const selectableOrders = orders.filter(order =>
-                order.status === 'QC' && order.billingStatus === 'pending'
+                (order.status === 'QC' || order.status === 'Complete') && order.billingStatus === 'pending'
             );
             setSelectedOrders(selectableOrders.map(order => order.id));
         } else {
@@ -201,7 +201,7 @@ const BillingPage: React.FC = () => {
             sortable: false,
             renderHeader: () => {
                 const selectableOrders = orders.filter(order =>
-                    order.status === 'QC' && order.billingStatus === 'pending'
+                    (order.status === 'QC' || order.status === 'Complete' || order.status === 'Delivered') && order.billingStatus === 'pending'
                 );
                 const allSelected = selectableOrders.length > 0 && selectableOrders.every(order => selectedOrders.includes(order.id));
                 const someSelected = selectedOrders.length > 0 && selectedOrders.length < selectableOrders.length;
@@ -223,7 +223,7 @@ const BillingPage: React.FC = () => {
                     type="checkbox"
                     checked={selectedOrders.includes(params.row.id)}
                     onChange={(e) => handleOrderSelect(params.row.id, e.target.checked)}
-                    disabled={params.row.status !== 'QC' || params.row.billingStatus !== 'pending'}
+                    disabled={(params.row.status !== 'QC' && params.row.status !== 'Complete' && params.row.status !== 'Delivered') || params.row.billingStatus !== 'pending'}
                     style={{ transform: 'scale(1.2)' }}
                 />
             ),

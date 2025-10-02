@@ -21,7 +21,7 @@ export default function QCPage() {
         data: orders = [],
         isLoading: loading,
         error
-    } = useCompletedOrders({ status: 'Completed' });
+    } = useCompletedOrders({ status: 'Complete' });
 
     const saveDamageRecordsMutation = useSaveDamageRecords();
 

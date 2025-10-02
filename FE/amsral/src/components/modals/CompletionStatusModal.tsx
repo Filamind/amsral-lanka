@@ -50,18 +50,25 @@ const CompletionStatusModal: React.FC<CompletionStatusModalProps> = ({
     onUpdate,
     loading = false
 }) => {
-    const [isCompleted, setIsCompleted] = useState(false);
+    const [isCompleted, setIsCompleted] = useState(true);
     const [returnQuantity, setReturnQuantity] = useState(0);
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
     // Initialize form when assignment changes
     useEffect(() => {
         if (assignment) {
-            setIsCompleted(assignment.status === 'Completed');
+            setIsCompleted(true); // Default to true (checked)
             setReturnQuantity(assignment.returnQuantity || assignment.quantity);
             setErrors({});
         }
     }, [assignment]);
+
+    // Ensure isCompleted is always true when modal opens
+    useEffect(() => {
+        if (open) {
+            setIsCompleted(true);
+        }
+    }, [open]);
 
     const handleSubmit = async () => {
         if (!assignment) return;

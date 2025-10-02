@@ -1,7 +1,7 @@
 import apiClient from '../config/api';
 
 // Order Status Types
-export type OrderStatus = 'Pending' | 'In Progress' | 'Completed' | 'Confirmed' | 'Processing' | 'Delivered' | 'QC';
+export type OrderStatus = 'Pending' | 'In Progress' | 'Complete' | 'Confirmed' | 'Processing' | 'Delivered' | 'QC';
 
 // Process Types
 export type ProcessType = 'viscose' | 'rib' | 'sand_blast' | 'chevron' | 'stone_wash' | 'enzyme_wash';
