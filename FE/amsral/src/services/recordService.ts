@@ -212,6 +212,21 @@ class RecordService {
       throw apiError.response?.data || { success: false, message: 'Failed to fetch assignment statistics' };
     }
   }
+
+  // Get all assignments with pagination
+  async getAllAssignments(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  }): Promise<AssignmentsResponse> {
+    try {
+      const response = await apiClient.get('/assignments', { params });
+      return response.data;
+    } catch (error: unknown) {
+      const apiError = error as { response?: { data?: { success: false; message: string } } };
+      throw apiError.response?.data || { success: false, message: 'Failed to fetch assignments' };
+    }
+  }
 }
 
 export default new RecordService();

@@ -57,7 +57,7 @@ const SimpleOrderForm: React.FC<SimpleOrderFormProps> = ({
                             name="quantity"
                             value={form.quantity}
                             onChange={onChange}
-                            placeholder="Quantity"
+                            placeholder="Quantity (Optional)"
                             min={1}
                             autoFocus
                             className="w-full px-4 py-4 text-lg border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"

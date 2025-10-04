@@ -18,6 +18,7 @@ const CustomersPage = lazy(() => import('./pages/CustomersPage'));
 const OrdersPage = lazy(() => import('./pages/OrdersPage'));
 const OrderRecordsPage = lazy(() => import('./pages/OrderRecordsPage'));
 const WorkFlowPage = lazy(() => import('./pages/WorkFlowPage'));
+const CompleteOrderPage = lazy(() => import('./pages/CompleteOrderPage'));
 const RecordAssignmentsPage = lazy(() => import('./pages/RecordAssignmentsPage'));
 const SystemDataPage = lazy(() => import('./pages/SystemDataPage'));
 const ManagementPage = lazy(() => import('./pages/ManagementPage'));
@@ -93,6 +94,7 @@ function App() {
                   <Route path="orders" element={<OrdersPage />} />
                   <Route path="orders/:orderId/records" element={<OrderRecordsPage />} />
                   <Route path="production" element={<WorkFlowPage />} />
+                  <Route path="complete-order" element={<CompleteOrderPage />} />
                   <Route path="production/record/:recordId" element={<RecordAssignmentsPage />} />
                   <Route path="management" element={<ManagementPage />} />
                   <Route path="management/orders/:orderId" element={<OrderDetailsPage />} />

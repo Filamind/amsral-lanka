@@ -14,7 +14,7 @@ export interface CreateOrderRequest {
   date: string;
   customerId: string;
   itemId: string;
-  quantity: number;
+  quantity?: number; // Made optional
   gpNo?: string;
   notes?: string;
   deliveryDate: string;

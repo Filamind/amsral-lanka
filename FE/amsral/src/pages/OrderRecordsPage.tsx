@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Typography, IconButton, Menu, MenuItem } from '@mui/material';
 import { ArrowBack, MoreVert } from '@mui/icons-material';
 import type { GridColDef } from '@mui/x-data-grid';
@@ -30,6 +30,7 @@ export default function OrderRecordsPage() {
     const { orderId } = useParams<{ orderId: string }>();
     const navigate = useNavigate();
     const { user } = useAuth();
+    const [searchParams] = useSearchParams();
 
     // Local state for UI
     const [showAddForm, setShowAddForm] = useState(false);
@@ -54,6 +55,10 @@ export default function OrderRecordsPage() {
         washType: '',
         processTypes: [],
     });
+
+    // Get remaining quantity from URL parameters
+    const remainingQuantityFromUrl = searchParams.get('remainingQuantity');
+    const defaultQuantity = remainingQuantityFromUrl ? parseInt(remainingQuantityFromUrl) : 0;
 
     // Pagination state (removed unused pagination state)
     const [pageSize, setPageSize] = useState(20); // Default to 20 rows per page
@@ -287,6 +292,29 @@ export default function OrderRecordsPage() {
     const handleMultiSelectChange = (field: string) => (e: { target: { value: string[] } }) => {
         handleRecordChange(field, e.target.value);
     };
+
+    // Set default quantity when form is opened
+    const handleOpenAddForm = () => {
+        setNewRecord({
+            id: '',
+            quantity: defaultQuantity > 0 ? defaultQuantity.toString() : '',
+            washType: '',
+            processTypes: [],
+        });
+        setShowAddForm(true);
+    };
+
+    // Initialize form with default quantity when component mounts
+    useEffect(() => {
+        if (defaultQuantity > 0) {
+            setNewRecord(prev => ({
+                ...prev,
+                quantity: defaultQuantity.toString()
+            }));
+            // Auto-show the form if there's a remaining quantity
+            setShowAddForm(true);
+        }
+    }, [defaultQuantity]);
 
     const getTotalRecordsQuantity = () => {
         return records.reduce((total, record) => total + Number(record.quantity), 0);
@@ -742,7 +770,7 @@ export default function OrderRecordsPage() {
                     <h3 className="text-lg font-semibold">Process Records</h3>
                     {!showAddForm && (
                         <PrimaryButton
-                            onClick={() => setShowAddForm(true)}
+                            onClick={handleOpenAddForm}
                             className="px-4 py-2"
                             style={{ backgroundColor: colors.primary[500], color: colors.text.white }}
                         >

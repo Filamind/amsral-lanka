@@ -17,6 +17,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import ReceiptIcon from '@mui/icons-material/Receipt';
 import PrintIcon from '@mui/icons-material/Print';
 import AssessmentIcon from '@mui/icons-material/Assessment';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import toast from 'react-hot-toast';
 import colors from '../../styles/colors';
 import { useState, useMemo } from 'react';
@@ -30,6 +31,7 @@ const NAVIGATION: NavigationItem[] = [
     { segment: 'dashboard', title: 'Dashboard', icon: <DashboardIcon /> },
     { segment: 'orders', title: 'Orders', icon: <ShoppingCartIcon /> },
     { segment: 'production', title: 'Production Flow', icon: <SettingsApplicationsIcon /> },
+    { segment: 'complete-order', title: 'Complete Order', icon: <CheckCircleIcon /> },
     { segment: 'management', title: 'Management', icon: <ManageAccountsIcon /> },
     { segment: 'qc', title: 'QC', icon: <AssessmentIcon /> },
     { segment: 'billing', title: 'Billing', icon: <ReceiptIcon /> },
