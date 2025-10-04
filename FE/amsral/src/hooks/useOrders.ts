@@ -29,6 +29,7 @@ export type OrderRow = {
   customerId: string;
   customerName: string;
   itemId?: string;
+  itemName?: string;
   quantity: number;
   gpNo?: string;
   notes: string;
@@ -83,6 +84,7 @@ export function useOrders(filters: {
         customerId: order.customerId,
         customerName: order.customerName,
         itemId: order.itemId || undefined,
+        itemName: order.itemName || undefined,
         quantity: order.quantity,
         notes: order.notes,
         records: order.records.map(record => ({

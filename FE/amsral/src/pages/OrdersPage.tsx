@@ -150,7 +150,8 @@ export default function OrdersPage() {
     if (!form.date) newErrors.date = 'Date is required';
     if (!form.customerId) newErrors.customerId = 'Customer is required';
     if (!form.itemId) newErrors.itemId = 'Item is required';
-    if (!form.quantity || Number(form.quantity) <= 0) newErrors.quantity = 'Quantity must be greater than 0';
+    // Quantity is now optional - only validate if provided
+    if (form.quantity && Number(form.quantity) <= 0) newErrors.quantity = 'Quantity must be greater than 0';
     if (!form.deliveryDate) newErrors.deliveryDate = 'Delivery date is required';
 
     return newErrors;
@@ -164,7 +165,7 @@ export default function OrdersPage() {
         date: order.date,
         customerId: order.customerId,
         itemId: order.itemId || '',
-        quantity: order.quantity.toString(),
+        quantity: order.quantity ? order.quantity.toString() : '',
         gpNo: order.gpNo || '',
         notes: order.notes,
         deliveryDate: order.deliveryDate,
@@ -207,8 +208,20 @@ export default function OrdersPage() {
   };
 
   const handleRowClick = (params: GridRowParams) => {
-    // Navigate to order records page
-    navigate(`/orders/${params.id}/records`);
+    const order = params.row;
+
+    // Only allow navigation to records if quantity is greater than 0
+    if (!order.quantity || order.quantity <= 0) {
+      toast.error('Cannot navigate to records: Order quantity must be greater than 0. Use the actions menu (⋮) to edit the order and add quantity.');
+      return;
+    }
+
+    // Calculate remaining quantity for this order
+    const totalRecordsQuantity = order.records?.reduce((total: number, record: { quantity: number }) => total + Number(record.quantity), 0) || 0;
+    const remainingQuantity = order.quantity - totalRecordsQuantity;
+
+    // Navigate to order records page with remaining quantity as URL parameter
+    navigate(`/orders/${params.id}/records?remainingQuantity=${remainingQuantity}`);
   };
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, order: OrderRow) => {
@@ -472,14 +485,36 @@ export default function OrdersPage() {
       )
     },
     {
+      field: 'itemName',
+      headerName: 'Item',
+      flex: 1.2,
+      minWidth: 150,
+      renderCell: (params) => (
+        <span className="text-sm lg:text-base" style={{ color: colors.text.primary }}>
+          {params.value || 'N/A'}
+        </span>
+      )
+    },
+    {
       field: 'quantity',
       headerName: 'Total Qty',
       flex: 0.6,
       minWidth: 90,
       type: 'number',
       renderCell: (params) => {
-        // Use the complete boolean field from API response for Total Qty coloring
+        const quantity = params.value;
         const isComplete = params.row.complete;
+
+        // Show different styling for orders with 0 or no quantity
+        if (!quantity || quantity <= 0) {
+          return (
+            <span className="px-2 py-1 lg:px-3 lg:py-1 rounded-xl text-xs lg:text-sm font-semibold bg-gray-100 text-gray-600">
+              {quantity || 'N/A'}
+            </span>
+          );
+        }
+
+        // Normal styling for orders with quantity > 0
         return (
           <span
             className={`px-2 py-1 lg:px-3 lg:py-1 rounded-xl text-xs lg:text-sm font-semibold ${isComplete
@@ -487,7 +522,7 @@ export default function OrdersPage() {
               : 'bg-red-100 text-red-800'
               }`}
           >
-            {params.value}
+            {quantity}
           </span>
         );
       }
@@ -671,7 +706,7 @@ export default function OrdersPage() {
         date: form.date,
         customerId: form.customerId,
         itemId: form.itemId,
-        quantity: Number(form.quantity),
+        quantity: form.quantity ? Number(form.quantity) : undefined, // Only include if provided
         notes: form.notes || undefined,
         deliveryDate: form.deliveryDate,
       };
@@ -709,7 +744,7 @@ export default function OrdersPage() {
         date: form.date,
         customerId: form.customerId,
         itemId: form.itemId,
-        quantity: Number(form.quantity),
+        quantity: form.quantity ? Number(form.quantity) : undefined, // Only include if provided
         gpNo: form.gpNo || undefined,
         notes: form.notes || undefined,
         deliveryDate: form.deliveryDate,
@@ -746,6 +781,29 @@ export default function OrdersPage() {
 
   return (
     <div className="w-full mx-auto px-1 sm:px-3 md:px-4 lg:px-6 py-3">
+      <style>
+        {`
+          .disabled-row-click {
+            opacity: 0.7 !important;
+            cursor: not-allowed !important;
+            background-color: #f9fafb !important;
+          }
+          .disabled-row-click:hover {
+            background-color: #f3f4f6 !important;
+          }
+          /* Allow actions menu to work normally */
+          .disabled-row-click .MuiIconButton-root {
+            cursor: pointer !important;
+            opacity: 1 !important;
+            pointer-events: auto !important;
+          }
+          /* Ensure the actions cell is fully functional */
+          .disabled-row-click [data-field="actions"] {
+            opacity: 1 !important;
+            pointer-events: auto !important;
+          }
+        `}
+      </style>
       <div className="flex flex-col gap-2 sm:gap-3 lg:gap-4 mb-4">
         <h2 className="text-xl md:text-2xl lg:text-3xl font-bold" style={{ color: colors.text.primary }}>Orders</h2>
         <div className="flex flex-col sm:flex-row lg:flex-row items-center justify-between gap-2 lg:gap-4 w-full">
@@ -819,6 +877,13 @@ export default function OrdersPage() {
             }
           }}
           onRowClick={handleRowClick}
+          getRowClassName={(params) => {
+            // Add disabled styling for rows with 0 or no quantity (but still allow actions menu)
+            if (!params.row.quantity || params.row.quantity <= 0) {
+              return 'disabled-row-click';
+            }
+            return '';
+          }}
           height="auto"
         />
       </div>
