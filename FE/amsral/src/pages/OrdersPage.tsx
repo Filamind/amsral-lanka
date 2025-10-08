@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Modal, Box, Menu, MenuItem, IconButton, Fab, Tooltip } from '@mui/material';
-import { MoreVert, Print, Inventory, PrintOutlined, PrintDisabled } from '@mui/icons-material';
+import { MoreVert, Print, /* Inventory, */ PrintOutlined, PrintDisabled } from '@mui/icons-material'; // Inventory commented - used for bag printing
 import type { GridColDef, GridRowParams } from '@mui/x-data-grid';
 import PrimaryButton from '../components/common/PrimaryButton';
 import PrimaryTable from '../components/common/PrimaryTable';
@@ -9,9 +9,9 @@ import SimpleOrderForm from '../components/orders/SimpleOrderForm';
 import ConfirmationDialog from '../components/common/ConfirmationDialog';
 import colors from '../styles/colors';
 import { type CreateOrderRequest, type ErrorResponse } from '../services/orderService';
-import { type BagLabelData } from '../utils/pdfUtils';
+// import { type BagLabelData } from '../utils/pdfUtils'; // Commented - used for bag printing
 import { usePrinter } from '../context/PrinterContext';
-import bagLabelPrinterService from '../services/bagLabelPrinterService';
+// import bagLabelPrinterService from '../services/bagLabelPrinterService'; // Commented - used for bag printing
 import orderRecordPrinterService from '../services/orderRecordPrinterService';
 import orderRecordsService, { type OrderRecordsDetails } from '../services/orderRecordsService';
 import type { OrderRecordReceiptData } from '../services/printerService';
@@ -54,20 +54,20 @@ export default function OrdersPage() {
   const canEdit = hasPermission(user, 'canEdit');
   const canDelete = hasPermission(user, 'canDelete');
 
-  // Bag printing modal state
-  const [bagModal, setBagModal] = useState({
-    open: false,
-    order: null as OrderRow | null,
-    numberOfBags: '',
-    quantity: '',
-  });
+  // Bag printing modal state - Commented out as per client request (may be used in future)
+  // const [bagModal, setBagModal] = useState({
+  //   open: false,
+  //   order: null as OrderRow | null,
+  //   numberOfBags: '',
+  //   quantity: '',
+  // });
 
-  // Bag printing progress state
-  const [bagPrintingProgress, setBagPrintingProgress] = useState({
-    isPrinting: false,
-    current: 0,
-    total: 0,
-  });
+  // Bag printing progress state - Commented out as per client request (may be used in future)
+  // const [bagPrintingProgress, setBagPrintingProgress] = useState({
+  //   isPrinting: false,
+  //   current: 0,
+  //   total: 0,
+  // });
 
   // Order record printing progress state
   const [orderRecordPrintingProgress, setOrderRecordPrintingProgress] = useState({
@@ -298,7 +298,7 @@ export default function OrdersPage() {
           orderId: orderDetails.orderId,
           customerName: orderDetails.customerName,
           itemName: record.itemName,
-          quantity: record.quantity,
+          quantity: record.quantity ?? 0, // Use 0 if quantity is null or undefined
           washType: record.washType,
           processTypes: record.processType.split(', '), // Convert comma-separated string to array
           trackingNumber: record.trackingId,
@@ -357,95 +357,95 @@ export default function OrdersPage() {
     }
   };
 
-  // Bag printing handlers
-  const handleBagPrintClick = (orderRow: OrderRow) => {
-    setBagModal({
-      open: true,
-      order: orderRow,
-      numberOfBags: '',
-      quantity: '',
-    });
-  };
+  // Bag printing handlers - Commented out as per client request (may be used in future)
+  // const handleBagPrintClick = (orderRow: OrderRow) => {
+  //   setBagModal({
+  //     open: true,
+  //     order: orderRow,
+  //     numberOfBags: '',
+  //     quantity: '',
+  //   });
+  // };
 
-  const handleBagModalClose = () => {
-    setBagModal({
-      open: false,
-      order: null,
-      numberOfBags: '',
-      quantity: '',
-    });
-  };
+  // const handleBagModalClose = () => {
+  //   setBagModal({
+  //     open: false,
+  //     order: null,
+  //     numberOfBags: '',
+  //     quantity: '',
+  //   });
+  // };
 
-  const handleNumberOfBagsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    // Only allow numbers
-    if (value === '' || /^\d+$/.test(value)) {
-      setBagModal(prev => ({
-        ...prev,
-        numberOfBags: value,
-      }));
-    }
-  };
+  // const handleNumberOfBagsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   const value = e.target.value;
+  //   // Only allow numbers
+  //   if (value === '' || /^\d+$/.test(value)) {
+  //     setBagModal(prev => ({
+  //       ...prev,
+  //       numberOfBags: value,
+  //     }));
+  //   }
+  // };
 
-  const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    // Only allow numbers
-    if (value === '' || /^\d+$/.test(value)) {
-      setBagModal(prev => ({
-        ...prev,
-        quantity: value,
-      }));
-    }
-  };
+  // const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   const value = e.target.value;
+  //   // Only allow numbers
+  //   if (value === '' || /^\d+$/.test(value)) {
+  //     setBagModal(prev => ({
+  //       ...prev,
+  //       quantity: value,
+  //     }));
+  //   }
+  // };
 
-  const handlePrintBags = async () => {
-    // Check if printer is connected
-    if (!isConnected) {
-      toast.error('Printer not connected. Please connect your printer first.');
-      return;
-    }
+  // const handlePrintBags = async () => {
+  //   // Check if printer is connected
+  //   if (!isConnected) {
+  //     toast.error('Printer not connected. Please connect your printer first.');
+  //     return;
+  //   }
 
-    try {
-      // Set printing state
-      setBagPrintingProgress({
-        isPrinting: true,
-        current: 0,
-        total: 1,
-      });
+  //   try {
+  //     // Set printing state
+  //     setBagPrintingProgress({
+  //       isPrinting: true,
+  //       current: 0,
+  //       total: 1,
+  //     });
 
-      // Prepare single bag receipt data
-      const bagData: BagLabelData = {
-        orderId: bagModal.order!.id,
-        customerName: bagModal.order!.customerName,
-        bagNumber: 1, // Single receipt
-        numberOfBags: bagModal.numberOfBags || '',
-        quantity: bagModal.quantity || '',
-      };
+  //     // Prepare single bag receipt data
+  //     const bagData: BagLabelData = {
+  //       orderId: bagModal.order!.id,
+  //       customerName: bagModal.order!.customerName,
+  //       bagNumber: 1, // Single receipt
+  //       numberOfBags: bagModal.numberOfBags || '',
+  //       quantity: bagModal.quantity || '',
+  //     };
 
-      // Print single bag receipt
-      await bagLabelPrinterService.printSingleBagReceipt(bagData);
+  //     // Print single bag receipt
+  //     await bagLabelPrinterService.printSingleBagReceipt(bagData);
 
-      // Reset printing state
-      setBagPrintingProgress({
-        isPrinting: false,
-        current: 0,
-        total: 0,
-      });
+  //     // Reset printing state
+  //     setBagPrintingProgress({
+  //       isPrinting: false,
+  //       current: 0,
+  //       total: 0,
+  //     });
 
-      toast.success('Bag receipt printed successfully!');
-      handleBagModalClose();
-    } catch (error) {
-      console.error('Error printing bag receipt:', error);
-      toast.error('Failed to print bag receipt. Please check printer connection.');
+  //     toast.success('Bag receipt printed successfully!');
+  //     handleBagModalClose();
+  //   } catch (error) {
+  //     console.error('Error printing bag receipt:', error);
+  //     toast.error('Failed to print bag receipt. Please check printer connection.');
 
-      // Reset printing state on error
-      setBagPrintingProgress({
-        isPrinting: false,
-        current: 0,
-        total: 0,
-      });
-    }
-  };
+  //     // Reset printing state on error
+  //     setBagPrintingProgress({
+  //       isPrinting: false,
+  //       current: 0,
+  //       total: 0,
+  //     });
+  //   }
+  // };
 
 
   // Define columns inside component to access handler functions
@@ -620,45 +620,46 @@ export default function OrdersPage() {
         );
       }
     },
-    {
-      field: 'bagPrint',
-      headerName: 'Bag',
-      flex: 0.25,
-      minWidth: 50,
-      sortable: false,
-      renderCell: (params) => {
-        const isComplete = (params.row.status || '').toLowerCase() === 'complete' || (params.row.status || '').toLowerCase() === 'qc';
-        const canPrint = isComplete && isConnected;
-        return (
-          <IconButton
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!isConnected) {
-                toast.error('Printer not connected. Please connect your printer first.');
-                return;
-              }
-              handleBagPrintClick(params.row);
-            }}
-            size="small"
-            sx={{
-              color: canPrint ? colors.button.primary : colors.text.muted,
-              opacity: canPrint ? 1 : 0.3,
-              padding: '4px'
-            }}
-            title={
-              !isComplete
-                ? "Order must be complete to print bags"
-                : !isConnected
-                  ? "Printer not connected"
-                  : "Print Bag Labels"
-            }
-            disabled={!canPrint}
-          >
-            <Inventory fontSize="small" />
-          </IconButton>
-        );
-      }
-    },
+    // Bag Print - Commented out as per client request (may be used in future)
+    // {
+    //   field: 'bagPrint',
+    //   headerName: 'Bag',
+    //   flex: 0.25,
+    //   minWidth: 50,
+    //   sortable: false,
+    //   renderCell: (params) => {
+    //     const isComplete = (params.row.status || '').toLowerCase() === 'complete' || (params.row.status || '').toLowerCase() === 'qc';
+    //     const canPrint = isComplete && isConnected;
+    //     return (
+    //       <IconButton
+    //         onClick={(e) => {
+    //           e.stopPropagation();
+    //           if (!isConnected) {
+    //             toast.error('Printer not connected. Please connect your printer first.');
+    //             return;
+    //           }
+    //           handleBagPrintClick(params.row);
+    //         }}
+    //         size="small"
+    //         sx={{
+    //           color: canPrint ? colors.button.primary : colors.text.muted,
+    //           opacity: canPrint ? 1 : 0.3,
+    //           padding: '4px'
+    //         }}
+    //         title={
+    //           !isComplete
+    //             ? "Order must be complete to print bags"
+    //             : !isConnected
+    //               ? "Printer not connected"
+    //               : "Print Bag Labels"
+    //         }
+    //         disabled={!canPrint}
+    //       >
+    //         <Inventory fontSize="small" />
+    //       </IconButton>
+    //     );
+    //   }
+    // },
     {
       field: 'actions',
       headerName: 'Actions',
@@ -1007,8 +1008,8 @@ export default function OrdersPage() {
         </Box>
       </Modal>
 
-      {/* Bag Printing Modal */}
-      <Modal open={bagModal.open} onClose={handleBagModalClose}>
+      {/* Bag Printing Modal - Commented out as per client request (may be used in future) */}
+      {/* <Modal open={bagModal.open} onClose={handleBagModalClose}>
         <Box
           sx={{
             position: 'absolute',
@@ -1077,7 +1078,6 @@ export default function OrdersPage() {
               </div>
             </div>
 
-            {/* Printer Status in Modal */}
             {!isConnected && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                 <div className="flex items-center gap-2">
@@ -1089,7 +1089,6 @@ export default function OrdersPage() {
               </div>
             )}
 
-            {/* Printing Progress */}
             {bagPrintingProgress.isPrinting && (
               <div className="p-3 md:p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="flex items-center gap-2">
@@ -1142,7 +1141,7 @@ export default function OrdersPage() {
             </div>
           </div>
         </Box>
-      </Modal>
+      </Modal> */}
 
       {/* Floating Printer Status Button */}
       <Tooltip title={isConnected ? 'Printer Connected' : 'Printer Disconnected'} arrow>

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+// import { useNavigate } from 'react-router-dom'; // Commented out - navigation disabled as per client request
 import { IconButton } from '@mui/material';
 import { LocalShipping } from '@mui/icons-material';
 import type { GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
@@ -16,7 +16,7 @@ import { hasPermission } from '../utils/roleUtils';
 
 
 export default function ManagementPage() {
-    const navigate = useNavigate();
+    // const navigate = useNavigate(); // Commented out - navigation disabled as per client request
     const { user } = useAuth();
 
     // Local state for UI
@@ -36,11 +36,13 @@ export default function ManagementPage() {
     const canMarkDelivered = hasPermission(user, 'canMarkDelivered');
 
     // Prepare filters for TanStack Query hooks
+    // Only show orders with status "Complete" or "QC" as per client request
     const orderFilters: ManagementOrderFilters = {
         page: currentPage,
         limit: pageSize,
         orderId: orderIdFilter ? parseInt(orderIdFilter) : undefined,
         customerName: customerNameFilter || undefined,
+        status: 'Complete,QC', // Filter to show only Complete or QC orders
     };
 
     // TanStack Query hooks
@@ -186,10 +188,10 @@ export default function ManagementPage() {
         return () => clearTimeout(timeoutId);
     }, [searchTerm]);
 
-    // Handle row click to navigate to order details
-    const handleRowClick = (params: any) => {
-        navigate(`/management/orders/${params.id}`);
-    };
+    // Handle row click to navigate to order details - Commented out as per client request
+    // const handleRowClick = (params: any) => {
+    //     navigate(`/management/orders/${params.id}`);
+    // };
 
     // Handle opening delivery modal
 
@@ -231,7 +233,7 @@ export default function ManagementPage() {
     return (
         <div className="w-full mx-auto px-2 sm:px-3 md:px-4 py-3">
             <div className="flex flex-col gap-2 sm:gap-3 mb-4">
-                <h2 className="text-xl md:text-2xl font-bold" style={{ color: colors.text.primary }}>Order Management</h2>
+                <h2 className="text-xl md:text-2xl font-bold" style={{ color: colors.text.primary }}>Delivery</h2>
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-2 w-full">
                     <div className="flex flex-1 items-center w-full sm:w-auto">
                         <input
@@ -267,7 +269,7 @@ export default function ManagementPage() {
                     columns={columns}
                     rows={orders}
                     loading={loading}
-                    onRowClick={handleRowClick}
+                    // onRowClick={handleRowClick} // Commented out - navigation to order details disabled as per client request
                     pageSizeOptions={[10, 20, 50, 100]}
                     pagination
                     paginationMode="server"

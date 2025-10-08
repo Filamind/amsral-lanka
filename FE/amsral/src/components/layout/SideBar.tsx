@@ -32,7 +32,7 @@ const NAVIGATION: NavigationItem[] = [
     { segment: 'orders', title: 'Orders', icon: <ShoppingCartIcon /> },
     { segment: 'production', title: 'Production Flow', icon: <SettingsApplicationsIcon /> },
     { segment: 'complete-order', title: 'Complete Order', icon: <CheckCircleIcon /> },
-    { segment: 'management', title: 'Management', icon: <ManageAccountsIcon /> },
+    { segment: 'management', title: 'Delivery', icon: <ManageAccountsIcon /> },
     { segment: 'qc', title: 'QC', icon: <AssessmentIcon /> },
     { segment: 'billing', title: 'Billing', icon: <ReceiptIcon /> },
     { segment: 'printer-test', title: 'Printer', icon: <PrintIcon /> },

@@ -14,6 +14,7 @@ export interface ManagementOrderFilters {
   limit: number;
   orderId?: number;
   customerName?: string;
+  status?: string; // Filter by order status (can be comma-separated for multiple statuses)
 }
 
 export interface UpdateDeliveryRequest {
