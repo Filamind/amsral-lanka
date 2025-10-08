@@ -441,13 +441,14 @@ class OrderService {
    * GET /api/orders?customerName=John&page=1&limit=5
    * GET /api/orders?orderId=3&page=1&limit=5
    * GET /api/orders?status=Pending&page=1&limit=10
+   * GET /api/orders?status=Complete,QC&page=1&limit=10 (comma-separated for multiple statuses)
    */
   async getManagementOrders(params?: {
     page?: number;
     limit?: number;
     customerName?: string;
     orderId?: number;
-    status?: OrderStatus;
+    status?: OrderStatus | string; // Allow string for comma-separated statuses like "Complete,QC"
   }): Promise<{ success: boolean; data: OrdersListResponse }> {
     try {
       const queryParams = new URLSearchParams();
@@ -456,7 +457,7 @@ class OrderService {
       if (params?.customerName) queryParams.append('customerName', params.customerName);
       if (params?.orderId) queryParams.append('orderId', params.orderId.toString());
       if (params?.status) queryParams.append('status', params.status);
-      
+
       const response = await apiClient.get(`/orders?${queryParams.toString()}`);
       return response.data;
     } catch (error: unknown) {

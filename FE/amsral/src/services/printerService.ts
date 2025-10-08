@@ -885,7 +885,7 @@ class PrinterService {
       await this.printText(`Order ID:         ${receiptData.orderId}`, { bold: true, doubleHeight: true, align: 'left' });
       await this.printText(`Customer:         ${receiptData.customerName}`, { bold: true, doubleHeight: true, align: 'left' });
       await this.printText(`Item:             ${receiptData.itemName}`, { bold: true, doubleHeight: true, align: 'left' });
-      await this.printText(`Quantity:         ${receiptData.quantity}`, { bold: true, doubleHeight: true, align: 'left' });
+      await this.printText(`Quantity:         ${receiptData.quantity ?? 'N/A'}`, { bold: true, doubleHeight: true, align: 'left' });
       
       if (receiptData.trackingNumber) {
         await this.printText(`Tracking:         ${receiptData.trackingNumber}`, { bold: true, doubleHeight: true, align: 'left' });

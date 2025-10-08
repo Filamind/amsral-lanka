@@ -91,6 +91,7 @@ const CompleteOrderPage: React.FC = () => {
                 </span>
             )
         },
+        { field: 'customerName', headerName: 'Customer', flex: 1.2, minWidth: 120 },
         { field: 'assignedTo', headerName: 'Assign To', flex: 1.2, minWidth: 120 },
         { field: 'quantity', headerName: 'Assigned Qty', flex: 0.8, minWidth: 100, type: 'number' },
         {

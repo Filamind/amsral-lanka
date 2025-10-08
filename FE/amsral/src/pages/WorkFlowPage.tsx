@@ -21,6 +21,7 @@ import {
 const recordsColumns: GridColDef[] = [
     { field: 'createdAt', headerName: 'Date', flex: 0.8, minWidth: 110 },
     { field: 'trackingNumber', headerName: 'Tracking No', flex: 0.8, minWidth: 100 },
+    { field: 'customerName', headerName: 'Customer', flex: 1.2, minWidth: 120 },
     { field: 'item', headerName: 'Item Name', flex: 1.5, minWidth: 150 },
     { field: 'washType', headerName: 'Wash Type', flex: 1.2, minWidth: 120 },
     {
